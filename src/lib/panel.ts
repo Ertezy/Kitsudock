@@ -15,14 +15,22 @@ export function runningBanners(banners: Banner[], nowSec: number): Banner[] {
 }
 
 /**
+ * Сколько баннеров одной игры идёт в карусель. Каждый слайд держит свою
+ * картинку, а значит и своё скачивание: без потолка щедрый файл хаба открывал
+ * бы десятки загрузок разом. Хвост списка отбрасывается после обычного порядка.
+ */
+export const MAX_SHOWN_BANNERS = 12;
+
+/**
  * Баннеры для карусели (спека этапа 7 §3.1): сначала идущие — ближайшие к
  * окончанию первыми, затем будущие — ближайшие к началу первыми. Кончившиеся
- * не показываются.
+ * не показываются. Больше `MAX_SHOWN_BANNERS` не бывает: лишние — те, что
+ * стоят в этом порядке последними.
  */
 export function shownBanners(banners: Banner[], nowSec: number): Banner[] {
   const running = runningBanners(banners, nowSec).sort((a, b) => a.endsAt - b.endsAt);
   const upcoming = banners.filter((b) => b.startsAt > nowSec).sort((a, b) => a.startsAt - b.startsAt);
-  return [...running, ...upcoming];
+  return [...running, ...upcoming].slice(0, MAX_SHOWN_BANNERS);
 }
 
 /**

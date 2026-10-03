@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { activeCodes, bannerKeys, codesFor, dataStatus, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
+import { activeCodes, bannerKeys, codesFor, dataStatus, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
 import type { Banner, Code, HubData, Video } from "../types";
@@ -141,6 +141,33 @@ describe("баннеры в карусели", () => {
     const now = 1000;
     const list = [b("late-end", 0, 5000), b("soon-end", 500, 2000), b("far", 4000, 9000), b("near", 1500, 9000), b("over", 0, 900)];
     expect(shownBanners(list, now).map((x) => x.title)).toEqual(["soon-end", "late-end", "near", "far"]);
+  });
+
+  it("в карусель попадает не больше двенадцати баннеров игры", () => {
+    expect(MAX_SHOWN_BANNERS).toBe(12);
+    const now = 1000;
+    // Пятнадцать идущих: у «b0» срок короче всех, у «b14» — длиннее всех.
+    const list = Array.from({ length: 15 }, (_, i) => b(`b${i}`, 0, 2000 + i));
+    const shown = shownBanners(list, now);
+    expect(shown).toHaveLength(MAX_SHOWN_BANNERS);
+    // Хвост отбрасывается после обычного порядка, а не до него.
+    expect(shown.map((x) => x.title)).toEqual(list.slice(0, 12).map((x) => x.title));
+  });
+
+  it("при переполнении будущие баннеры уступают идущим, а не наоборот", () => {
+    const now = 1000;
+    const running = Array.from({ length: 10 }, (_, i) => b(`run${i}`, 0, 2000 + i));
+    const upcoming = Array.from({ length: 5 }, (_, i) => b(`next${i}`, 2000 + i, 9000));
+    expect(shownBanners([...upcoming, ...running], now).map((x) => x.title)).toEqual([
+      ...running.map((x) => x.title),
+      "next0",
+      "next1",
+    ]);
+  });
+
+  it("ровно двенадцать баннеров остаются все", () => {
+    const list = Array.from({ length: 12 }, (_, i) => b(`b${i}`, 0, 2000 + i));
+    expect(shownBanners(list, 1000)).toHaveLength(12);
   });
 
   it("одни будущие баннеры — панель не пуста", () => {

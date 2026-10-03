@@ -4,6 +4,11 @@
 //! Все команды асинхронные: синхронные в Tauri выполняются в главном потоке
 //! и подмораживали бы окно на чтении файлов и запуске процессов.
 //!
+//! Сеть внутри команды — только через `blocking`: рабочие потоки async-пула
+//! общие для всех команд и для `asset://`, и медленный сервер не должен их
+//! занимать. Остальные команды сети не касаются: докачку картинок магазинов и
+//! лаунчера по-прежнему ведут собственные потоки (`art.rs`, `launcher_art.rs`).
+//!
 //! Команда, ошибку которой страница показывает человеку, возвращает
 //! `AppError` — код и подробность; фразу на выбранном языке собирает страница
 //! (спека этапа 6 §6.2). Команды, чьи ошибки страница не показывает
@@ -20,6 +25,27 @@ use crate::launch;
 /// Запись конфига из команды: текст ошибки сохранения уходит подробностью.
 fn save_config(app: &AppHandle, cfg: &config::AppConfig) -> Result<(), AppError> {
     config::save(app, cfg).map_err(|e| AppError::with(code::CONFIG_SAVE_FAILED, e))
+}
+
+/// Блокирующая работа команды — сетевой запрос — на пуле для блокирующего.
+///
+/// Тело `async`-команды идёт на рабочих потоках общего пула, и те же потоки
+/// обслуживают остальные команды и протокол `asset://`. Запрос, который
+/// ждёт медленный сервер, держал бы такой поток до конца срока, а десяток
+/// слайдов карусели с картинками занял бы их все: запуск игры и список игр
+/// стояли бы в очереди. Поэтому всё, что ждёт сеть, зовётся только отсюда.
+///
+/// Синхронной командой это не заменить: в Tauri она выполняется в главном
+/// потоке и подвесила бы окно. Оборвавшаяся работа (паника) возвращается той
+/// же ошибкой-строкой, какую команда отдаёт и при обычном отказе.
+async fn blocking<T, F>(work: F) -> Result<T, String>
+where
+    T: Send + 'static,
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|e| format!("фоновая работа оборвалась: {e}"))?
 }
 
 /// Вид запуска кодом — слово на языке интерфейса подставляет страница
@@ -168,8 +194,12 @@ pub async fn launch_game(app: AppHandle, game_id: String) -> Result<String, AppE
 
 #[tauri::command]
 pub async fn get_hub(app: AppHandle) -> Result<hub::HubData, String> {
-    let cfg = config::load(&app);
-    hub::load(&app, cfg.hub_url.as_deref())
+    // До двух запросов, и у каждого свой срок: ждать их на рабочем потоке нельзя.
+    blocking(move || {
+        let cfg = config::load(&app);
+        hub::load(&app, cfg.hub_url.as_deref())
+    })
+    .await
 }
 
 #[tauri::command]
@@ -182,8 +212,13 @@ pub async fn get_last_played(app: AppHandle) -> Option<String> {
 /// Интерфейс получает путь к файлу, а не адрес: страница в интернет не ходит.
 #[tauri::command]
 pub async fn cache_image(app: AppHandle, url: String) -> Result<String, String> {
-    let path = crate::images::fetch(&app, &url)?;
-    Ok(path.to_string_lossy().into_owned())
+    // Каждый слайд карусели просит свою картинку, а хост может отвечать
+    // десять секунд: на рабочих потоках таких запросов хватило бы на все.
+    blocking(move || {
+        let path = crate::images::fetch(&app, &url)?;
+        Ok(path.to_string_lossy().into_owned())
+    })
+    .await
 }
 
 /// Найденная в магазинах игра — для экрана с галочками.
@@ -624,6 +659,9 @@ pub async fn open_log_folder(app: AppHandle) -> Result<(), AppError> {
 mod tests {
     use super::*;
     use crate::config::{Game, Launch};
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{mpsc, Arc, Condvar, Mutex};
+    use std::time::Duration;
 
     fn steam_game() -> Game {
         Game {
@@ -666,6 +704,91 @@ mod tests {
         let mut g = steam_game();
         g.launch = Launch::Exe;
         assert_eq!(view_of_without_icon(&g).source_kind, "exe");
+    }
+
+    #[test]
+    fn blocking_work_runs_off_the_async_workers() {
+        // Задача команды крутится на рабочем потоке async-пула, а её
+        // блокирующая часть обязана уйти на другой поток.
+        let (polled_on, ran_on) = tauri::async_runtime::block_on(tauri::async_runtime::spawn(async {
+            let polled_on = std::thread::current().id();
+            let ran_on = blocking(|| Ok(std::thread::current().id())).await.unwrap();
+            (polled_on, ran_on)
+        }))
+        .unwrap();
+        assert_ne!(polled_on, ran_on);
+    }
+
+    #[test]
+    fn slow_downloads_do_not_hold_up_other_commands() {
+        // Медленных заданий заведомо больше, чем рабочих потоков пула; все
+        // они стоят у закрытых ворот. Быстрая команда обязана выполниться,
+        // пока ворота закрыты. Сторож откроет их сам через три секунды, чтобы
+        // сломанный код дал упавший тест, а не зависший.
+        let gate = Arc::new((Mutex::new(false), Condvar::new()));
+        let released = Arc::new(AtomicBool::new(false));
+        let open_gate = {
+            let gate = gate.clone();
+            move || {
+                *gate.0.lock().unwrap() = true;
+                gate.1.notify_all();
+            }
+        };
+        let workers = std::thread::available_parallelism().map_or(8, |n| n.get());
+
+        let slow: Vec<_> = (0..workers * 4)
+            .map(|_| {
+                let gate = gate.clone();
+                tauri::async_runtime::spawn(async move {
+                    blocking(move || {
+                        let mut open = gate.0.lock().unwrap();
+                        while !*open {
+                            open = gate.1.wait(open).unwrap();
+                        }
+                        Ok(())
+                    })
+                    .await
+                })
+            })
+            .collect();
+
+        let (done, watchdog_done) = mpsc::channel::<()>();
+        let watchdog = {
+            let released = released.clone();
+            let open_gate = open_gate.clone();
+            std::thread::spawn(move || {
+                if watchdog_done.recv_timeout(Duration::from_secs(3)).is_err() {
+                    released.store(true, Ordering::SeqCst);
+                    open_gate();
+                }
+            })
+        };
+
+        let quick = tauri::async_runtime::block_on(tauri::async_runtime::spawn(async { 7 })).unwrap();
+        let held_back = released.load(Ordering::SeqCst);
+
+        done.send(()).unwrap();
+        watchdog.join().unwrap();
+        open_gate();
+        for job in slow {
+            tauri::async_runtime::block_on(job).unwrap().unwrap();
+        }
+        assert_eq!(quick, 7);
+        assert!(!held_back, "быстрая команда дождалась, пока медленные закончат");
+    }
+
+    #[test]
+    fn the_work_error_reaches_the_page_unchanged() {
+        let result = tauri::async_runtime::block_on(blocking::<(), _>(|| Err("нет сети".to_string())));
+        assert_eq!(result, Err("нет сети".to_string()));
+    }
+
+    #[test]
+    fn work_that_panics_becomes_an_error_instead_of_a_hung_call() {
+        let result = tauri::async_runtime::block_on(blocking(|| -> Result<(), String> {
+            panic!("сбой внутри загрузки")
+        }));
+        assert!(result.is_err());
     }
 
     fn found_game(launch: Launch, source: crate::stores::Source) -> crate::stores::InstalledGame {
