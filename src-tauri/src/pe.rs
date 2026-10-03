@@ -10,6 +10,7 @@
 //! Файл может быть обрезан, повреждён или вообще не быть программой — ответом
 //! будет «картинки нет», но никогда не паника.
 
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
 use std::path::Path;
@@ -189,11 +190,17 @@ fn resource_bytes<'a>(b: &'a [u8], sections: &[Section], res: &Resource) -> Opti
 /// Оглавление устроено так: шесть байт заголовка, дальше записи по
 /// четырнадцать. Ширина занимает **один байт**, поэтому число 256 в него не
 /// помещается и записывается нулём.
+///
+/// Номер картинки, уже встречавшийся в оглавлении, пропускается: остаётся
+/// первая запись. Картинка по номеру всё равно одна, и повторы ничего не
+/// добавляют — только заставили бы копировать одно и то же по разу на запись,
+/// а их в оглавлении до 65 535.
 fn group_members(dir: &[u8]) -> Vec<(u32, u32)> {
     let Some(count) = u16_at(dir, 4) else {
         return Vec::new();
     };
     let mut out = Vec::new();
+    let mut seen = HashSet::new();
     for i in 0..count as usize {
         let Some(entry) = i.checked_mul(14).and_then(|o| o.checked_add(6)) else {
             break;
@@ -204,7 +211,9 @@ fn group_members(dir: &[u8]) -> Vec<(u32, u32)> {
         let Some(id) = u16_at(dir, entry.saturating_add(12)) else {
             break;
         };
-        out.push((if width == 0 { 256 } else { width as u32 }, id as u32));
+        if seen.insert(id) {
+            out.push((if width == 0 { 256 } else { width as u32 }, id as u32));
+        }
     }
     out
 }
@@ -278,6 +287,8 @@ const HEADER_BYTES: u64 = 64 * 1024;
 /// Потолок на секцию с ресурсами. У настоящих программ она — от десятков
 /// килобайт до единиц мегабайт (у Genshin Impact полмегабайта); секция больше
 /// потолка — признак испорченного заголовка, и читать её целиком незачем.
+/// Тот же потолок — на сумму всех картинок, которые отдаёт разбор
+/// (`copy_within_budget`).
 const MAX_RESOURCE_SECTION_BYTES: u64 = 32 * 1024 * 1024;
 
 /// Тело `icon_candidates_in_file`: `None` на любой неудаче, чтобы можно было
@@ -330,6 +341,32 @@ fn icon_candidates(bytes: &[u8]) -> Vec<Vec<u8>> {
     candidates_in(bytes, &sections, resource_rva)
 }
 
+/// Копирует содержимое картинок по порядку, пока сумма скопированного не
+/// упрётся в `MAX_RESOURCE_SECTION_BYTES`: картинка, после которой сумма
+/// стала бы больше, и все за ней не берутся.
+///
+/// Предел нужен потому, что размер в листе ресурса — число из файла: сумма
+/// размеров картинок ничем не связана с размером секции, и копировать всё
+/// подряд значило бы отдать расход памяти на откуп файлу. У настоящих файлов
+/// суммарный вес картинок не превышает секцию, в которой они лежат, так что
+/// границу, равную её потолку, они не заденут. Копия делается только после
+/// проверки, поэтому предел ограничивает и память.
+fn copy_within_budget<'a>(pictures: impl Iterator<Item = &'a [u8]>) -> Vec<Vec<u8>> {
+    let mut out = Vec::new();
+    let mut total = 0u64;
+    for bytes in pictures {
+        let Some(next) = total.checked_add(bytes.len() as u64) else {
+            break;
+        };
+        if next > MAX_RESOURCE_SECTION_BYTES {
+            break;
+        }
+        total = next;
+        out.push(bytes.to_vec());
+    }
+    out
+}
+
 /// Выбор без разбора заголовков файла: секции и адрес таблицы уже найдены.
 /// Вынесено отдельно ради тестов — собрать дерево ресурсов в памяти куда
 /// проще, чем целый исполняемый файл.
@@ -342,10 +379,9 @@ fn candidates_in(b: &[u8], sections: &[Section], resource_rva: u32) -> Vec<Vec<u
     let Some(group) = groups.iter().min_by_key(|g| g.id) else {
         let mut loose: Vec<&Resource> = icons.iter().collect();
         loose.sort_by_key(|r| std::cmp::Reverse(r.size));
-        return loose
-            .into_iter()
-            .filter_map(|r| resource_bytes(b, sections, r).map(<[u8]>::to_vec))
-            .collect();
+        return copy_within_budget(
+            loose.into_iter().filter_map(|r| resource_bytes(b, sections, r)),
+        );
     };
 
     let Some(dir) = resource_bytes(b, sections, group) else {
@@ -356,11 +392,12 @@ fn candidates_in(b: &[u8], sections: &[Section], resource_rva: u32) -> Vec<Vec<u
     // в оглавлении. У Honkai: Star Rail две картинки по 256 подряд, и от этого
     // зависит, какая из них станет иконкой.
     members.sort_by_key(|(width, _)| std::cmp::Reverse(*width));
-    members
-        .into_iter()
-        .filter_map(|(_, id)| icons.iter().find(|r| r.id == id))
-        .filter_map(|r| resource_bytes(b, sections, r).map(<[u8]>::to_vec))
-        .collect()
+    copy_within_budget(
+        members
+            .into_iter()
+            .filter_map(|(_, id)| icons.iter().find(|r| r.id == id))
+            .filter_map(|r| resource_bytes(b, sections, r)),
+    )
 }
 
 #[cfg(test)]
@@ -703,6 +740,157 @@ mod tests {
         assert!(icon_candidates_in_file(&path).is_empty());
         std::fs::write(&path, b"MZ").unwrap(); // обрезан сразу после подписи
         assert!(icon_candidates_in_file(&path).is_empty());
+        std::fs::remove_file(&path).ok();
+    }
+
+    /// Дерево ресурсов из любого числа картинок и, при желании, одной группы
+    /// под номером 101. Картинка — тройка «номер, адрес содержимого, длина»;
+    /// содержимое разных картинок вправе лежать друг поверх друга: формат
+    /// этого не запрещает. Смещения между узлами считаются от корня, адреса
+    /// листов — абсолютные, как в `tree_at`.
+    fn icon_tree(icons: &[(u32, u32, u32)], group: Option<(u32, u32)>) -> Vec<u8> {
+        let n = icons.len() as u32;
+        let root_len = 16 + 8 * (1 + u32::from(group.is_some()));
+        let icon_type = root_len;
+        let icon_names = icon_type + 16 + 8 * n; // дальше n узлов-имён по 24 байта
+        let after_names = icon_names + 24 * n;
+        let (group_type, group_name, leaves) = if group.is_some() {
+            (after_names, after_names + 24, after_names + 48)
+        } else {
+            (0, 0, after_names)
+        };
+        let group_leaf = leaves + 16 * n;
+
+        let mut root = vec![(RT_ICON, icon_type)];
+        if group.is_some() {
+            root.push((RT_GROUP_ICON, group_type));
+        }
+        let mut b = node(&root);
+        let by_id: Vec<(u32, u32)> = icons
+            .iter()
+            .enumerate()
+            .map(|(i, (id, _, _))| (*id, icon_names + 24 * i as u32))
+            .collect();
+        b.extend(node(&by_id));
+        for i in 0..n {
+            b.extend(node(&[(0, leaves + 16 * i)]));
+        }
+        if group.is_some() {
+            b.extend(node(&[(101, group_name)]));
+            b.extend(node(&[(0, group_leaf)]));
+        }
+        for (_, rva, size) in icons {
+            b.extend(leaf(*rva, *size));
+        }
+        if let Some((rva, size)) = group {
+            b.extend(leaf(rva, size));
+        }
+        b
+    }
+
+    /// Ресурсы, у которых содержимое каждой картинки — начало одного общего
+    /// `payload`: адрес у всех один, различаются номер и длина. Оглавление
+    /// группы `dir`, если оно есть, лежит между деревом и `payload`. Секция
+    /// начинается с адреса `base`.
+    fn overlapping_icons(
+        base: u32,
+        icons: &[(u32, u32)],
+        dir: Option<&[u8]>,
+        payload: &[u8],
+    ) -> Vec<u8> {
+        let probe = icon_tree(&vec![(0, 0, 0); icons.len()], dir.map(|_| (0, 0)));
+        let head = base + probe.len() as u32;
+        let payload_at = head + dir.map_or(0, |d| d.len() as u32);
+        let placed: Vec<(u32, u32, u32)> =
+            icons.iter().map(|(id, size)| (*id, payload_at, *size)).collect();
+        let mut b = icon_tree(&placed, dir.map(|d| (head, d.len() as u32)));
+        if let Some(d) = dir {
+            b.extend_from_slice(d);
+        }
+        b.extend_from_slice(payload);
+        b
+    }
+
+    /// Сколько байт всего в найденных картинках.
+    fn total_len(found: &[Vec<u8>]) -> u64 {
+        found.iter().map(|p| p.len() as u64).sum()
+    }
+
+    #[test]
+    fn group_members_keeps_only_the_first_entry_for_a_repeated_number() {
+        let dir = group_dir(&[(32, 1), (0, 1), (16, 2), (0, 2)]);
+        assert_eq!(group_members(&dir), vec![(32, 1), (16, 2)]);
+    }
+
+    #[test]
+    fn a_group_repeating_one_picture_yields_it_once() {
+        // Оглавление на предельные 65 535 записей, и все ведут к одной картинке:
+        // копия на каждую запись раздувала бы ответ в десятки тысяч раз. В
+        // сравнение идёт длина, а не сами списки — иначе провал печатал бы их
+        // целиком.
+        let payload = vec![7u8; 64];
+        let dir = group_dir(&vec![(0u8, 1u16); 65_535]);
+        let b = overlapping_icons(0, &[(1, payload.len() as u32)], Some(&dir), &payload);
+        let found = candidates_in(&b, &whole(&b), 0);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0], payload);
+    }
+
+    /// Размер одной картинки в тестах про бюджет: достаточно мал, чтобы их
+    /// набиралось много, и достаточно велик, чтобы без предела сумма
+    /// перевалила за потолок.
+    const EACH: usize = 1024 * 1024;
+
+    #[test]
+    fn a_group_stops_collecting_at_the_byte_budget() {
+        // Картинки лежат друг поверх друга, и каждая в отдельности
+        // укладывается в секцию, но вместе они в потолок не влезают. Бюджет
+        // включительно: ровно на потолке — ещё можно, на байт больше — уже
+        // нет.
+        let fit = MAX_RESOURCE_SECTION_BYTES as usize / EACH;
+        let payload = vec![7u8; EACH];
+        let icons: Vec<(u32, u32)> = (1..=fit as u32 * 3).map(|id| (id, EACH as u32)).collect();
+        let members: Vec<(u8, u16)> = icons.iter().map(|(id, _)| (0, *id as u16)).collect();
+        let b = overlapping_icons(0, &icons, Some(&group_dir(&members)), &payload);
+        let found = candidates_in(&b, &whole(&b), 0);
+        assert_eq!(found.len(), fit);
+        assert_eq!(total_len(&found), MAX_RESOURCE_SECTION_BYTES);
+    }
+
+    #[test]
+    fn loose_pictures_stop_collecting_at_the_byte_budget() {
+        // Тот же бюджет на запасном пути, где оглавления нет.
+        let fit = MAX_RESOURCE_SECTION_BYTES as usize / EACH;
+        let payload = vec![7u8; EACH];
+        let icons: Vec<(u32, u32)> = (1..=fit as u32 * 3).map(|id| (id, EACH as u32)).collect();
+        let b = overlapping_icons(0, &icons, None, &payload);
+        let found = candidates_in(&b, &whole(&b), 0);
+        assert_eq!(found.len(), fit);
+        assert_eq!(total_len(&found), MAX_RESOURCE_SECTION_BYTES);
+    }
+
+    #[test]
+    fn the_pictures_read_from_a_file_never_add_up_to_more_than_the_ceiling() {
+        // Через настоящее чтение файла. Каждая картинка занимает больше
+        // половины потолка, и целиком в секцию они укладываются только лёжа
+        // друг на друге; сложенные вместе, превысили бы потолок.
+        let va = 0x2000;
+        let each = (MAX_RESOURCE_SECTION_BYTES / 8 * 5) as usize;
+        let payload = vec![7u8; each];
+        let icons = [(1, each as u32), (2, each as u32), (3, each as u32)];
+        let dir = group_dir(&[(0, 1), (0, 2), (0, 3)]);
+        let body = overlapping_icons(va, &icons, Some(&dir), &payload);
+        let size = body.len() as u32;
+        let path = write_pe("byte-budget", va, &[(va, size, size, 0x400)], &body, 0x400);
+
+        let found = icon_candidates_in_file(&path);
+        assert!(!found.is_empty(), "первая картинка укладывается в потолок и должна найтись");
+        assert!(
+            total_len(&found) <= MAX_RESOURCE_SECTION_BYTES,
+            "картинок прочитано на {} байт при потолке {}",
+            total_len(&found),
+            MAX_RESOURCE_SECTION_BYTES
+        );
         std::fs::remove_file(&path).ok();
     }
 }
