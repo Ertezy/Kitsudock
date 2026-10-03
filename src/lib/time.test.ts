@@ -69,6 +69,11 @@ describe("hubFreshness", () => {
   it("данные старше суток показывают дату", () => {
     expect(hubFreshness(NOW - 2 * DAY, NOW, "ru")).toBe("данные от 28 августа");
   });
+  it("время, которого нет в календаре, не роняет строку свежести", () => {
+    expect(hubFreshness(-9e12, NOW, "ru")).toBe("данные от —");
+    expect(hubFreshness(NaN, NOW, "en")).toBe("data from —");
+    expect(hubFreshness(-Infinity, NOW, "en")).toBe("data from —");
+  });
 });
 
 describe("progress", () => {

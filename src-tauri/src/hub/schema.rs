@@ -45,9 +45,53 @@ pub struct AppRelease {
     pub url: String,
 }
 
+/// Страницы релизов этого приложения: только они годятся как ссылка «Вышла
+/// версия». Та же строка — в `src/lib/update.ts` и у сборщика (`APP_URL_PREFIX`).
+const RELEASES_URL_PREFIX: &str = "https://github.com/Ertezy/Kitsudock/releases/";
+
+/// Сегмент пути «.» или «..», в том числе в записи `%2e` любого регистра
+/// (`%2e%2e`, `.%2e`): разбор адреса такие сегменты сворачивает, и ссылка
+/// приходит не туда, куда читается в строке.
+fn is_dot_segment(segment: &str) -> bool {
+    let mut rest = segment;
+    let mut parts = 0;
+    while !rest.is_empty() {
+        if let Some(tail) = rest.strip_prefix('.') {
+            rest = tail;
+        } else if rest.as_bytes().get(..3).is_some_and(|h| h.eq_ignore_ascii_case(b"%2e")) {
+            // Первые три байта — ASCII, так что срез по границе символа.
+            rest = &rest[3..];
+        } else {
+            return false;
+        }
+        parts += 1;
+        if parts > 2 {
+            return false;
+        }
+    }
+    parts > 0
+}
+
+/// Ссылка на страницу релиза: строка начинается с `RELEASES_URL_PREFIX`, в
+/// пути нет сегментов «.» и «..», а во всей строке — обратной косой черты,
+/// пробелов и управляющих знаков. Правило то же, что у сборщика
+/// (`appUrlOk`); крейта `url` в приложении нет, поэтому разбор ручной.
+fn is_release_url(url: &str) -> bool {
+    let Some(tail) = url.strip_prefix(RELEASES_URL_PREFIX) else {
+        return false;
+    };
+    if url.chars().any(|c| c == '\\' || c.is_whitespace() || c.is_control()) {
+        return false;
+    }
+    // Путь кончается на «?» или «#»: «..» в запросе и якоре ничего не сворачивает.
+    let path = tail.split(['?', '#']).next().unwrap_or("");
+    !path.split('/').any(is_dot_segment)
+}
+
 /// Поле `app`, разобранное снисходительно: битое (не та форма, не три числа
-/// через точку, не https) становится `None`, а остальной файл читается как
-/// обычно (спека 2026-10-01 §2.2). Строки «Вышла версия» тогда просто нет.
+/// через точку, ссылка не на страницу релизов этого приложения) становится
+/// `None`, а остальной файл читается как обычно (спека 2026-10-01 §2.2).
+/// Строки «Вышла версия» тогда просто нет.
 fn lenient_app<'de, D>(d: D) -> Result<Option<AppRelease>, D::Error>
 where
     D: Deserializer<'de>,
@@ -63,7 +107,45 @@ where
         && parts
             .iter()
             .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()));
-    Ok((three_numbers && release.url.starts_with("https://")).then_some(release))
+    Ok((three_numbers && is_release_url(&release.url)).then_some(release))
+}
+
+/// Самая поздняя дата, которую умеет JS `Date` (в секундах); раньше эпохи
+/// файл хаба появиться не мог. Время вне `0..=MAX_UPDATED_AT` окно показать
+/// не сможет: `Intl` бросает на такой дате ошибку, и экран остаётся пустым.
+const MAX_UPDATED_AT: i64 = 8_640_000_000_000;
+
+/// `updatedAt` вне допустимого диапазона делает негодным весь файл: он
+/// отбрасывается, как битый JSON, и вызывающий код берёт следующий источник
+/// (кеш, затем файл из комплекта). Чинить число молча нельзя — по нему
+/// считается свежесть данных.
+fn bounded_updated_at<'de, D>(d: D) -> Result<i64, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let secs = i64::deserialize(d)?;
+    if (0..=MAX_UPDATED_AT).contains(&secs) {
+        Ok(secs)
+    } else {
+        Err(serde::de::Error::custom(format!(
+            "updatedAt {secs} вне диапазона 0..={MAX_UPDATED_AT}"
+        )))
+    }
+}
+
+/// Ролики живут только на ютубе: адрес любого другого сайта в панели —
+/// кнопка, которая открывает его в браузере человека от имени приложения.
+const YOUTUBE_URL_PREFIX: &str = "https://www.youtube.com/";
+
+/// Массив видео: битые записи пропускаются, как у `lenient_vec`, а ролики с
+/// адресом не на `YOUTUBE_URL_PREFIX` отбрасываются поодиночке.
+fn lenient_videos<'de, D>(d: D) -> Result<Vec<Video>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let mut videos: Vec<Video> = lenient_vec(d)?;
+    videos.retain(|v| v.url.starts_with(YOUTUBE_URL_PREFIX));
+    Ok(videos)
 }
 
 /// Текущий фон официального лаунчера игры (спека 2026-10-02 §2): картинка и,
@@ -100,7 +182,8 @@ pub struct HubData {
     #[serde(default)]
     pub version: u32,
     /// Когда сборщик собрал файл. Основа правила протухания (спека §6).
-    #[serde(default)]
+    /// Вне `0..=MAX_UPDATED_AT` файл не разбирается вовсе.
+    #[serde(default, deserialize_with = "bounded_updated_at")]
     pub updated_at: i64,
     #[serde(default, deserialize_with = "lenient_vec")]
     pub games: Vec<HubGame>,
@@ -108,7 +191,7 @@ pub struct HubData {
     pub codes: Vec<Code>,
     #[serde(default, deserialize_with = "lenient_vec")]
     pub banners: Vec<Banner>,
-    #[serde(default, deserialize_with = "lenient_vec")]
+    #[serde(default, deserialize_with = "lenient_videos")]
     pub videos: Vec<Video>,
     /// Последняя опубликованная версия приложения. Нет поля — нет и строки
     /// «Вышла версия».
@@ -389,6 +472,142 @@ mod tests {
         }
     }
 
+    const RELEASES: &str = "https://github.com/Ertezy/Kitsudock/releases/";
+
+    fn app_of(url: &str) -> Option<AppRelease> {
+        let text = serde_json::json!({"version": 2, "updatedAt": 7, "app": {"version": "0.1.1", "url": url}}).to_string();
+        serde_json::from_str::<HubData>(&text).unwrap().app
+    }
+
+    #[test]
+    fn only_release_pages_of_this_app_are_accepted_as_the_update_link() {
+        for url in [
+            "https://github.com/Ertezy/Kitsudock/releases/tag/v0.1.1",
+            "https://github.com/Ertezy/Kitsudock/releases/latest",
+            "https://github.com/Ertezy/Kitsudock/releases/tag/v0.1.1?from=app#notes",
+            // Точки внутри сегмента и «..» в запросе пути не сворачивают.
+            "https://github.com/Ertezy/Kitsudock/releases/tag/v0.1.1.rc.2",
+            "https://github.com/Ertezy/Kitsudock/releases/tag/...",
+            "https://github.com/Ertezy/Kitsudock/releases/?back=../..",
+        ] {
+            assert_eq!(app_of(url).map(|a| a.url), Some(url.to_string()), "{url}");
+        }
+    }
+
+    #[test]
+    fn a_foreign_update_link_drops_the_app_field_and_the_file_still_reads() {
+        for url in [
+            "https://evil.test/Ertezy/Kitsudock/releases/tag/v0.1.1",
+            "https://github.com/Someone/Kitsudock/releases/tag/v0.1.1",
+            "https://github.com/Ertezy/Other/releases/tag/v0.1.1",
+            "https://github.com/ertezy/kitsudock/releases/tag/v0.1.1",
+            "https://github.com/Ertezy/Kitsudock",
+            "https://github.com/Ertezy/Kitsudock/issues/1",
+            "https://github.com/Ertezy/Kitsudock/releases",
+            "http://github.com/Ertezy/Kitsudock/releases/tag/v0.1.1",
+            "https://github.com.evil.test/Ertezy/Kitsudock/releases/tag/v0.1.1",
+            "https://github.com@evil.test/Ertezy/Kitsudock/releases/tag/v0.1.1",
+        ] {
+            let text = serde_json::json!({"version": 2, "updatedAt": 7, "app": {"version": "0.1.1", "url": url}}).to_string();
+            let d: HubData = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{url}: {e}"));
+            assert_eq!(d.app, None, "{url}");
+            assert_eq!(d.updated_at, 7, "{url}: остальной файл читается");
+        }
+    }
+
+    #[test]
+    fn an_update_link_that_climbs_out_of_the_releases_path_is_dropped() {
+        for tail in [
+            "../../other/repo/releases/tag/v1",
+            "tag/../../../other/repo/releases/tag/v1",
+            "./tag/v1",
+            "tag/./v1",
+            "tag/..",
+            "%2e%2e/%2e%2e/other/repo/releases/tag/v1",
+            "%2E%2E/other",
+            ".%2e/other",
+            "%2e./other",
+            "tag/%2e%2e/%2e%2e/x",
+            "tag/%2e/v1",
+            "tag/..?x=1",
+            "tag/..#x",
+        ] {
+            let url = format!("{RELEASES}{tail}");
+            assert_eq!(app_of(&url), None, "{url}");
+        }
+    }
+
+    #[test]
+    fn an_update_link_with_a_backslash_whitespace_or_control_character_is_dropped() {
+        for tail in [
+            r"tag\..\..\x",
+            r"tag\v1",
+            "tag/v1 ",
+            "tag/ v1",
+            "tag/v1\t",
+            "tag/v1\n",
+            "tag/v1\r",
+            "tag/v\u{0}1",
+            "tag/v1\u{7f}",
+            "tag/v1\u{a0}",
+            "tag/v1\u{2028}",
+            "tag/v1?x=a b",
+        ] {
+            let url = format!("{RELEASES}{tail}");
+            assert_eq!(app_of(&url), None, "{url:?}");
+        }
+    }
+
+    #[test]
+    fn videos_off_youtube_are_dropped_and_the_rest_are_kept() {
+        let video = |url: &str| {
+            serde_json::json!({"gameId": "hsr", "title": "T", "url": url, "thumb": null,
+                "publishedAt": 1, "duration": null, "premiere": false})
+        };
+        let hub = serde_json::json!({"version": 2, "updatedAt": 7, "videos": [
+            video("https://www.youtube.com/watch?v=a"),
+            video("https://youtu.be/b"),
+            video("https://m.youtube.com/watch?v=c"),
+            video("http://www.youtube.com/watch?v=d"),
+            video("https://www.youtube.com.evil.test/watch?v=e"),
+            video("https://evil.test/?u=https://www.youtube.com/watch?v=f"),
+            video("https://www.youtube.com/watch?v=g"),
+        ]});
+        let d: HubData = serde_json::from_str(&hub.to_string()).unwrap();
+        let urls: Vec<&str> = d.videos.iter().map(|v| v.url.as_str()).collect();
+        assert_eq!(urls, ["https://www.youtube.com/watch?v=a", "https://www.youtube.com/watch?v=g"]);
+        assert_eq!(d.updated_at, 7, "остальной файл читается");
+    }
+
+    #[test]
+    fn a_time_the_window_cannot_show_rejects_the_whole_file() {
+        // Предел — самая поздняя дата, которую умеет JS `Date`. Дальше окно
+        // не отрисуется, поэтому такой файл — такой же негодный, как битый
+        // JSON: вызывающий код берёт следующий источник.
+        for bad in [
+            "-1",
+            "8640000000001",
+            "-8640000000001",
+            "9223372036854775807",
+            "-9223372036854775808",
+        ] {
+            let text = format!(r#"{{"version":2,"updatedAt":{bad}}}"#);
+            assert!(serde_json::from_str::<HubData>(&text).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn the_edges_of_the_allowed_time_range_are_accepted() {
+        for (text, want) in [
+            (r#"{"version":2,"updatedAt":0}"#, 0),
+            (r#"{"version":2,"updatedAt":8640000000000}"#, 8_640_000_000_000),
+            (r#"{"version":2}"#, 0),
+        ] {
+            let d: HubData = serde_json::from_str(text).unwrap_or_else(|e| panic!("{text}: {e}"));
+            assert_eq!(d.updated_at, want, "{text}");
+        }
+    }
+
     #[test]
     fn the_app_field_survives_the_local_cache_round_trip() {
         // Так файл ложится в локальный кеш и читается обратно:
@@ -447,5 +666,17 @@ mod tests {
         // Демо-данные из первого этапа не должны пережить замену.
         assert!(!text.contains("DEMO"), "в файле остались демо-данные");
         assert!(!text.contains("example.com"), "в файле остались заглушечные адреса");
+    }
+
+    #[test]
+    fn the_bundled_snapshot_loses_nothing_to_the_address_and_date_checks() {
+        // Настоящий файл проходит новые проверки целиком: ни одно видео не
+        // отброшено, время не отвергнуто, `app` (если он есть) не пропал.
+        let text = include_str!("../../resources/hub.json");
+        let raw: serde_json::Value = serde_json::from_str(text).unwrap();
+        let d: HubData = serde_json::from_str(text).expect("файл из комплекта не разобрался");
+        assert_eq!(d.updated_at, raw["updatedAt"].as_i64().unwrap());
+        assert_eq!(d.videos.len(), raw["videos"].as_array().unwrap().len(), "видео отброшено");
+        assert_eq!(d.app.is_some(), raw.get("app").is_some_and(|a| !a.is_null()), "app пропал");
     }
 }

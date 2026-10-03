@@ -5,6 +5,7 @@ import ReactDOM from "react-dom/client";
 // чтобы нарисовать буквы. Вариативное начертание — один файл на все веса.
 import "@fontsource-variable/golos-text";
 import App from "./App";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { api } from "./lib/api";
 import { asLang, setLanguage } from "./i18n";
 import { asVideoLang, setVideoLanguage } from "./lib/videoLanguage";
@@ -19,9 +20,13 @@ void Promise.all([
 ]).then(([lang, videoLang]) => {
   setLanguage(lang);
   setVideoLanguage(videoLang);
+  // Предохранитель снаружи App: упавшая отрисовка не должна оставлять пустое
+  // окно — вместо него короткое сообщение и кнопка перезагрузки.
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
-      <App />
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
     </React.StrictMode>,
   );
 });

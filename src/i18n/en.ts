@@ -102,6 +102,12 @@ export const en = {
     configSaveFailed: (d?: string) => (d ? `Couldn't save the settings: ${d}` : "Couldn't save the settings"),
     autostartFailed: (d?: string) => (d ? `Couldn't change autostart: ${d}` : "Couldn't change autostart"),
   },
+  // Экран на месте окна, если отрисовка упала (src/components/ErrorBoundary.tsx).
+  crash: {
+    title: "Something went wrong",
+    hint: "The window couldn't be displayed. Reloading usually fixes it. Your games and settings are not affected.",
+    reload: "Reload",
+  },
   // Экран настроек и первый запуск (спека этапа 6, Task 6). Термины — по
   // глоссарию §4.5; повторяющиеся надписи (вкладки, «Дополнительно»,
   // «Сохранить», «Найти заново») используются из одного поля в нескольких местах.

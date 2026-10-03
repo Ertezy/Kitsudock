@@ -31,10 +31,18 @@ export function relativeDays(lang: Lang, days: number): string {
   return new Intl.RelativeTimeFormat(LOCALES[lang], { numeric }).format(days, "day");
 }
 
-/** «Aug 28» / «28 августа» — в часовом поясе пользователя. */
+/** Вместо даты, которую нечем показать. */
+const NO_DATE = "—";
+
+/** «Aug 28» / «28 августа» — в часовом поясе пользователя. Время приходит из
+ *  файла хаба, и дата вне диапазона `Date` (±8.64e12 с) — не повод ронять
+ *  отрисовку: `Intl` бросает на ней RangeError, и окно остаётся пустым.
+ *  Такая дата — прочерк. */
 export function dayMonth(lang: Lang, sec: number): string {
+  const date = new Date(sec * 1000);
+  if (Number.isNaN(date.getTime())) return NO_DATE;
   return new Intl.DateTimeFormat(LOCALES[lang], {
     day: "numeric",
     month: lang === "en" ? "short" : "long",
-  }).format(new Date(sec * 1000));
+  }).format(date);
 }

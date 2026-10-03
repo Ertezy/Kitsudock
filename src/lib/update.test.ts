@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { availableUpdate, isNewer } from "./update";
+import { availableUpdate, isNewer, isReleaseUrl } from "./update";
 import type { HubData } from "../types";
 
 const hub = (app?: { version: string; url: string }): HubData => ({
@@ -46,5 +46,84 @@ describe("availableUpdate", () => {
     expect(availableUpdate(null, "0.1.0")).toBeNull();
     expect(availableUpdate(hub(), "0.1.0")).toBeNull();
     expect(availableUpdate(hub(RELEASE), null)).toBeNull();
+  });
+
+  it("ignores a newer release whose link is not a release page of this app", () => {
+    for (const url of [
+      "https://evil.test/Ertezy/Kitsudock/releases/tag/v0.1.1",
+      "https://github.com/Someone/Kitsudock/releases/tag/v0.1.1",
+      "https://github.com/Ertezy/Kitsudock",
+      "http://github.com/Ertezy/Kitsudock/releases/tag/v0.1.1",
+      "https://github.com/Ertezy/Kitsudock/releases/../../other/repo/releases/tag/v1",
+      "https://github.com/Ertezy/Kitsudock/releases/%2e%2e/%2e%2e/other/repo/releases/tag/v1",
+    ]) {
+      expect(availableUpdate(hub({ version: "0.1.1", url }), "0.1.0"), url).toBeNull();
+    }
+  });
+});
+
+describe("isReleaseUrl", () => {
+  const PREFIX = "https://github.com/Ertezy/Kitsudock/releases/";
+
+  it("accepts release pages of this app", () => {
+    for (const url of [
+      "https://github.com/Ertezy/Kitsudock/releases/tag/v0.1.1",
+      "https://github.com/Ertezy/Kitsudock/releases/latest",
+      "https://github.com/Ertezy/Kitsudock/releases/tag/v0.1.1?from=app#notes",
+      "https://github.com/Ertezy/Kitsudock/releases/tag/v0.1.1.rc.2",
+      "https://github.com/Ertezy/Kitsudock/releases/tag/...",
+      "https://github.com/Ertezy/Kitsudock/releases/?back=../..",
+    ]) {
+      expect(isReleaseUrl(url), url).toBe(true);
+    }
+  });
+
+  it("rejects other addresses", () => {
+    for (const url of [
+      "",
+      "https://github.com/Ertezy/Kitsudock",
+      "https://github.com/Ertezy/Kitsudock/releases",
+      "https://github.com/ertezy/kitsudock/releases/tag/v0.1.1",
+      "https://github.com.evil.test/Ertezy/Kitsudock/releases/tag/v0.1.1",
+      "https://github.com@evil.test/Ertezy/Kitsudock/releases/tag/v0.1.1",
+    ]) {
+      expect(isReleaseUrl(url), url).toBe(false);
+    }
+  });
+
+  it("rejects a path with a dot segment, written plainly or percent-encoded", () => {
+    for (const tail of [
+      "../../other/repo/releases/tag/v1",
+      "tag/../../../other/repo/releases/tag/v1",
+      "./tag/v1",
+      "tag/./v1",
+      "tag/..",
+      "%2e%2e/%2e%2e/other/repo/releases/tag/v1",
+      "%2E%2E/other",
+      ".%2e/other",
+      "%2e./other",
+      "tag/%2e/v1",
+      "tag/..?x=1",
+      "tag/..#x",
+    ]) {
+      expect(isReleaseUrl(PREFIX + tail), tail).toBe(false);
+    }
+  });
+
+  it("rejects a backslash, whitespace or a control character anywhere", () => {
+    for (const tail of [
+      "tag\\..\\..\\x",
+      "tag/v1 ",
+      "tag/ v1",
+      "tag/v1\t",
+      "tag/v1\n",
+      "tag/v\u00001",
+      "tag/v1\u007f",
+      "tag/v1\u00a0",
+      "tag/v1\u2028",
+      "tag/v1?x=a b",
+    ]) {
+      expect(isReleaseUrl(PREFIX + tail), JSON.stringify(tail)).toBe(false);
+    }
   });
 });

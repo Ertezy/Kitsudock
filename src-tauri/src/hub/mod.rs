@@ -165,26 +165,33 @@ fn exceeds_hub_ceiling(len: usize) -> bool {
     len as u64 > MAX_HUB_BYTES as u64
 }
 
-/// Читает и разбирает местный файл хаба (`hub.json`, `hub_cache.json`).
+/// Читает текст файла хаба, но не больше потолка размера.
 ///
-/// Потолок размера тот же, что и у сетевой загрузки: это те же данные,
-/// разница только в источнике. Без потолка человек, подменивший `hub.json`
-/// огромным файлом (случайно или нет), заставил бы приложение вычитывать его
-/// целиком в память при каждом запуске.
-fn read_json_file(path: &Path) -> Option<HubData> {
-    let file = fs::File::open(path).ok()?;
+/// Потолок тот же, что и у сетевой загрузки: это те же данные, разница только
+/// в источнике. Без потолка человек, подменивший `hub.json` огромным файлом
+/// (случайно или нет), заставил бы приложение вычитывать его целиком в память
+/// при каждом запуске; то же верно и для файла из комплекта.
+fn read_capped(path: &Path) -> Result<String, String> {
+    let file = fs::File::open(path).map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     let mut text = String::new();
     file.take(MAX_HUB_BYTES as u64 + 1)
         .read_to_string(&mut text)
-        .ok()?;
+        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
     if exceeds_hub_ceiling(text.len()) {
         log::error!(
             "[hub] {} больше потолка в {MAX_HUB_BYTES} байт, файл пропущен",
             path.display()
         );
-        return None;
+        return Err(format!("{} больше потолка в {MAX_HUB_BYTES} байт", path.display()));
     }
-    serde_json::from_str(&text).ok()
+    Ok(text)
+}
+
+/// Читает и разбирает местный файл хаба (`hub.json`, `hub_cache.json`).
+/// Файл, которого нет, не читается, слишком велик или не разбирается (в том
+/// числе из-за времени вне диапазона), — `None`.
+fn read_json_file(path: &Path) -> Option<HubData> {
+    serde_json::from_str(&read_capped(path).ok()?).ok()
 }
 
 /// Блокирующая загрузка по https с коротким таймаутом и условным заголовком.
@@ -213,10 +220,27 @@ fn fetch_remote(url: &str, etag: Option<&str>) -> Remote {
     if resp.into_reader().take(MAX_HUB_BYTES as u64).read_to_string(&mut body).is_err() {
         return Remote::Failed;
     }
-    match serde_json::from_str(&body) {
-        Ok(data) => Remote::Fresh { data: Box::new(data), etag: tag },
+    remote_from_body(&body, tag)
+}
+
+/// Скачанное тело ответа: годный файл — свежие данные, любой негодный
+/// (не JSON, время вне диапазона) — `Failed`. Вынесена из `fetch_remote`,
+/// чтобы это правило проверялось без сети.
+fn remote_from_body(body: &str, etag: Option<String>) -> Remote {
+    match serde_json::from_str(body) {
+        Ok(data) => Remote::Fresh { data: Box::new(data), etag },
         Err(_) => Remote::Failed,
     }
+}
+
+/// Файл хаба из комплекта: тот же потолок размера и тот же разбор, что и у
+/// скачанного. Путь параметром, чтобы проверять без `AppHandle`.
+fn read_bundled(path: &Path) -> Result<HubData, String> {
+    let text = read_capped(path)?;
+    let mut data: HubData =
+        serde_json::from_str(&text).map_err(|e| format!("parse {}: {e}", path.display()))?;
+    data.source = Some("bundled".to_string());
+    Ok(data)
 }
 
 fn bundled(app: &AppHandle) -> Result<HubData, String> {
@@ -224,13 +248,7 @@ fn bundled(app: &AppHandle) -> Result<HubData, String> {
         .path()
         .resource_dir()
         .map_err(|e| format!("resource dir: {e}"))?;
-    let path = dir.join("resources/hub.json");
-    let text = fs::read_to_string(&path)
-        .map_err(|e| format!("cannot read {}: {e}", path.display()))?;
-    let mut data: HubData =
-        serde_json::from_str(&text).map_err(|e| format!("parse {}: {e}", path.display()))?;
-    data.source = Some("bundled".to_string());
-    Ok(data)
+    read_bundled(&dir.join("resources/hub.json"))
 }
 
 /// Местная цепочка без сети: сначала `override_path` (ручная подмена),
@@ -458,6 +476,66 @@ mod tests {
         let data = read_local_chain(&override_path, &cache_path).expect("должен найтись cache");
         assert_eq!(data.version, 5);
         assert_eq!(data.source.as_deref(), Some("cache"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    /// Файл хаба с временем, которое окно показать не сможет.
+    const IMPOSSIBLE_TIME: &str = r#"{"version":2,"updatedAt":-9000000000000}"#;
+
+    #[test]
+    fn a_local_file_with_an_impossible_time_is_read_as_a_broken_one() {
+        let dir = temp_hub_dir("impossible-time");
+        let path = dir.join("hub_cache.json");
+        std::fs::write(&path, IMPOSSIBLE_TIME).unwrap();
+
+        assert!(read_json_file(&path).is_none());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn local_chain_skips_an_override_with_an_impossible_time_for_the_cache() {
+        let dir = temp_hub_dir("impossible-override");
+        let override_path = dir.join("hub.json");
+        let cache_path = dir.join("hub_cache.json");
+        std::fs::write(&override_path, IMPOSSIBLE_TIME).unwrap();
+        std::fs::write(&cache_path, hub_json(5)).unwrap();
+
+        let data = read_local_chain(&override_path, &cache_path).expect("должен найтись cache");
+        assert_eq!(data.version, 5);
+        assert_eq!(data.source.as_deref(), Some("cache"));
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_downloaded_body_with_an_impossible_time_fails_like_a_broken_one() {
+        // Сеть тут не нужна: разбор тела вынесен из `fetch_remote`. `Failed`
+        // отправляет `decide` к местной цепочке, как и любой битый ответ.
+        assert!(matches!(remote_from_body(IMPOSSIBLE_TIME, None), Remote::Failed));
+        assert!(matches!(remote_from_body("это не json", None), Remote::Failed));
+        match remote_from_body(r#"{"version":2,"updatedAt":1790786927}"#, Some("\"t\"".into())) {
+            Remote::Fresh { data, etag } => {
+                assert_eq!(data.updated_at, 1_790_786_927);
+                assert_eq!(etag.as_deref(), Some("\"t\""));
+            }
+            _ => panic!("годный ответ обязан пройти"),
+        }
+    }
+
+    #[test]
+    fn the_bundled_file_is_read_through_the_same_ceiling_and_checks() {
+        let dir = temp_hub_dir("bundled");
+        let path = dir.join("hub.json");
+
+        std::fs::write(&path, hub_json(2)).unwrap();
+        assert_eq!(read_bundled(&path).expect("годный файл").version, 2);
+
+        std::fs::write(&path, "0".repeat(MAX_HUB_BYTES + 1)).unwrap();
+        assert!(read_bundled(&path).is_err(), "файл больше потолка не читается");
+
+        std::fs::write(&path, IMPOSSIBLE_TIME).unwrap();
+        assert!(read_bundled(&path).is_err(), "время вне диапазона — как битый файл");
+
+        assert!(read_bundled(&dir.join("нет.json")).is_err());
         std::fs::remove_dir_all(&dir).ok();
     }
 

@@ -63,6 +63,18 @@ describe("относительные дни и даты", () => {
     expect(dayMonth("en", noon)).toBe("Aug 28");
     expect(dayMonth("ru", noon)).toBe("28 августа");
   });
+
+  it("время вне календаря JS — прочерк, а не ошибка (иначе окно остаётся пустым)", () => {
+    for (const sec of [NaN, Infinity, -Infinity, 8_640_000_000_001, -8_640_000_000_001, 9.2e18]) {
+      expect(dayMonth("en", sec), String(sec)).toBe("—");
+      expect(dayMonth("ru", sec), String(sec)).toBe("—");
+    }
+  });
+
+  it("крайние даты, которые Date ещё знает, форматируются как обычно", () => {
+    expect(dayMonth("en", 8_640_000_000_000)).toBe("Sep 13");
+    expect(dayMonth("en", 0)).not.toBe("—");
+  });
 });
 
 describe("текущий язык", () => {
