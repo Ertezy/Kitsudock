@@ -15,7 +15,10 @@ interface Preset {
   /** Идентификатор в данных хаба; `null` — у игры нет ни кодов, ни баннеров, ни роликов. */
   contentId: string | null;
   sourceKind: SourceKind;
+  /** Откуда у игры фон, пока своего нет. */
   artSource: GameView["artSource"];
+  /** Показывается своя картинка вместо фона из `artSource`: есть что убирать на вкладке «Вид». */
+  ownPicture?: boolean;
   /** Два оттенка заглушек; `null` — у игры нет ни фона, ни иконки (рисуются запасные). */
   hues: [number, number] | null;
 }
@@ -23,7 +26,7 @@ interface Preset {
 const PRESETS: Preset[] = [
   { id: "genshin", title: "Genshin Impact", contentId: "genshin", sourceKind: "epic", artSource: "hoyoplay", hues: [38, 205] },
   { id: "hsr", title: "Honkai: Star Rail", contentId: "hsr", sourceKind: "exe", artSource: "hoyoplay", hues: [268, 218] },
-  { id: "zzz", title: "Zenless Zone Zero", contentId: "zzz", sourceKind: "exe", artSource: "picture", hues: [338, 28] },
+  { id: "zzz", title: "Zenless Zone Zero", contentId: "zzz", sourceKind: "exe", artSource: "hoyoplay", ownPicture: true, hues: [338, 28] },
   { id: "wuthering", title: "Wuthering Waves", contentId: "wuthering", sourceKind: "steam", artSource: "steam", hues: [188, 140] },
   // Игра без данных хаба и без картинок: на ней видны запасные фон и иконка-буква.
   { id: "endfield", title: "Arknights: Endfield", contentId: null, sourceKind: "exe", artSource: "fill", hues: null },
@@ -37,12 +40,38 @@ function toView(p: Preset, index: number): GameView {
     sourceKind: p.sourceKind,
     iconPath: p.hues ? iconArt(p.title, p.hues[0], p.hues[1]) : null,
     artPath: p.hues ? backgroundArt(p.hues[0], p.hues[1], 100 + index) : null,
-    artSource: p.artSource,
+    artSource: p.ownPicture ? "picture" : p.artSource,
     videoPath: null,
     videoMissing: false,
     args: "",
     missing: false,
   };
+}
+
+/** Какой фон у игры без своей картинки и своего видео: тот, что был бы у неё из лаунчера или магазина. */
+export function baseArt(game: Pick<GameView, "id">): Pick<GameView, "artSource" | "artPath"> {
+  const index = PRESETS.findIndex((p) => p.id === game.id);
+  if (index < 0) return { artSource: "fill", artPath: null };
+  const { artSource, artPath } = toView({ ...PRESETS[index], ownPicture: false }, index);
+  return { artSource, artPath };
+}
+
+/** Своя картинка вместо выбора файла: оттенки выводятся из названия, как у запасных заливок. */
+export function ownArt(title: string): string {
+  const hue = hueOf(title);
+  return backgroundArt(hue, (hue + 70) % 360, 200 + (hue % 50));
+}
+
+/** Своя иконка вместо выбора файла. */
+export function ownIcon(title: string): string {
+  const hue = hueOf(title);
+  return iconArt(title, hue, (hue + 70) % 360);
+}
+
+function hueOf(text: string): number {
+  let hue = 0;
+  for (const ch of text) hue = (hue * 31 + ch.charCodeAt(0)) % 360;
+  return hue;
 }
 
 /** Список игр, как его отдаёт `get_games`. */
@@ -186,15 +215,22 @@ function videos(now: number): Video[] {
   ];
 }
 
-/** Данные хаба, как их отдаёт `get_hub`, — свежие, «только что с сервера». */
-export function makeHub(now: number): HubData {
+/** Откуда хаб: сеть, кеш или файл из комплекта (`_source` в данных). */
+export type HubSource = "remote" | "cache" | "bundled";
+
+/**
+ * Данные хаба, как их отдаёт `get_hub`. По умолчанию свежие, «только что с
+ * сервера». Возраст сдвигает только `updatedAt`: сроки кодов, баннеров и роликов
+ * считаются от «сейчас», чтобы таймеры на стенде не зависели от сценария.
+ */
+export function makeHub(now: number, source: HubSource = "remote", ageSec = 25 * 60): HubData {
   return {
     version: 2,
-    updatedAt: now - 25 * 60,
+    updatedAt: now - ageSec,
     games: HUB_GAMES.map((g) => ({ ...g })),
     codes: codes(now),
     banners: banners(now),
     videos: videos(now),
-    _source: "remote",
+    _source: source,
   };
 }

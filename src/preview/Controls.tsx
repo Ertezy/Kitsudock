@@ -11,6 +11,7 @@ const SCENARIO_LABELS: Record<Scenario, string> = {
   normal: "normal",
   loading: "loading",
   offline: "offline",
+  stale: "stale",
   firstRun: "first run",
 };
 

@@ -9,18 +9,23 @@ import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { About, AppConfig, Behaviour, FoundGame, GameView } from "../types";
 import type { Lang, VideoLang } from "../i18n/native";
 import { artFromUrl } from "./art";
-import { gameFromScan, makeGames, makeHub, makeScan } from "./data";
+import { baseArt, gameFromScan, makeGames, makeHub, makeScan, ownArt, ownIcon } from "./data";
 
 // ---------------------------------------------------------------- адрес стенда
 
 /**
- * Состояние данных. `normal` — всё загружено; `loading` — хаб и список игр
- * отвечают через минуту, то есть пока не ответили; `offline` — сети нет, хаб
- * отказывает; `firstRun` — приложение запущено впервые, игр ещё нет.
+ * Состояние данных.
+ * - `normal` — всё загружено, хаб свежий;
+ * - `loading` — игры есть, а хаб ещё не ответил (ответит через минуту): главный
+ *   экран при `hub === null`;
+ * - `offline` — сети нет, хаб отдан из кеша, которому 30 часов (`_source: "cache"`);
+ * - `stale` — сети нет и кеша нет: хаб из комплекта старше недели
+ *   (`_source: "bundled"`), панель прячет коды и баннеры;
+ * - `firstRun` — приложение запущено впервые, игр ещё нет.
  */
-export type Scenario = "normal" | "loading" | "offline" | "firstRun";
+export type Scenario = "normal" | "loading" | "offline" | "stale" | "firstRun";
 
-export const SCENARIOS: readonly Scenario[] = ["normal", "loading", "offline", "firstRun"];
+export const SCENARIOS: readonly Scenario[] = ["normal", "loading", "offline", "stale", "firstRun"];
 
 /** Варианты палитры. Следующие задачи дописывают сюда значения, больше ничего. */
 export const PALETTES: readonly string[] = ["current"];
@@ -135,12 +140,22 @@ export const PREVIEW_COMMANDS: readonly string[] = [...APP_COMMANDS, ...PLUGIN_C
 type Args = Record<string, unknown>;
 type Handler = (args: Args) => unknown;
 
-/** Сколько «грузятся» данные в сценарии `loading`: за это время их не дождаться. */
+const HOUR = 3600;
+const DAY = 86400;
+
+/** Сколько хаб «грузится» в сценарии `loading`: за это время его не дождаться. */
 const LOADING_MS = 60_000;
 /** Сколько на стенде «запускается» игра: достаточно, чтобы разглядеть это состояние. */
 const LAUNCH_MS = 1500;
-/** Так отказывает `get_hub` в Rust: он возвращает `Result<_, String>`, то есть строку. */
-const NO_NETWORK = "request to the hub failed: network is unreachable (os error 10051)";
+/** Возраст кеша хаба в сценарии `offline`. */
+const CACHE_AGE_SEC = 30 * HOUR;
+/** Возраст хаба из комплекта в сценарии `stale`: старше недели, когда панель прячет коды и баннеры. */
+const BUNDLED_AGE_SEC = 8 * DAY;
+/** Без сети картинку не скачать: настоящая `cache_image` тоже отказывает строкой. */
+const NO_PICTURE = "image download failed: the stand has no network";
+
+/** Как `hub::is_safe_https` в Rust: схема https без учёта регистра и хотя бы один знак хоста. */
+const isSafeHttps = (url: string): boolean => /^https:\/\/[^/]/i.test(url);
 
 /** Копия значения: мост отдаёт странице свежие данные, а не ссылку на состояние стенда. */
 const clone = <T>(value: T): T => structuredClone(value);
@@ -154,8 +169,11 @@ export interface StandSettings {
   motion?: boolean;
 }
 
-function createHandlers(scenario: Scenario, settings: StandSettings): Record<AppCommand, Handler> {
+/** Ответы стенда на команды моста. Отдельной функцией ради теста: ей не нужно окно. */
+export function createHandlers(scenario: Scenario, settings: StandSettings = {}): Record<AppCommand, Handler> {
   const firstRun = scenario === "firstRun";
+  // Без сети не только хаб старый, но и картинок не скачать.
+  const noNetwork = scenario === "offline" || scenario === "stale";
   const state = {
     games: firstRun ? [] : makeGames(),
     seeded: !firstRun,
@@ -168,12 +186,14 @@ function createHandlers(scenario: Scenario, settings: StandSettings): Record<App
     autostart: false,
     hubUrl: null as string | null,
     cacheBytes: 48_234_496,
+    cacheFiles: 37,
   };
 
   const find = (gameId: unknown): GameView | undefined => state.games.find((g) => g.id === gameId);
 
   return {
-    get_games: () => (scenario === "loading" ? after(LOADING_MS, () => clone(state.games)) : clone(state.games)),
+    // Список игр локальный и отвечает сразу в любом сценарии, как в приложении.
+    get_games: () => clone(state.games),
     get_config: (): AppConfig => ({
       version: 1,
       hubUrl: state.hubUrl,
@@ -183,23 +203,30 @@ function createHandlers(scenario: Scenario, settings: StandSettings): Record<App
       storeArt: state.storeArt,
       games: [],
     }),
+    // Как в Rust (`hub::load`): без сети хаб не отказывает, а отдаётся из кеша,
+    // а если кеша нет — из комплекта; откуда именно, видно по `_source`.
     get_hub: () => {
-      if (scenario === "offline") return Promise.reject(NO_NETWORK);
-      const make = () => makeHub(Math.floor(Date.now() / 1000));
+      const make = () => {
+        const now = Math.floor(Date.now() / 1000);
+        if (scenario === "offline") return makeHub(now, "cache", CACHE_AGE_SEC);
+        if (scenario === "stale") return makeHub(now, "bundled", BUNDLED_AGE_SEC);
+        return makeHub(now);
+      };
       return scenario === "loading" ? after(LOADING_MS, make) : make();
     },
     get_last_played: () => state.lastPlayed,
+    // Как в Rust: запуск отвечает идентификатором игры.
     launch_game: ({ gameId }) => {
       if (!find(gameId)) return Promise.reject({ code: "gameNotFound" });
       return after(LAUNCH_MS, () => {
         state.lastPlayed = String(gameId);
-        return "";
+        return String(gameId);
       });
     },
     // Адреса картинок хаба стенд узнаёт сам и отвечает нарисованной картинкой;
-    // без сети (`offline`) и для чужого адреса картинки нет, как у настоящего отказа.
+    // без сети и для чужого адреса картинки нет.
     cache_image: ({ url }) => {
-      if (scenario === "offline") return Promise.reject(NO_NETWORK);
+      if (noNetwork) return Promise.reject(NO_PICTURE);
       const art = artFromUrl(String(url));
       return art ?? Promise.reject(`no picture for ${String(url)} on the stand`);
     },
@@ -209,13 +236,46 @@ function createHandlers(scenario: Scenario, settings: StandSettings): Record<App
       state.games.push(game);
       return game.id;
     },
+    // Поля, как их понимает Rust: отсутствует — не трогать; пустая строка у
+    // фона, иконки, видео и привязки — стереть своё; иначе — задать. Файлов на
+    // стенде нет, поэтому «заданное» — нарисованная картинка.
     update_game: (u) => {
       const game = find(u.gameId);
       if (!game) return Promise.reject({ code: "gameNotFound" });
-      if (typeof u.title === "string") game.title = u.title;
+      // Путь к игре: Rust отказывает, если по пути нет файла. Стенд считает файлом
+      // любой непустой путь, и находка снимает «файл пропал».
+      if (typeof u.exe === "string") {
+        if (u.exe === "") return Promise.reject({ code: "fileMissing", detail: "" });
+        game.missing = false;
+      }
+      if (typeof u.title === "string") {
+        if (u.title.trim() === "") return Promise.reject({ code: "emptyTitle" });
+        game.title = u.title;
+      }
+      if (typeof u.background === "string") {
+        if (u.background === "") {
+          if (game.artSource === "picture") Object.assign(game, baseArt(game));
+        } else {
+          game.artPath = ownArt(game.title);
+          if (game.artSource !== "video") game.artSource = "picture";
+        }
+      }
+      // У `<video>` из рисунка кадра не будет: на стенде от своего видео виден
+      // только неподвижный кадр-постер.
+      if (typeof u.video === "string") {
+        if (u.video === "") {
+          game.videoPath = null;
+          game.videoMissing = false;
+          if (game.artSource === "video") Object.assign(game, baseArt(game));
+        } else {
+          game.videoPath = ownArt(game.title);
+          game.videoMissing = false;
+          game.artSource = "video";
+        }
+      }
+      if (typeof u.icon === "string") game.iconPath = u.icon === "" ? null : ownIcon(game.title);
       if (typeof u.contentId === "string") game.contentId = u.contentId === "" ? null : u.contentId;
       if (typeof u.args === "string") game.args = u.args;
-      if (u.icon === "") game.iconPath = null;
       return null;
     },
     remove_game: ({ gameId }) => {
@@ -280,15 +340,20 @@ function createHandlers(scenario: Scenario, settings: StandSettings): Record<App
     },
 
     check_video: () => null,
+    // Как в Rust: пустая строка — «нет адреса», не https — отказ с кодом без подробности.
     set_hub_url: ({ url }) => {
-      state.hubUrl = typeof url === "string" && url !== "" ? url : null;
+      const value = typeof url === "string" && url.trim() !== "" ? url : null;
+      if (value !== null && !isSafeHttps(value)) return Promise.reject({ code: "hubUrlNotHttps" });
+      state.hubUrl = value;
       return null;
     },
     image_cache_size: () => state.cacheBytes,
+    // Как в Rust: отвечает числом удалённых файлов, а не байтов.
     clear_image_cache: () => {
-      const freed = state.cacheBytes;
+      const removed = state.cacheFiles;
+      state.cacheFiles = 0;
       state.cacheBytes = 0;
-      return freed;
+      return removed;
     },
     get_about: (): About => ({
       version: "0.1.0",
