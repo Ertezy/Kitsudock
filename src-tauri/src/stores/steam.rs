@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use super::{InstalledGame, Launch, Source};
+use super::{read_manifest, InstalledGame, Launch, Source, MAX_MANIFEST_BYTES};
 use crate::vdf;
 
 /// Корни установки самого Steam: сначала реестр (пользователь мог поставить
@@ -77,18 +77,35 @@ pub fn game_from_manifest(acf_text: &str, library: &Path) -> Option<InstalledGam
 
 /// Всё, что Steam считает установленным, во всех библиотеках.
 pub fn installed() -> Vec<InstalledGame> {
+    installed_in(&install_roots())
+}
+
+/// То же по готовому списку корней Steam. Файл крупнее `MAX_MANIFEST_BYTES`
+/// (манифест игры или `libraryfolders.vdf`) пропускается с записью в журнал,
+/// не читаясь целиком: без списка библиотек остаётся один корень.
+fn installed_in(steam_roots: &[PathBuf]) -> Vec<InstalledGame> {
     let mut games = Vec::new();
     let mut seen_appids = std::collections::HashSet::new();
 
-    for steam_root in install_roots() {
+    for steam_root in steam_roots {
         let steamapps = steam_root.join("steamapps");
         if !steamapps.is_dir() {
             continue;
         }
-        let vdf_text = std::fs::read_to_string(steamapps.join("libraryfolders.vdf"))
-            .unwrap_or_default();
+        let vdf_path = steamapps.join("libraryfolders.vdf");
+        let vdf_text = match read_manifest(&vdf_path) {
+            Ok(Some(text)) => text,
+            Ok(None) => {
+                log::warn!(
+                    "[steam] {:?} больше потолка в {MAX_MANIFEST_BYTES} байт, читаю только корень",
+                    vdf_path
+                );
+                String::new()
+            }
+            Err(_) => String::new(),
+        };
 
-        for library in library_roots_from_vdf(&vdf_text, &steam_root) {
+        for library in library_roots_from_vdf(&vdf_text, steam_root) {
             let dir = library.join("steamapps");
             let Ok(entries) = std::fs::read_dir(&dir) else {
                 log::warn!("[steam] не могу прочитать библиотеку {:?}", dir);
@@ -104,9 +121,19 @@ pub fn installed() -> Vec<InstalledGame> {
                 if !is_manifest {
                     continue;
                 }
-                let Ok(text) = std::fs::read_to_string(&path) else {
-                    log::warn!("[steam] не могу прочитать манифест {:?}", path);
-                    continue;
+                let text = match read_manifest(&path) {
+                    Ok(Some(text)) => text,
+                    Ok(None) => {
+                        log::warn!(
+                            "[steam] манифест {:?} больше потолка в {MAX_MANIFEST_BYTES} байт, пропущен",
+                            path
+                        );
+                        continue;
+                    }
+                    Err(_) => {
+                        log::warn!("[steam] не могу прочитать манифест {:?}", path);
+                        continue;
+                    }
                 };
                 if let Some(game) = game_from_manifest(&text, &library) {
                     if let Launch::Steam { appid } = game.launch {
@@ -180,6 +207,61 @@ mod tests {
                 PathBuf::from(r"D:\SteamLibrary"),
             ]
         );
+    }
+
+    fn appids(games: &[InstalledGame]) -> Vec<u32> {
+        let mut ids: Vec<u32> = games
+            .iter()
+            .filter_map(|g| match g.launch {
+                Launch::Steam { appid } => Some(appid),
+                _ => None,
+            })
+            .collect();
+        ids.sort_unstable();
+        ids
+    }
+
+    /// Манифест игры; `padding` знаков в лишнем поле раздувают файл.
+    fn acf(appid: u32, padding: usize) -> String {
+        let junk = "x".repeat(padding);
+        format!(
+            "\"AppState\"\n{{\n\t\"appid\"\t\t\"{appid}\"\n\t\"name\"\t\t\"G{appid}\"\n\t\"installdir\"\t\t\"G{appid}\"\n\t\"junk\"\t\t\"{junk}\"\n}}"
+        )
+    }
+
+    /// `libraryfolders.vdf` с одной дополнительной библиотекой.
+    fn library_list(library: &Path, padding: usize) -> String {
+        let path = library.display().to_string().replace('\\', "\\\\");
+        let junk = "x".repeat(padding);
+        format!(
+            "\"libraryfolders\"\n{{\n\t\"0\"\n\t{{\n\t\t\"path\"\t\t\"{path}\"\n\t}}\n\t\"junk\"\t\t\"{junk}\"\n}}"
+        )
+    }
+
+    #[test]
+    fn oversized_steam_files_are_skipped_and_the_rest_are_still_read() {
+        let base = std::env::temp_dir().join(format!("gh-steam-cap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&base);
+        let root = base.join("steam");
+        let other = base.join("lib2");
+        let big = MAX_MANIFEST_BYTES as usize;
+        std::fs::create_dir_all(root.join("steamapps")).unwrap();
+        std::fs::create_dir_all(other.join("steamapps")).unwrap();
+        std::fs::write(root.join("steamapps").join("appmanifest_1.acf"), acf(1, 0)).unwrap();
+        std::fs::write(root.join("steamapps").join("appmanifest_2.acf"), acf(2, big)).unwrap();
+        std::fs::write(other.join("steamapps").join("appmanifest_3.acf"), acf(3, 0)).unwrap();
+        let vdf_path = root.join("steamapps").join("libraryfolders.vdf");
+        let roots = [root.clone()];
+
+        // Список библиотек крупнее потолка не читается: остаётся один корень.
+        // Манифест игры 2 крупнее потолка пропущен в любом случае.
+        std::fs::write(&vdf_path, library_list(&other, big)).unwrap();
+        assert_eq!(appids(&installed_in(&roots)), [1]);
+
+        // Тот же список обычного размера: вторая библиотека находится.
+        std::fs::write(&vdf_path, library_list(&other, 0)).unwrap();
+        assert_eq!(appids(&installed_in(&roots)), [1, 3]);
+        let _ = std::fs::remove_dir_all(&base);
     }
 
     #[test]

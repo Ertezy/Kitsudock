@@ -7,11 +7,11 @@
 //! Три идентификатора из манифеста складываются в официальную ссылку запуска,
 //! поэтому пользователю не нужно ничего вводить руками.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use serde::Deserialize;
 
-use super::{InstalledGame, Launch, Source};
+use super::{read_manifest, InstalledGame, Launch, Source, MAX_MANIFEST_BYTES};
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
@@ -113,10 +113,16 @@ fn manifests_dir() -> Option<PathBuf> {
 
 /// Всё, что Epic считает установленным.
 pub fn installed() -> Vec<InstalledGame> {
-    let Some(dir) = manifests_dir() else {
-        return Vec::new();
-    };
-    let Ok(entries) = std::fs::read_dir(&dir) else {
+    match manifests_dir() {
+        Some(dir) => installed_in(&dir),
+        None => Vec::new(),
+    }
+}
+
+/// То же по папке с манифестами. Файл крупнее `MAX_MANIFEST_BYTES` пропускается
+/// с записью в журнал, не читаясь целиком.
+fn installed_in(dir: &Path) -> Vec<InstalledGame> {
+    let Ok(entries) = std::fs::read_dir(dir) else {
         return Vec::new();
     };
 
@@ -131,9 +137,19 @@ pub fn installed() -> Vec<InstalledGame> {
         if !is_item {
             continue;
         }
-        let Ok(text) = std::fs::read_to_string(&path) else {
-            log::warn!("[epic] не могу прочитать манифест {:?}", path);
-            continue;
+        let text = match read_manifest(&path) {
+            Ok(Some(text)) => text,
+            Ok(None) => {
+                log::warn!(
+                    "[epic] манифест {:?} больше потолка в {MAX_MANIFEST_BYTES} байт, пропущен",
+                    path
+                );
+                continue;
+            }
+            Err(_) => {
+                log::warn!("[epic] не могу прочитать манифест {:?}", path);
+                continue;
+            }
         };
         match game_from_manifest(&text) {
             ManifestEntry::Game(game) => games.push(game),
@@ -307,6 +323,28 @@ mod tests {
     fn dlc_stays_dlc_even_with_odd_identifiers() {
         let dlc = DLC.replace("KingletAztec", "king let/aztec");
         assert!(matches!(game_from_manifest(&dlc), ManifestEntry::Dlc));
+    }
+
+    #[test]
+    fn an_oversized_manifest_is_skipped_and_the_others_are_still_read() {
+        let dir = std::env::temp_dir().join(format!("gh-epic-cap-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+
+        std::fs::write(dir.join("small.item"), GENSHIN).unwrap();
+        // Годный JSON с настоящей игрой, но крупнее потолка: пропущен только
+        // из-за размера.
+        let big = genshin_with("DisplayName", "Huge").replacen(
+            '{',
+            &format!("{{ \"Padding\": \"{}\",", "x".repeat(MAX_MANIFEST_BYTES as usize)),
+            1,
+        );
+        assert!(matches!(game_from_manifest(&big), ManifestEntry::Game(_)));
+        std::fs::write(dir.join("big.item"), &big).unwrap();
+
+        let titles: Vec<String> = installed_in(&dir).into_iter().map(|g| g.title).collect();
+        assert_eq!(titles, ["Genshin Impact"]);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 
     /// Закрепляет саму суть исправления: DLC и нечитаемая запись — это два

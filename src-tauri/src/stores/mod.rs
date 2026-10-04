@@ -11,6 +11,29 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+/// Потолок размера файла манифеста магазина (`.item` Epic, `.acf` и
+/// `libraryfolders.vdf` Steam). Настоящие занимают единицы килобайт, а список
+/// установленного читается при запуске, до появления окна: файл, подложенный
+/// в общую папку, не должен заставлять приложение вычитывать его целиком.
+pub(crate) const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
+
+/// Текст файла манифеста, но не больше `MAX_MANIFEST_BYTES`. Файл крупнее
+/// потолка — `Ok(None)`: вызывающий пропускает его и пишет об этом в журнал.
+/// Нечитаемый или не UTF-8 файл — ошибка, как и у `read_to_string`.
+pub(crate) fn read_manifest(path: &Path) -> std::io::Result<Option<String>> {
+    use std::io::Read;
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)?
+        .take(MAX_MANIFEST_BYTES + 1)
+        .read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > MAX_MANIFEST_BYTES {
+        return Ok(None);
+    }
+    String::from_utf8(bytes)
+        .map(Some)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+}
+
 /// Чем именно запускается игра.
 ///
 /// Живёт здесь, а не в `config.rs`, потому что источник этого знания —
@@ -156,6 +179,52 @@ pub fn installed() -> Vec<InstalledGame> {
 mod tests {
     use super::*;
     use crate::config::Game;
+
+    /// Пустая папка под файлы теста.
+    fn scratch(tag: &str) -> PathBuf {
+        let p = std::env::temp_dir().join(format!("gh-stores-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&p);
+        std::fs::create_dir_all(&p).unwrap();
+        p
+    }
+
+    #[test]
+    fn a_manifest_up_to_the_ceiling_is_read_and_one_byte_more_is_not() {
+        let dir = scratch("cap");
+        let at_cap = dir.join("at.item");
+        std::fs::write(&at_cap, "a".repeat(MAX_MANIFEST_BYTES as usize)).unwrap();
+        let text = read_manifest(&at_cap).unwrap().expect("на пределе файл читается");
+        assert_eq!(text.len() as u64, MAX_MANIFEST_BYTES);
+
+        let over = dir.join("over.item");
+        std::fs::write(&over, "a".repeat(MAX_MANIFEST_BYTES as usize + 1)).unwrap();
+        assert!(read_manifest(&over).unwrap().is_none(), "на байт больше — пропуск");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_oversized_manifest_is_skipped_not_reported_as_unreadable() {
+        // Двухбайтовые знаки поперёк границы: чтение до потолка оборвало бы
+        // знак посередине, но это всё равно «слишком велик», а не ошибка текста.
+        let dir = scratch("cap-utf8");
+        let path = dir.join("big.item");
+        std::fs::write(&path, "я".repeat(MAX_MANIFEST_BYTES as usize)).unwrap();
+        assert!(read_manifest(&path).unwrap().is_none());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_missing_or_non_text_manifest_is_an_error() {
+        let dir = scratch("cap-err");
+        assert!(read_manifest(&dir.join("nope.item")).is_err());
+        let binary = dir.join("bin.item");
+        std::fs::write(&binary, [0xFF, 0xFE, 0x00, 0xC3]).unwrap();
+        assert_eq!(
+            read_manifest(&binary).unwrap_err().kind(),
+            std::io::ErrorKind::InvalidData
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+    }
 
     fn exe_game(exe: &str) -> Game {
         let mut g = Game::manual("g".into(), "G".into());
