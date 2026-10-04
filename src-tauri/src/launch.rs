@@ -34,6 +34,7 @@ use tauri_plugin_opener::OpenerExt;
 
 use crate::config::{Game, Launch};
 use crate::error::{code, AppError};
+use crate::stores::epic::first_bad_launch_id;
 
 /// Разбор строки аргументов по правилам Windows `CommandLineToArgvW`
 /// (НЕ по POSIX):
@@ -327,6 +328,21 @@ pub fn epic_uri(namespace: &str, catalog_item_id: &str, app_name: &str) -> Strin
     )
 }
 
+/// Ссылка запуска для сохранённой игры Epic. Идентификаторы лежат в конфиге и
+/// целиком попадают в ссылку, поэтому перед запуском они проверяются теми же
+/// правилами, что и при чтении манифеста. Негодное поле — `EPIC_OPEN_FAILED` с
+/// его именем; значение в ошибку не идёт: в нём могут быть любые знаки.
+fn checked_epic_uri(
+    namespace: &str,
+    catalog_item_id: &str,
+    app_name: &str,
+) -> Result<String, AppError> {
+    match first_bad_launch_id(namespace, catalog_item_id, app_name) {
+        Some(field) => Err(AppError::with(code::EPIC_OPEN_FAILED, field)),
+        None => Ok(epic_uri(namespace, catalog_item_id, app_name)),
+    }
+}
+
 /// Ошибка — код с подробностью: фразу на языке интерфейса собирает страница
 /// (спека этапа 6 §6.2).
 pub fn launch(app: &AppHandle, game: &Game) -> Result<(), AppError> {
@@ -342,7 +358,7 @@ pub fn launch(app: &AppHandle, game: &Game) -> Result<(), AppError> {
             catalog_item_id,
             app_name,
         } => {
-            let uri = epic_uri(namespace, catalog_item_id, app_name);
+            let uri = checked_epic_uri(namespace, catalog_item_id, app_name)?;
             app.opener()
                 .open_url(&uri, None::<String>)
                 .map_err(|e| AppError::with(code::EPIC_OPEN_FAILED, e.to_string()))
@@ -395,6 +411,48 @@ mod launch_tests {
         assert_eq!(
             epic_uri("879b0d87", "7d690c12", "41869934"),
             "com.epicgames.launcher://apps/879b0d87%3A7d690c12%3A41869934?action=launch&silent=true"
+        );
+    }
+
+    #[test]
+    fn a_saved_epic_game_with_ordinary_ids_gets_the_official_link() {
+        assert_eq!(
+            checked_epic_uri("879b0d87", "7d690c12", "41869934"),
+            Ok(epic_uri("879b0d87", "7d690c12", "41869934"))
+        );
+        assert!(checked_epic_uri("a.b_c-d", "Fortnite", "0").is_ok());
+    }
+
+    #[test]
+    fn a_saved_epic_id_with_other_characters_is_refused_naming_only_the_field() {
+        let bad = [
+            "", "a b", "a%3Ab", "a:b", "a/b", "a\\b", "a?b", "a&b", "a#b", "a\"b", "a\nb",
+            "игра", " ",
+        ];
+        let fields = ["CatalogNamespace", "CatalogItemId", "AppName"];
+        for (at, field) in fields.into_iter().enumerate() {
+            for value in bad {
+                let mut ids = ["ns", "item", "app"];
+                ids[at] = value;
+                // Подробность — имя поля, а не само значение.
+                assert_eq!(
+                    checked_epic_uri(ids[0], ids[1], ids[2]),
+                    Err(AppError::with(code::EPIC_OPEN_FAILED, field)),
+                    "{field}={value:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_first_bad_saved_epic_id_in_order_is_the_one_named() {
+        assert_eq!(
+            checked_epic_uri("a:b", "x/y", "p q"),
+            Err(AppError::with(code::EPIC_OPEN_FAILED, "CatalogNamespace"))
+        );
+        assert_eq!(
+            checked_epic_uri("ns", "x/y", "p q"),
+            Err(AppError::with(code::EPIC_OPEN_FAILED, "CatalogItemId"))
         );
     }
 

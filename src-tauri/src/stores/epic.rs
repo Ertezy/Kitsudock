@@ -52,6 +52,29 @@ fn is_launch_id(id: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
 }
 
+/// Имя в манифесте первого из трёх идентификаторов, который не годится для
+/// ссылки запуска, — или `None`, если годятся все. Порядок полей постоянный:
+/// в журнал и в ошибку идёт первое по порядку.
+///
+/// Эти три строки целиком попадают в ссылку запуска (`launch::epic_uri`),
+/// поэтому годятся только простые. Проверка нужна дважды: при чтении манифеста,
+/// который лежит в общей для всех папке, и перед запуском сохранённой игры —
+/// конфиг мог быть изменён после того, как игра была найдена.
+pub(crate) fn first_bad_launch_id(
+    namespace: &str,
+    catalog_item_id: &str,
+    app_name: &str,
+) -> Option<&'static str> {
+    [
+        ("CatalogNamespace", namespace),
+        ("CatalogItemId", catalog_item_id),
+        ("AppName", app_name),
+    ]
+    .into_iter()
+    .find(|(_, id)| !is_launch_id(id))
+    .map(|(field, _)| field)
+}
+
 /// Одна запись из содержимого файла `.item`.
 pub fn game_from_manifest(json: &str) -> ManifestEntry {
     let Ok(m) = serde_json::from_str::<Manifest>(json) else {
@@ -60,16 +83,8 @@ pub fn game_from_manifest(json: &str) -> ManifestEntry {
     if m.launch_executable.trim().is_empty() {
         return ManifestEntry::Dlc;
     }
-    // Эти три строки целиком попадают в ссылку запуска (`launch::epic_uri`),
-    // поэтому годятся только простые: манифест лежит в общей для всех папке.
-    for (field, id) in [
-        ("CatalogNamespace", &m.catalog_namespace),
-        ("CatalogItemId", &m.catalog_item_id),
-        ("AppName", &m.app_name),
-    ] {
-        if !is_launch_id(id) {
-            return ManifestEntry::BadId(field);
-        }
+    if let Some(field) = first_bad_launch_id(&m.catalog_namespace, &m.catalog_item_id, &m.app_name) {
+        return ManifestEntry::BadId(field);
     }
     let install_path = PathBuf::from(&m.install_location);
     ManifestEntry::Game(InstalledGame {
