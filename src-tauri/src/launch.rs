@@ -270,11 +270,12 @@ const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// PowerShell по абсолютному пути из системной папки Windows, а не по имени:
 /// поиск по имени смотрит сначала в папку самой программы и в текущую папку.
-/// Переменной нет или она пуста — `C:\Windows`.
+/// Переменной нет, она пуста или путь в ней не абсолютный (относительный
+/// вернул бы поиск от текущей папки) — `C:\Windows`.
 fn powershell_exe(system_root: Option<std::ffi::OsString>) -> PathBuf {
     system_root
-        .filter(|root| !root.is_empty())
         .map(PathBuf::from)
+        .filter(|root| root.is_absolute())
         .unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
         .join("System32")
         .join("WindowsPowerShell")
@@ -574,6 +575,16 @@ mod launch_tests {
         // Пустая переменная — всё равно что её отсутствие: иначе путь стал бы
         // относительным и вернулся бы поиск по имени.
         assert_eq!(powershell_exe(Some("".into())), fallback);
+    }
+
+    #[test]
+    fn a_non_absolute_system_root_is_ignored_like_a_missing_one() {
+        let fallback =
+            PathBuf::from(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe");
+        // Относительный путь вернул бы поиск относительно текущей папки.
+        for root in ["Windows", r"\Windows", "C:Windows", ".", r"..\Windows", "%SystemRoot%"] {
+            assert_eq!(powershell_exe(Some(root.into())), fallback, "{root}");
+        }
     }
 
     #[test]

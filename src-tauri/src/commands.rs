@@ -659,22 +659,71 @@ pub async fn open_log_folder(app: AppHandle) -> Result<(), AppError> {
 /// длиной в килобайты, а нужна только суть.
 const MAX_UI_ERROR_CHARS: usize = 500;
 
+/// Сколько знаков входа просматривается: пробелов и невидимых знаков в тексте
+/// может быть много, и без этого предела бесконечно длинный вход, целиком из
+/// них, не набрал бы ни одного знака и не остановился.
+const MAX_UI_ERROR_SCAN: usize = 8 * MAX_UI_ERROR_CHARS;
+
+/// Знаки общей категории Unicode `Cf` (форматирование): смена направления
+/// письма (U+202A–202E, U+2066–2069), знаки нулевой ширины, метка порядка
+/// байтов, мягкий перенос и прочие. Глазом их не видно, а читающему журнал они
+/// могут показать одну строку вместо другой. Крейта с таблицами Unicode в
+/// приложении нет, поэтому диапазоны перечислены (Unicode 16, сверено с
+/// таблицей категорий).
+fn is_format_char(c: char) -> bool {
+    matches!(
+        c as u32,
+        0x00AD
+            | 0x0600..=0x0605
+            | 0x061C
+            | 0x06DD
+            | 0x070F
+            | 0x0890..=0x0891
+            | 0x08E2
+            | 0x180E
+            | 0x200B..=0x200F
+            | 0x202A..=0x202E
+            | 0x2060..=0x2064
+            | 0x2066..=0x206F
+            | 0xFEFF
+            | 0xFFF9..=0xFFFB
+            | 0x110BD
+            | 0x110CD
+            | 0x13430..=0x1343F
+            | 0x1BCA0..=0x1BCA3
+            | 0x1D173..=0x1D17A
+            | 0xE0001
+            | 0xE0020..=0xE007F
+    )
+}
+
 /// Строка журнала из текста, который прислало окно. Окну доверять нельзя:
 /// перевод строки в тексте дописал бы в журнал «чужую» запись, а управляющие
-/// знаки испортили бы его при чтении. Поэтому каждый управляющий и пробельный
-/// знак (в том числе перевод строки) становится пробелом, подряд идущие
-/// пробелы сворачиваются, текст режется до `MAX_UI_ERROR_CHARS` знаков.
+/// и невидимые знаки испортили бы его при чтении. Поэтому каждый управляющий,
+/// пробельный и форматирующий знак (в том числе перевод строки) становится
+/// пробелом, подряд идущие пробелы сворачиваются.
 fn ui_error_line(message: &str) -> String {
+    sanitized_line(message.chars())
+}
+
+/// Тело `ui_error_line` по потоку знаков. Набор останавливается, как только
+/// собрано `MAX_UI_ERROR_CHARS` знаков (и просмотрено не больше
+/// `MAX_UI_ERROR_SCAN`), так что огромный вход обходится не весь.
+fn sanitized_line(chars: impl Iterator<Item = char>) -> String {
     let mut text = String::new();
-    for c in message.chars() {
-        let c = if c.is_control() || c.is_whitespace() { ' ' } else { c };
+    let mut kept = 0;
+    for c in chars.take(MAX_UI_ERROR_SCAN) {
+        let c = if c.is_control() || c.is_whitespace() || is_format_char(c) { ' ' } else { c };
         if c == ' ' && (text.is_empty() || text.ends_with(' ')) {
             continue;
         }
         text.push(c);
+        kept += 1;
+        if kept == MAX_UI_ERROR_CHARS {
+            break;
+        }
     }
-    let cut: String = text.chars().take(MAX_UI_ERROR_CHARS).collect();
-    format!("[ui] {cut}").trim_end().to_string()
+    format!("[ui] {text}").trim_end().to_string()
 }
 
 /// Записать в журнал ошибку, из-за которой упал интерфейс: у окна своего
@@ -733,6 +782,50 @@ mod tests {
         assert_eq!(ui_error_line(&"a".repeat(500)).chars().count(), 5 + 500);
         let spaced = format!("{} tail", "a".repeat(499));
         assert_eq!(ui_error_line(&spaced), format!("[ui] {}", "a".repeat(499)));
+    }
+
+    #[test]
+    fn bidi_overrides_and_zero_width_characters_become_spaces() {
+        // Смена направления письма и невидимые знаки позволили бы выдать
+        // одну строку журнала за другую при чтении глазами.
+        assert_eq!(ui_error_line("a\u{202e}b\u{2066}c\u{2069}d"), "[ui] a b c d");
+        assert_eq!(ui_error_line("a\u{200b}b\u{200d}c\u{feff}d\u{2060}e"), "[ui] a b c d e");
+    }
+
+    #[test]
+    fn a_character_of_every_format_range_is_neutralised() {
+        // По одному-два знака из каждого диапазона `is_format_char`.
+        for c in [
+            '\u{ad}', '\u{600}', '\u{605}', '\u{61c}', '\u{6dd}', '\u{70f}', '\u{890}', '\u{891}',
+            '\u{8e2}', '\u{180e}', '\u{200b}', '\u{200f}', '\u{202a}', '\u{202e}', '\u{2060}',
+            '\u{2064}', '\u{2066}', '\u{2069}', '\u{206a}', '\u{206f}', '\u{feff}', '\u{fff9}',
+            '\u{fffb}', '\u{110bd}', '\u{110cd}', '\u{13430}', '\u{1343f}', '\u{1bca0}',
+            '\u{1bca3}', '\u{1d173}', '\u{1d17a}', '\u{e0001}', '\u{e0020}', '\u{e007f}',
+        ] {
+            assert_eq!(ui_error_line(&format!("a{c}b")), "[ui] a b", "U+{:04X}", c as u32);
+        }
+    }
+
+    #[test]
+    fn ordinary_text_next_to_the_format_ranges_is_kept() {
+        for c in ['\u{ac}', '\u{ae}', '\u{2070}', '\u{fffc}', '\u{e0100}', 'ё', 'я', '日', '😀'] {
+            assert_eq!(ui_error_line(&format!("a{c}b")), format!("[ui] a{c}b"), "U+{:04X}", c as u32);
+        }
+    }
+
+    #[test]
+    fn building_stops_after_500_characters_even_for_endless_input() {
+        // Бесконечный итератор: без остановки на 500 знаках тест не завершился бы.
+        assert_eq!(
+            sanitized_line(std::iter::repeat('a')),
+            format!("[ui] {}", "a".repeat(500))
+        );
+    }
+
+    #[test]
+    fn endless_whitespace_or_format_characters_cannot_hang_it_either() {
+        assert_eq!(sanitized_line(std::iter::repeat('\n')), "[ui]");
+        assert_eq!(sanitized_line(std::iter::repeat('\u{200b}')), "[ui]");
     }
 
     #[test]

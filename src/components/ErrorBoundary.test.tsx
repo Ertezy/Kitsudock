@@ -102,6 +102,50 @@ describe("запись падения в журнал", () => {
     expect(vi.mocked(api.reportUiError).mock.calls[0]![0].length).toBeLessThanOrEqual(2000);
   });
 
+  /** Нет одиноких половинок суррогатных пар: другое JSON моста не принимает. */
+  function isWellFormed(text: string): boolean {
+    for (let i = 0; i < text.length; i++) {
+      const unit = text.charCodeAt(i);
+      if (unit >= 0xd800 && unit <= 0xdbff) {
+        const next = text.charCodeAt(i + 1);
+        if (!(next >= 0xdc00 && next <= 0xdfff)) return false;
+        i++;
+      } else if (unit >= 0xdc00 && unit <= 0xdfff) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  it("обрезка не разрывает суррогатную пару", () => {
+    vi.mocked(api.reportUiError).mockResolvedValue(undefined);
+    const emoji = String.fromCodePoint(0x1f600);
+    // «Error: » — 7 единиц, ещё 1992 — и граница в 2000 единиц приходится
+    // ровно посередине первой пары.
+    new ErrorBoundary({ children: null }).componentDidCatch(new Error("a".repeat(1992) + emoji + emoji), info);
+    const sent = vi.mocked(api.reportUiError).mock.calls[0]![0];
+    expect(isWellFormed(sent)).toBe(true);
+    expect(Array.from(sent).length).toBeLessThanOrEqual(2000);
+    // Цела та пара, что уместилась: граница считается знаками, а не единицами.
+    expect(sent.endsWith("a" + emoji)).toBe(true);
+  });
+
+  it("целые пары до границы остаются как есть", () => {
+    vi.mocked(api.reportUiError).mockResolvedValue(undefined);
+    const emoji = String.fromCodePoint(0x1f600);
+    new ErrorBoundary({ children: null }).componentDidCatch(new Error(`я${emoji}я`), info);
+    expect(vi.mocked(api.reportUiError).mock.calls[0]![0]).toContain(`я${emoji}я`);
+  });
+
+  it("одинокая половинка пары во входном тексте заменяется, а не уходит по мосту", () => {
+    vi.mocked(api.reportUiError).mockResolvedValue(undefined);
+    const lone = String.fromCharCode(0xd83d);
+    new ErrorBoundary({ children: null }).componentDidCatch(new Error(`x${lone}y`), info);
+    const sent = vi.mocked(api.reportUiError).mock.calls[0]![0];
+    expect(isWellFormed(sent)).toBe(true);
+    expect(sent).toContain(`x${String.fromCharCode(0xfffd)}y`);
+  });
+
   it("сбой самой записи (синхронный или отказ обещания) не вылетает из предохранителя", async () => {
     const boundary = new ErrorBoundary({ children: null });
     vi.mocked(api.reportUiError).mockImplementation(() => {

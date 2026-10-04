@@ -121,8 +121,8 @@ describe("isReleaseUrl", () => {
       "tag/v1\u007f",
       "tag/v1\u00a0",
       "tag/v1\u2028",
-      // U+FEFF: \u0442\u043e\u0442 \u0436\u0435 \u043d\u0430\u0431\u043e\u0440, \u0447\u0442\u043e \u0432 Rust (`is_release_url`), \u0433\u0434\u0435 \u0435\u0433\u043e \u043e\u0442\u0434\u0435\u043b\u044c\u043d\u043e
-      // \u043f\u0435\u0440\u0435\u0447\u0438\u0441\u043b\u044f\u044e\u0442: `char::is_whitespace` \u0435\u0433\u043e \u043f\u0440\u043e\u0431\u0435\u043b\u043e\u043c \u043d\u0435 \u0441\u0447\u0438\u0442\u0430\u0435\u0442.
+      // U+FEFF: тот же набор, что в Rust (`is_release_url`), где его отдельно
+      // перечисляют: `char::is_whitespace` его пробелом не считает.
       "tag/v1\ufeff",
       "tag/\ufeffv1",
       "tag/v1?x=a\ufeffb",

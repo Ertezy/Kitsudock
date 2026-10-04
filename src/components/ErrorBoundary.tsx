@@ -29,8 +29,30 @@ interface State {
   failed: boolean;
 }
 
-/** Дальше Rust всё равно режет текст; здесь — чтобы не гнать по мосту мегабайты. */
+/** Дальше Rust всё равно режет текст; здесь — чтобы не гнать по мосту мегабайты.
+ *  Считается знаками (кодовыми точками), а не 16-битными единицами строки. */
 const MAX_REPORT_CHARS = 2000;
+
+const REPLACEMENT_CHAR = String.fromCharCode(0xfffd);
+
+/**
+ * Первые `max` знаков текста. Резать по единицам (`slice`) нельзя: граница
+ * может прийтись посередине суррогатной пары, и по мосту ушла бы одинокая
+ * половинка, которую JSON моста не принимает — запись пропала бы. Одинокие
+ * половинки, что были в самом тексте, заменяются на U+FFFD по той же причине.
+ */
+function cutText(text: string, max: number): string {
+  // Берётся с запасом по единицам, чтобы не раскладывать огромную строку:
+  // в первых 2·max единицах не меньше max знаков, а разрезанная на краю пара
+  // оказывается за max-м знаком и отбрасывается.
+  return Array.from(text.slice(0, max * 2))
+    .slice(0, max)
+    .map((ch) => {
+      const unit = ch.charCodeAt(0);
+      return ch.length === 1 && unit >= 0xd800 && unit <= 0xdfff ? REPLACEMENT_CHAR : ch;
+    })
+    .join("");
+}
 
 /** «Название: текст» для ошибки; бросить можно и строку, и что угодно. */
 function describe(error: unknown): string {
@@ -62,7 +84,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
    */
   componentDidCatch(error: unknown, info: ErrorInfo) {
     try {
-      const text = `${describe(error)}\n${info?.componentStack ?? ""}`.slice(0, MAX_REPORT_CHARS);
+      const text = cutText(`${describe(error)}\n${info?.componentStack ?? ""}`, MAX_REPORT_CHARS);
       void Promise.resolve(api.reportUiError(text)).catch(() => {});
     } catch {
       // Журнал недоступен — экран отказа от этого не зависит.

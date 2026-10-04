@@ -33,10 +33,12 @@ pub enum ManifestEntry {
     Game(InstalledGame),
     /// DLC: `LaunchExecutable` пуст. Это норма, а не сбой — логировать не надо.
     Dlc,
-    /// JSON не разобрался, не хватает полей или идентификаторы запуска с
-    /// посторонними знаками (см. `is_launch_id`) — вот это уже стоит
-    /// залогировать.
+    /// JSON не разобрался или не хватает полей — вот это уже стоит залогировать.
     Invalid,
+    /// Запись разобралась, но один из идентификаторов запуска пуст или с
+    /// посторонними знаками (см. `is_launch_id`). Внутри — имя поля из
+    /// манифеста: в журнал идёт оно, а не значение.
+    BadId(&'static str),
 }
 
 /// Годится ли идентификатор для ссылки запуска: непустой, только латинские
@@ -60,11 +62,14 @@ pub fn game_from_manifest(json: &str) -> ManifestEntry {
     }
     // Эти три строки целиком попадают в ссылку запуска (`launch::epic_uri`),
     // поэтому годятся только простые: манифест лежит в общей для всех папке.
-    if ![&m.catalog_namespace, &m.catalog_item_id, &m.app_name]
-        .into_iter()
-        .all(|id| is_launch_id(id))
-    {
-        return ManifestEntry::Invalid;
+    for (field, id) in [
+        ("CatalogNamespace", &m.catalog_namespace),
+        ("CatalogItemId", &m.catalog_item_id),
+        ("AppName", &m.app_name),
+    ] {
+        if !is_launch_id(id) {
+            return ManifestEntry::BadId(field);
+        }
     }
     let install_path = PathBuf::from(&m.install_location);
     ManifestEntry::Game(InstalledGame {
@@ -119,7 +124,14 @@ pub fn installed() -> Vec<InstalledGame> {
             ManifestEntry::Game(game) => games.push(game),
             ManifestEntry::Dlc => {}
             ManifestEntry::Invalid => {
-                log::warn!("[epic] манифест {:?} не разобран или с недопустимыми идентификаторами", path);
+                log::warn!("[epic] не могу разобрать манифест {:?}", path);
+            }
+            // Само значение в журнал не идёт: в нём могут быть любые знаки.
+            ManifestEntry::BadId(field) => {
+                log::warn!(
+                    "[epic] в манифесте {:?} недопустимое значение поля {field}: игра пропущена",
+                    path
+                );
             }
         }
     }
@@ -243,9 +255,35 @@ mod tests {
         for field in ["CatalogNamespace", "CatalogItemId", "AppName"] {
             for id in bad {
                 let entry = game_from_manifest(&genshin_with(field, id));
-                assert!(matches!(entry, ManifestEntry::Invalid), "{field}={id:?}");
+                // Не просто «негодно», а с именем поля: оно попадает в журнал.
+                assert!(
+                    matches!(&entry, ManifestEntry::BadId(f) if *f == field),
+                    "{field}={id:?}: {entry:?}"
+                );
             }
         }
+    }
+
+    #[test]
+    fn the_first_bad_identifier_in_manifest_order_is_the_one_named() {
+        let both = genshin_with("AppName", "a b").replace("879b0d8776ab46a59a129983ba78f0ce", "a:b");
+        assert!(matches!(
+            game_from_manifest(&both),
+            ManifestEntry::BadId("CatalogNamespace")
+        ));
+        let item_and_app = genshin_with("AppName", "a b").replace("7d690c122fde4c60bed85405f343ad10", "x/y");
+        assert!(matches!(
+            game_from_manifest(&item_and_app),
+            ManifestEntry::BadId("CatalogItemId")
+        ));
+    }
+
+    #[test]
+    fn a_bad_identifier_is_not_the_same_outcome_as_unreadable_json() {
+        let bad = game_from_manifest(&genshin_with("AppName", "a b"));
+        assert!(matches!(bad, ManifestEntry::BadId(_)));
+        assert!(!matches!(bad, ManifestEntry::Invalid));
+        assert!(!matches!(game_from_manifest("{ not json"), ManifestEntry::BadId(_)));
     }
 
     /// DLC отбрасывается молча и раньше проверки идентификаторов: у него
