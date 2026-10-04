@@ -14,9 +14,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
+      # Все действия закреплены на коммит, а не на тег: тег можно переставить,
+      # коммит нельзя. Тег остался в комментарии, обновления предлагает dependabot.
+      # Токен в .git/config после checkout не нужен: дальше ничего не пушится.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 20
           cache: npm
@@ -29,12 +34,17 @@ jobs:
 
       # Номер в теге и в tauri.conf.json обязан совпадать: иначе в релизе
       # лежал бы установщик с другой версией в имени и в «Программах».
+      # Тег приходит через переменную окружения, а не подстановкой в текст
+      # скрипта: имя тега задаёт тот, кто его создаёт, и в тексте скрипта оно
+      # было бы кодом.
       - name: Версия тега = версия приложения
         shell: pwsh
+        env:
+          TAG: ${{ github.ref_name }}
         run: |
           $conf = Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
-          if ("v$($conf.version)" -ne "${{ github.ref_name }}") {
-            throw "тег ${{ github.ref_name }}, а в tauri.conf.json версия $($conf.version)"
+          if ("v$($conf.version)" -ne $env:TAG) {
+            throw "тег $($env:TAG), а в tauri.conf.json версия $($conf.version)"
           }
 
       # В установщик кладётся самый свежий файл данных — на случай первого
@@ -45,7 +55,7 @@ jobs:
       # Имя установщика постоянное, без номера версии: тогда ссылка
       # releases/latest/download/Kitsudock-setup.exe в README всегда скачивает
       # последнюю версию одним кликом.
-      - uses: tauri-apps/tauri-action@v1
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
