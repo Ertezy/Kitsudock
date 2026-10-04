@@ -12,7 +12,7 @@
 //! не ответит вовсе, — соединение закрывается без ответа, и второй экземпляр
 //! запускается как обычно, без защиты.
 
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::time::Duration;
 
@@ -23,6 +23,9 @@ pub const PORT: u16 = 47632;
 const HELLO: &str = "kitsudock show";
 const REPLY: &str = "kitsudock ok";
 const WAIT: Duration = Duration::from_millis(500);
+/// Сколько байт строки читается с порта: приветствие вместе с личностью —
+/// несколько десятков байт.
+const MAX_LINE: u64 = 256;
 
 pub enum Start {
     /// Порт свободен — этот экземпляр первый.
@@ -69,7 +72,10 @@ pub fn ask_to_show(port: u16, identity: &str) -> bool {
         return false;
     }
     let mut line = String::new();
-    BufReader::new(stream).read_line(&mut line).is_ok() && line.trim_end() == REPLY
+    // Ответ чужой программы читается не дальше `MAX_LINE` байт: без предела
+    // она могла бы гнать байты без конца строки до самого таймаута.
+    BufReader::new(stream.take(MAX_LINE)).read_line(&mut line).is_ok()
+        && line.trim_end() == REPLY
 }
 
 /// Первый экземпляр: на приветствие со своей личностью отвечает и зовёт
@@ -81,7 +87,12 @@ pub fn serve(listener: TcpListener, identity: String, on_show: impl Fn() + Send 
         for stream in listener.incoming().flatten() {
             let _ = stream.set_read_timeout(Some(WAIT));
             let mut line = String::new();
-            if BufReader::new(&stream).read_line(&mut line).is_ok() && line.trim_end() == expected
+            // Порт открыт любой программе на этом компьютере: приветствие —
+            // одна короткая строка, и дальше `MAX_LINE` байт никто не читается.
+            // Клиент без конца строки обрывается сразу, а не по таймауту, и
+            // следующее соединение обслуживается как обычно.
+            if BufReader::new((&stream).take(MAX_LINE)).read_line(&mut line).is_ok()
+                && line.trim_end() == expected
             {
                 let _ = (&stream).write_all(format!("{REPLY}\n").as_bytes());
                 on_show();
@@ -135,6 +146,65 @@ mod tests {
         });
         assert!(matches!(claim(port, r"OTHERDOMAIN\other"), Start::Alone));
         assert!(rx.try_recv().is_err(), "окно чужого пользователя показывать не просили");
+    }
+
+    /// Подключается, шлёт `bytes` байт без перевода строки и ждёт: сервер
+    /// должен оборвать чтение сам, не дожидаясь ни конца строки, ни таймаута.
+    /// Возвращает, сколько байт ответа пришло до закрытия соединения. Сброс
+    /// соединения тоже считается закрытием: сокет с непрочитанным хвостом
+    /// Windows закрывает именно так.
+    fn send_without_newline(port: u16, bytes: usize) -> usize {
+        use std::io::ErrorKind;
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+        stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+        let _ = stream.write_all(&vec![b'x'; bytes]);
+        let mut reply = Vec::new();
+        match stream.read_to_end(&mut reply) {
+            Ok(_) => {}
+            Err(e) if matches!(e.kind(), ErrorKind::ConnectionReset | ErrorKind::ConnectionAborted) => {}
+            Err(e) => panic!("сервер не закрыл соединение: {e}"),
+        }
+        reply.len()
+    }
+
+    #[test]
+    fn a_client_that_never_ends_its_line_is_dropped_and_the_listener_keeps_serving() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let (tx, rx) = mpsc::channel();
+        serve(listener, WHO.to_string(), move || {
+            let _ = tx.send(());
+        });
+
+        let started = std::time::Instant::now();
+        let got = send_without_newline(port, 1024);
+        assert_eq!(got, 0, "плохому клиенту не отвечают");
+        assert!(
+            started.elapsed() < Duration::from_millis(400),
+            "сервер ждал конца строки, вместо того чтобы оборвать чтение на пределе"
+        );
+        assert!(rx.try_recv().is_err(), "окно по такому запросу не показывают");
+
+        // Следующий нормальный экземпляр обслуживается как обычно.
+        assert!(matches!(claim(port, WHO), Start::Handed));
+        rx.recv_timeout(Duration::from_secs(2)).expect("первый экземпляр получил просьбу показать окно");
+    }
+
+    #[test]
+    fn a_reply_that_never_ends_its_line_is_not_read_past_the_limit() {
+        let foreign = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = foreign.local_addr().unwrap().port();
+        std::thread::spawn(move || {
+            for stream in foreign.incoming().flatten() {
+                // Ответ без перевода строки и заметно длиннее предела; соединение
+                // остаётся открытым, как у зависшей чужой программы.
+                let _ = (&stream).write_all(&vec![b'y'; 4096]);
+                std::thread::sleep(Duration::from_secs(3));
+            }
+        });
+        let started = std::time::Instant::now();
+        assert!(!ask_to_show(port, WHO));
+        assert!(started.elapsed() < Duration::from_millis(400), "ответ читался без предела");
     }
 
     #[test]

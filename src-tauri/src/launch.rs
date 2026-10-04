@@ -268,12 +268,26 @@ fn elevation_script(exe: &Path, cwd: &Path, args: &[String]) -> String {
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
+/// PowerShell по абсолютному пути из системной папки Windows, а не по имени:
+/// поиск по имени смотрит сначала в папку самой программы и в текущую папку.
+/// Переменной нет или она пуста — `C:\Windows`.
+fn powershell_exe(system_root: Option<std::ffi::OsString>) -> PathBuf {
+    system_root
+        .filter(|root| !root.is_empty())
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\Windows"))
+        .join("System32")
+        .join("WindowsPowerShell")
+        .join("v1.0")
+        .join("powershell.exe")
+}
+
 /// Запускает игру через PowerShell `Start-Process` (игры с аргументами и запасной
 /// путь, когда оболочка отказала), чтобы Windows показала окно UAC.
 /// Ждать нечего: пользователь может думать над окном сколько угодно, а отказ от
 /// UAC — его выбор, а не ошибка запуска.
 fn start_elevated(exe: &Path, cwd: &Path, args: &[String]) -> std::io::Result<()> {
-    let mut powershell = Command::new("powershell.exe");
+    let mut powershell = Command::new(powershell_exe(std::env::var_os("SystemRoot")));
     powershell
         .args(["-NoProfile", "-NonInteractive", "-Command", "-"])
         .stdin(Stdio::piped())
@@ -542,6 +556,24 @@ mod launch_tests {
             script,
             r#"Start-Process -FilePath 'C:\g\a.exe' -WorkingDirectory 'C:\g' -ArgumentList '-config "C:\My Games\\" "say \"hi\""'"#
         );
+    }
+
+    #[test]
+    fn powershell_is_started_by_absolute_path_from_the_system_root() {
+        assert_eq!(
+            powershell_exe(Some(r"D:\WINNT".into())),
+            PathBuf::from(r"D:\WINNT\System32\WindowsPowerShell\v1.0\powershell.exe")
+        );
+    }
+
+    #[test]
+    fn without_a_system_root_powershell_comes_from_c_windows() {
+        let fallback =
+            PathBuf::from(r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe");
+        assert_eq!(powershell_exe(None), fallback);
+        // Пустая переменная — всё равно что её отсутствие: иначе путь стал бы
+        // относительным и вернулся бы поиск по имени.
+        assert_eq!(powershell_exe(Some("".into())), fallback);
     }
 
     #[test]
