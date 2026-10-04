@@ -26,7 +26,7 @@ tauri-plugin-window-state = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # Windows registry access: Steam install path (custom installs).
-winreg = "0.52"
+winreg = "0.55"
 # Small blocking https client for the remote hub. TLS is rustls with the bundled
 # webpki-roots (the default `tls` feature), not native-tls / the Windows store.
 ureq = { version = "2", features = ["json"] }
