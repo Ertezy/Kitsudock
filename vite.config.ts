@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
@@ -14,4 +15,7 @@ export default defineConfig({
     },
   },
   envPrefix: ["VITE_", "TAURI_ENV_"],
+  // Vitest по умолчанию подменяет CSS пустой строкой, даже при `?raw`. Сторожу
+  // стилей (`src/styles.test.ts`) нужен настоящий текст файла.
+  test: { css: { include: [/styles\.css/] } },
 });
