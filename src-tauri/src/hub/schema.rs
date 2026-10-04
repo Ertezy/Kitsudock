@@ -75,12 +75,19 @@ fn is_dot_segment(segment: &str) -> bool {
 /// Ссылка на страницу релиза: строка начинается с `RELEASES_URL_PREFIX`, в
 /// пути нет сегментов «.» и «..», а во всей строке — обратной косой черты,
 /// пробелов и управляющих знаков. Правило то же, что у сборщика
-/// (`appUrlOk`); крейта `url` в приложении нет, поэтому разбор ручной.
+/// (`appUrlOk`) и у окна (`isReleaseUrl` в `src/lib/update.ts`); крейта `url`
+/// в приложении нет, поэтому разбор ручной.
+///
+/// JS-овское `\s` считает пробелом ещё и U+FEFF, а `char::is_whitespace` — нет,
+/// поэтому он перечислен отдельно: иначе две проверки разошлись бы.
 fn is_release_url(url: &str) -> bool {
     let Some(tail) = url.strip_prefix(RELEASES_URL_PREFIX) else {
         return false;
     };
-    if url.chars().any(|c| c == '\\' || c.is_whitespace() || c.is_control()) {
+    if url
+        .chars()
+        .any(|c| c == '\\' || c == '\u{feff}' || c.is_whitespace() || c.is_control())
+    {
         return false;
     }
     // Путь кончается на «?» или «#»: «..» в запросе и якоре ничего не сворачивает.
@@ -551,6 +558,12 @@ mod tests {
             "tag/v1\u{7f}",
             "tag/v1\u{a0}",
             "tag/v1\u{2028}",
+            // U+FEFF: JS `\s` его считает пробелом, а `char::is_whitespace` в
+            // Rust нет — правило двух проверок должно совпадать.
+            "tag/v1\u{feff}",
+            "tag/\u{feff}v1",
+            "tag/v1?x=a\u{feff}b",
+            "tag/v1#\u{feff}",
             "tag/v1?x=a b",
         ] {
             let url = format!("{RELEASES}{tail}");
