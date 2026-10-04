@@ -655,6 +655,36 @@ pub async fn open_log_folder(app: AppHandle) -> Result<(), AppError> {
         .map_err(|e| AppError::with(code::OPEN_FOLDER_FAILED, e.to_string()))
 }
 
+/// Дольше этого сообщение интерфейса в журнал не идёт: стек падения бывает
+/// длиной в килобайты, а нужна только суть.
+const MAX_UI_ERROR_CHARS: usize = 500;
+
+/// Строка журнала из текста, который прислало окно. Окну доверять нельзя:
+/// перевод строки в тексте дописал бы в журнал «чужую» запись, а управляющие
+/// знаки испортили бы его при чтении. Поэтому каждый управляющий и пробельный
+/// знак (в том числе перевод строки) становится пробелом, подряд идущие
+/// пробелы сворачиваются, текст режется до `MAX_UI_ERROR_CHARS` знаков.
+fn ui_error_line(message: &str) -> String {
+    let mut text = String::new();
+    for c in message.chars() {
+        let c = if c.is_control() || c.is_whitespace() { ' ' } else { c };
+        if c == ' ' && (text.is_empty() || text.ends_with(' ')) {
+            continue;
+        }
+        text.push(c);
+    }
+    let cut: String = text.chars().take(MAX_UI_ERROR_CHARS).collect();
+    format!("[ui] {cut}").trim_end().to_string()
+}
+
+/// Записать в журнал ошибку, из-за которой упал интерфейс: у окна своего
+/// моста к журналу нет. Ничего не возвращает и не падает: журнал — не повод
+/// для второй ошибки поверх первой.
+#[tauri::command]
+pub async fn report_ui_error(message: String) {
+    log::error!("{}", ui_error_line(&message));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -676,6 +706,39 @@ mod tests {
             icon: None,
             video: None,
         }
+    }
+
+    #[test]
+    fn a_ui_error_goes_to_the_log_as_one_tagged_line() {
+        assert_eq!(
+            ui_error_line("TypeError: x is undefined"),
+            "[ui] TypeError: x is undefined"
+        );
+    }
+
+    #[test]
+    fn newlines_and_control_characters_cannot_split_or_forge_a_log_line() {
+        let line = ui_error_line("boom\r\n[error] forged\n\tat f()\u{0}\u{1b}[31m\u{2028}end");
+        assert_eq!(line, "[ui] boom [error] forged at f() [31m end");
+        assert!(!line.chars().any(|c| c.is_control()), "{line:?}");
+    }
+
+    #[test]
+    fn a_ui_error_is_cut_to_500_characters_not_bytes() {
+        let long = "ж".repeat(2000);
+        let line = ui_error_line(&long);
+        assert_eq!(line.chars().count(), "[ui] ".chars().count() + 500);
+        assert!(line.ends_with('ж'));
+        // Ровно на пределе — без изменений; пробел на срезе не остаётся.
+        assert_eq!(ui_error_line(&"a".repeat(500)).chars().count(), 5 + 500);
+        let spaced = format!("{} tail", "a".repeat(499));
+        assert_eq!(ui_error_line(&spaced), format!("[ui] {}", "a".repeat(499)));
+    }
+
+    #[test]
+    fn an_empty_ui_error_still_leaves_a_line() {
+        assert_eq!(ui_error_line(""), "[ui]");
+        assert_eq!(ui_error_line(" \n\t "), "[ui]");
     }
 
     #[test]

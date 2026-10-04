@@ -95,6 +95,8 @@ export const api = {
   clearImageCache: () => invoke<number>("clear_image_cache"),
   getAbout: () => invoke<About>("get_about"),
   openLogFolder: () => invoke<void>("open_log_folder"),
+  /** Записать в журнал приложения, из-за чего упал интерфейс (Rust режет и чистит текст). */
+  reportUiError: (message: string) => invoke<void>("report_ui_error", { message }),
 
   /** Выбрать исполняемый файл игры. `null` — человек отменил. */
   pickExe: async () => {

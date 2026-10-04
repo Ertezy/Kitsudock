@@ -203,7 +203,8 @@ pub fn run() {
             commands::image_cache_size,
             commands::clear_image_cache,
             commands::get_about,
-            commands::open_log_folder
+            commands::open_log_folder,
+            commands::report_ui_error
         ])
         .run(tauri::generate_context!())
         .expect("ошибка при запуске приложения");

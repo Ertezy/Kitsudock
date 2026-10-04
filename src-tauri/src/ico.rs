@@ -24,6 +24,12 @@ const MAX_SIDE: u32 = 1024;
 
 const PNG_MAGIC: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
 
+/// Потолок для готового PNG, который отдаётся как есть. Такую картинку никто
+/// не проверяет: она ложится в кеш байт в байт и потом уходит окну. Настоящая
+/// иконка 256×256 весит сотни килобайт; всё, что крупнее мегабайта, уступает
+/// место следующей картинке группы.
+const MAX_PNG_ICON_BYTES: usize = 1024 * 1024;
+
 /// Число из двух байтов, младшим вперёд.
 fn u16_at(b: &[u8], off: usize) -> Option<u16> {
     let s = b.get(off..off.checked_add(2)?)?;
@@ -42,7 +48,9 @@ fn u32_at(b: &[u8], off: usize) -> Option<u32> {
 /// группы, а если не подошла ни одна — игра получает букву-заглушку.
 pub fn to_png(resource: &[u8]) -> Option<Vec<u8>> {
     if resource.get(..8) == Some(&PNG_MAGIC) {
-        return Some(resource.to_vec());
+        // Слишком большой готовый PNG — не иконка: пусть вызывающий возьмёт
+        // следующую картинку группы.
+        return (resource.len() <= MAX_PNG_ICON_BYTES).then(|| resource.to_vec());
     }
     let (width, height, pixels) = decode_dib(resource)?;
     Some(encode_png(width, height, &pixels))
@@ -238,6 +246,31 @@ mod tests {
         let mut png = Vec::from(PNG_MAGIC);
         png.extend_from_slice(b"whatever follows");
         assert_eq!(to_png(&png), Some(png.clone()));
+    }
+
+    fn png_of_len(len: usize) -> Vec<u8> {
+        let mut png = Vec::from(PNG_MAGIC);
+        png.resize(len, 0);
+        png
+    }
+
+    #[test]
+    fn a_png_resource_up_to_the_cap_is_passed_through_and_one_byte_more_is_refused() {
+        let at_cap = png_of_len(MAX_PNG_ICON_BYTES);
+        // Без assert_eq!: при отказе он напечатал бы мегабайт байтов.
+        assert!(to_png(&at_cap).as_deref() == Some(&at_cap[..]), "на пределе — как есть");
+        assert!(to_png(&png_of_len(MAX_PNG_ICON_BYTES + 1)).is_none(), "на байт больше — отказ");
+    }
+
+    #[test]
+    fn a_refused_png_hands_the_icon_over_to_the_next_candidate() {
+        // Как в `icons::resolve`: первая картинка, которую удалось привести к
+        // PNG, и становится иконкой; слишком большая уступает следующей.
+        let next = dib(2, 2, 32, &[[1, 2, 3, 255]; 4]);
+        let candidates = [png_of_len(MAX_PNG_ICON_BYTES + 1), next.clone()];
+        let picked = candidates.iter().find_map(|c| to_png(c)).expect("следующая картинка подошла");
+        assert_eq!(picked, to_png(&next).unwrap());
+        assert_eq!(picked.get(16..24), Some(&[0, 0, 0, 2, 0, 0, 0, 2][..]));
     }
 
     #[test]

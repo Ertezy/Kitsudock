@@ -1,5 +1,6 @@
-import { Component, type ReactNode } from "react";
+import { Component, type ErrorInfo, type ReactNode } from "react";
 import { currentT } from "../i18n";
+import { api } from "../lib/api";
 
 /**
  * Что видно вместо окна, если отрисовка упала. Без этого React убирает всё
@@ -28,6 +29,19 @@ interface State {
   failed: boolean;
 }
 
+/** Дальше Rust всё равно режет текст; здесь — чтобы не гнать по мосту мегабайты. */
+const MAX_REPORT_CHARS = 2000;
+
+/** «Название: текст» для ошибки; бросить можно и строку, и что угодно. */
+function describe(error: unknown): string {
+  if (error instanceof Error) return `${error.name}: ${error.message}`;
+  try {
+    return String(error);
+  } catch {
+    return "(unprintable value)";
+  }
+}
+
 /**
  * Корневой предохранитель. Классом, потому что у React 18 нет хука для
  * перехвата ошибок отрисовки. Ловит падения при отрисовке и в жизненном
@@ -38,6 +52,21 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
 
   static getDerivedStateFromError(): State {
     return { failed: true };
+  }
+
+  /**
+   * Падение уходит в журнал приложения: у окна своего журнала нет, а без
+   * записи по жалобе «окно сломалось» не из чего понять, что именно упало.
+   * Из предохранителя ничего не вылетает: сбой записи не должен стать второй
+   * ошибкой поверх первой.
+   */
+  componentDidCatch(error: unknown, info: ErrorInfo) {
+    try {
+      const text = `${describe(error)}\n${info?.componentStack ?? ""}`.slice(0, MAX_REPORT_CHARS);
+      void Promise.resolve(api.reportUiError(text)).catch(() => {});
+    } catch {
+      // Журнал недоступен — экран отказа от этого не зависит.
+    }
   }
 
   render() {
