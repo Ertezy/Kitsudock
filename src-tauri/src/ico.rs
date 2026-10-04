@@ -25,9 +25,10 @@ const MAX_SIDE: u32 = 1024;
 const PNG_MAGIC: [u8; 8] = [0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
 
 /// Потолок для готового PNG, который отдаётся как есть. Такую картинку никто
-/// не проверяет: она ложится в кеш байт в байт и потом уходит окну. Настоящая
-/// иконка 256×256 весит сотни килобайт; всё, что крупнее мегабайта, уступает
-/// место следующей картинке группы.
+/// не разбирает: она ложится в кеш байт в байт и потом уходит окну. Настоящая
+/// иконка 256×256 весит сотни килобайт; всё, что крупнее мегабайта или чьи
+/// стороны, записанные в заголовке, больше `MAX_SIDE`, уступает место
+/// следующей картинке группы.
 const MAX_PNG_ICON_BYTES: usize = 1024 * 1024;
 
 /// Число из двух байтов, младшим вперёд.
@@ -42,6 +43,21 @@ fn u32_at(b: &[u8], off: usize) -> Option<u32> {
     Some(u32::from_le_bytes([s[0], s[1], s[2], s[3]]))
 }
 
+/// Число из четырёх байтов, старшим вперёд (так в PNG).
+fn u32_be_at(b: &[u8], off: usize) -> Option<u32> {
+    let s = b.get(off..off.checked_add(4)?)?;
+    Some(u32::from_be_bytes([s[0], s[1], s[2], s[3]]))
+}
+
+/// Ширина и высота готового PNG из заголовка IHDR — первого куска после подписи
+/// (байты 16..24). Нет куска IHDR на месте или файл короче — `None`.
+fn png_size(png: &[u8]) -> Option<(u32, u32)> {
+    if png.get(12..16)? != b"IHDR" {
+        return None;
+    }
+    Some((u32_be_at(png, 16)?, u32_be_at(png, 20)?))
+}
+
 /// Картинка иконки в виде PNG — или `None`, если этот ресурс нам не по зубам.
 ///
 /// `None` здесь не беда: вызывающий переходит к следующей картинке той же
@@ -49,8 +65,12 @@ fn u32_at(b: &[u8], off: usize) -> Option<u32> {
 pub fn to_png(resource: &[u8]) -> Option<Vec<u8>> {
     if resource.get(..8) == Some(&PNG_MAGIC) {
         // Слишком большой готовый PNG — не иконка: пусть вызывающий возьмёт
-        // следующую картинку группы.
-        return (resource.len() <= MAX_PNG_ICON_BYTES).then(|| resource.to_vec());
+        // следующую картинку группы. Размер в байтах мало что говорит о
+        // размере картинки: стороны берутся из заголовка и не должны быть ни
+        // нулевыми, ни больше потолка, как у картинки старого формата.
+        let sides_fit = png_size(resource)
+            .is_some_and(|(w, h)| (1..=MAX_SIDE).contains(&w) && (1..=MAX_SIDE).contains(&h));
+        return (resource.len() <= MAX_PNG_ICON_BYTES && sides_fit).then(|| resource.to_vec());
     }
     let (width, height, pixels) = decode_dib(resource)?;
     Some(encode_png(width, height, &pixels))
@@ -241,17 +261,73 @@ mod tests {
         out
     }
 
+    /// PNG без картинки: подпись, кусок IHDR с заданными сторонами, дальше нули
+    /// до `len` байт (но не короче самого заголовка).
+    fn png_with(width: u32, height: u32, len: usize) -> Vec<u8> {
+        let mut png = Vec::from(PNG_MAGIC);
+        png.extend_from_slice(&13u32.to_be_bytes());
+        png.extend_from_slice(b"IHDR");
+        png.extend_from_slice(&width.to_be_bytes());
+        png.extend_from_slice(&height.to_be_bytes());
+        png.resize(len.max(png.len()), 0);
+        png
+    }
+
+    fn png_of_len(len: usize) -> Vec<u8> {
+        png_with(256, 256, len)
+    }
+
     #[test]
     fn a_png_resource_is_passed_through_untouched() {
-        let mut png = Vec::from(PNG_MAGIC);
+        let mut png = png_with(256, 256, 0);
         png.extend_from_slice(b"whatever follows");
         assert_eq!(to_png(&png), Some(png.clone()));
     }
 
-    fn png_of_len(len: usize) -> Vec<u8> {
-        let mut png = Vec::from(PNG_MAGIC);
-        png.resize(len, 0);
-        png
+    #[test]
+    fn a_png_with_sides_up_to_the_cap_is_passed_through() {
+        for (w, h) in [(1, 1), (16, 16), (256, 256), (MAX_SIDE, 1), (1, MAX_SIDE), (MAX_SIDE, MAX_SIDE)] {
+            let png = png_with(w, h, 0);
+            assert_eq!(to_png(&png), Some(png.clone()), "{w}x{h}");
+        }
+    }
+
+    #[test]
+    fn a_png_with_a_side_over_the_cap_or_zero_is_refused() {
+        // Малый файл, но заголовок обещает огромную картинку: окну её отдавать
+        // нельзя, разворачиваться она будет уже в нём.
+        for (w, h) in [
+            (MAX_SIDE + 1, 256),
+            (256, MAX_SIDE + 1),
+            (MAX_SIDE + 1, MAX_SIDE + 1),
+            (u32::MAX, 1),
+            (1, u32::MAX),
+            (0, 256),
+            (256, 0),
+        ] {
+            assert_eq!(to_png(&png_with(w, h, 0)), None, "{w}x{h}");
+        }
+    }
+
+    #[test]
+    fn a_png_without_a_readable_header_is_refused() {
+        // Подпись одна, короче заголовка, и на месте IHDR что-то другое.
+        let full = png_with(256, 256, 0);
+        assert_eq!(to_png(&PNG_MAGIC), None);
+        for cut in [8, 12, 16, 20, 23] {
+            assert_eq!(to_png(&full[..cut]), None, "обрезано до {cut} байт");
+        }
+        let mut other_chunk = full.clone();
+        other_chunk[12..16].copy_from_slice(b"IDAT");
+        assert_eq!(to_png(&other_chunk), None);
+    }
+
+    #[test]
+    fn a_png_refused_for_its_sides_hands_the_icon_over_to_the_next_candidate() {
+        let next = dib(2, 2, 32, &[[1, 2, 3, 255]; 4]);
+        let candidates = [png_with(MAX_SIDE + 1, 256, 0), next.clone()];
+        let picked = candidates.iter().find_map(|c| to_png(c)).expect("следующая картинка подошла");
+        assert_eq!(picked, to_png(&next).unwrap());
     }
 
     #[test]

@@ -140,18 +140,23 @@ where
     }
 }
 
-/// Ролики живут только на ютубе: адрес любого другого сайта в панели —
-/// кнопка, которая открывает его в браузере человека от имени приложения.
-const YOUTUBE_URL_PREFIX: &str = "https://www.youtube.com/";
+/// Ролики живут только на ютубе, и только по адресам двух видов, которые
+/// отдаёт сборщик: обычный ролик и короткий. Любая другая страница сайта или
+/// другой сайт — это в панели кнопка, которая открывает адрес в браузере
+/// человека от имени приложения.
+const YOUTUBE_VIDEO_PREFIXES: [&str; 2] = [
+    "https://www.youtube.com/watch?v=",
+    "https://www.youtube.com/shorts/",
+];
 
 /// Массив видео: битые записи пропускаются, как у `lenient_vec`, а ролики с
-/// адресом не на `YOUTUBE_URL_PREFIX` отбрасываются поодиночке.
+/// адресом не на `YOUTUBE_VIDEO_PREFIXES` отбрасываются поодиночке.
 fn lenient_videos<'de, D>(d: D) -> Result<Vec<Video>, D::Error>
 where
     D: Deserializer<'de>,
 {
     let mut videos: Vec<Video> = lenient_vec(d)?;
-    videos.retain(|v| v.url.starts_with(YOUTUBE_URL_PREFIX));
+    videos.retain(|v| YOUTUBE_VIDEO_PREFIXES.iter().any(|p| v.url.starts_with(p)));
     Ok(videos)
 }
 
@@ -590,6 +595,43 @@ mod tests {
         let urls: Vec<&str> = d.videos.iter().map(|v| v.url.as_str()).collect();
         assert_eq!(urls, ["https://www.youtube.com/watch?v=a", "https://www.youtube.com/watch?v=g"]);
         assert_eq!(d.updated_at, 7, "остальной файл читается");
+    }
+
+    #[test]
+    fn only_watch_and_shorts_pages_of_youtube_are_kept() {
+        let video = |url: &str| {
+            serde_json::json!({"gameId": "hsr", "title": "T", "url": url, "thumb": null,
+                "publishedAt": 1, "duration": null, "premiere": false})
+        };
+        let kept = [
+            "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+            "https://www.youtube.com/shorts/Q-ipLPGL8Qg",
+        ];
+        let dropped = [
+            // Другие страницы того же сайта.
+            "https://www.youtube.com/",
+            "https://www.youtube.com/account",
+            "https://www.youtube.com/redirect?q=https%3A%2F%2Fevil.test%2F",
+            "https://www.youtube.com/playlist?list=PL1",
+            "https://www.youtube.com/@channel",
+            "https://www.youtube.com/live/abc",
+            "https://www.youtube.com/embed/abc",
+            "https://www.youtube.com/watch",
+            "https://www.youtube.com/watch/abc",
+            "https://www.youtube.com/watch?x=1&v=abc",
+            "https://www.youtube.com/shorts",
+            // Чужие приставки к тому же началу.
+            "https://www.youtube.com.evil.test/watch?v=a",
+            "https://www.youtube.com@evil.test/shorts/a",
+            "http://www.youtube.com/shorts/a",
+            "HTTPS://www.youtube.com/shorts/a",
+            " https://www.youtube.com/watch?v=a",
+        ];
+        let all: Vec<_> = kept.iter().chain(dropped.iter()).map(|u| video(u)).collect();
+        let hub = serde_json::json!({"version": 2, "updatedAt": 7, "videos": all});
+        let d: HubData = serde_json::from_str(&hub.to_string()).unwrap();
+        let urls: Vec<&str> = d.videos.iter().map(|v| v.url.as_str()).collect();
+        assert_eq!(urls, kept);
     }
 
     #[test]
