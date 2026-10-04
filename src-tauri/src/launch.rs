@@ -245,6 +245,15 @@ fn ps_string(value: &str) -> String {
     }
 }
 
+/// Путь для `-FilePath` и `-WorkingDirectory`. Windows PowerShell 5.1 читает оба
+/// значения как шаблон имён: `[`, `]` и обратная кавычка в них значили бы не сами
+/// себя, и запуск мог бы попасть в другой файл или папку, подходящие под шаблон.
+/// `WildcardPattern.Escape` превращает их в буквальные знаки, и стартует именно
+/// тот файл, который выбран, и в его собственной папке.
+fn ps_literal_path(path: &str) -> String {
+    format!("([Management.Automation.WildcardPattern]::Escape({}))", ps_string(path))
+}
+
 /// Скрипт для PowerShell: `Start-Process` идёт через ShellExecute, а он
 /// показывает UAC. Каталог задан явно, как и у обычного запуска. Аргументы —
 /// ОДНОЙ строкой, собранной по правилам Windows: массив в `-ArgumentList`
@@ -254,8 +263,8 @@ fn ps_string(value: &str) -> String {
 fn elevation_script(exe: &Path, cwd: &Path, args: &[String]) -> String {
     let mut script = format!(
         "Start-Process -FilePath {} -WorkingDirectory {}",
-        ps_string(&exe.to_string_lossy()),
-        ps_string(&cwd.to_string_lossy()),
+        ps_literal_path(&exe.to_string_lossy()),
+        ps_literal_path(&cwd.to_string_lossy()),
     );
     if !args.is_empty() {
         script.push_str(" -ArgumentList ");
@@ -523,8 +532,47 @@ mod launch_tests {
         );
         assert_eq!(
             script,
-            r"Start-Process -FilePath 'C:\Games\Genshin Impact\GenshinImpact.exe' -WorkingDirectory 'C:\Games\Genshin Impact'"
+            r"Start-Process -FilePath ([Management.Automation.WildcardPattern]::Escape('C:\Games\Genshin Impact\GenshinImpact.exe')) -WorkingDirectory ([Management.Automation.WildcardPattern]::Escape('C:\Games\Genshin Impact'))"
         );
+    }
+
+    #[test]
+    fn brackets_in_the_path_are_escaped_so_the_exact_file_starts_in_its_own_folder() {
+        // Оба значения PowerShell 5.1 читает как шаблон, поэтому экранируются оба.
+        let script = elevation_script(
+            Path::new(r"C:\Games\[ab]\g[1].exe"),
+            Path::new(r"C:\Games\[ab]"),
+            &[],
+        );
+        assert_eq!(
+            script,
+            r"Start-Process -FilePath ([Management.Automation.WildcardPattern]::Escape('C:\Games\[ab]\g[1].exe')) -WorkingDirectory ([Management.Automation.WildcardPattern]::Escape('C:\Games\[ab]'))"
+        );
+    }
+
+    #[test]
+    fn escaping_wraps_the_whole_path_value_with_quotes_and_non_ascii_intact() {
+        // Апостроф и кириллица рядом со скобками: кавычки удвоены, кириллица
+        // по-прежнему вставлена кодами, а `Escape` получает всё значение целиком.
+        let script = elevation_script(
+            Path::new(r"D:\Игры [it's]\a.exe"),
+            Path::new(r"D:\Игры [it's]"),
+            &[],
+        );
+        assert!(script.is_ascii(), "{script}");
+        let (file_path, working_directory) = script
+            .strip_prefix("Start-Process -FilePath ")
+            .and_then(|rest| rest.split_once(" -WorkingDirectory "))
+            .expect("оба параметра на месте");
+        for value in [file_path, working_directory] {
+            assert!(
+                value.starts_with(r"([Management.Automation.WildcardPattern]::Escape(('D:\'+[char]0x0418+"),
+                "{value}"
+            );
+            assert!(value.contains("[it''s]"), "{value}");
+            assert!(value.ends_with("')))"), "{value}");
+        }
+        assert!(file_path.ends_with(r"\a.exe')))"), "{file_path}");
     }
 
     #[test]
@@ -542,7 +590,7 @@ mod launch_tests {
         );
         assert_eq!(
             script,
-            r"Start-Process -FilePath 'C:\O''Neil''s\a.exe' -WorkingDirectory 'C:\O''Neil''s' -ArgumentList '-name it''s'"
+            r"Start-Process -FilePath ([Management.Automation.WildcardPattern]::Escape('C:\O''Neil''s\a.exe')) -WorkingDirectory ([Management.Automation.WildcardPattern]::Escape('C:\O''Neil''s')) -ArgumentList '-name it''s'"
         );
     }
 
@@ -555,7 +603,7 @@ mod launch_tests {
         let script = elevation_script(Path::new(r"C:\g\a.exe"), Path::new(r"C:\g"), &args);
         assert_eq!(
             script,
-            r#"Start-Process -FilePath 'C:\g\a.exe' -WorkingDirectory 'C:\g' -ArgumentList '-config "C:\My Games\\" "say \"hi\""'"#
+            r#"Start-Process -FilePath ([Management.Automation.WildcardPattern]::Escape('C:\g\a.exe')) -WorkingDirectory ([Management.Automation.WildcardPattern]::Escape('C:\g')) -ArgumentList '-config "C:\My Games\\" "say \"hi\""'"#
         );
     }
 
@@ -595,7 +643,9 @@ mod launch_tests {
             &["ё".to_string()],
         );
         assert!(script.is_ascii(), "{script}");
-        assert!(script.starts_with(r"Start-Process -FilePath ('D:\'+[char]0x0418+"));
+        assert!(script.starts_with(
+            r"Start-Process -FilePath ([Management.Automation.WildcardPattern]::Escape(('D:\'+[char]0x0418+"
+        ));
         assert!(script.contains(" -ArgumentList ("));
     }
 }
