@@ -131,6 +131,25 @@ function zProblems(decls: Decl[]): string[] {
     .map((d) => `${d.selector} { z-index: ${d.value} }`);
 }
 
+const NAMED =
+  "black|white|red|green|blue|yellow|orange|pink|purple|violet|brown|gold|silver|gray|grey|maroon|navy|teal|aqua|cyan|magenta|fuchsia|lime|olive|indigo|crimson|coral|salmon|plum|lavender";
+const COLOUR_LITERAL = new RegExp(
+  `#[0-9a-f]{3,8}(?![\\w-])|(?<![\\w-])(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\\(|(?<![\\w-])(${NAMED})(?![\\w-])`,
+  "i",
+);
+
+/**
+ * Цвет вне :root — только из токенов. Проверяются все свойства, не только
+ * `color` и `background`: тень, рамка, градиент, полоса прокрутки и `fill` тоже
+ * несут цвет. Разрешены `transparent`, `currentColor`, `inherit` и смесь
+ * токенов через `color-mix` — в них нет числа, которое разойдётся с палитрой.
+ */
+function colourProblems(decls: Decl[]): string[] {
+  return decls
+    .filter((d) => !isRoot(d.selector) && COLOUR_LITERAL.test(d.value))
+    .map((d) => `${d.selector} { ${d.prop}: ${d.value} }`);
+}
+
 const decls = parse(rawCss);
 
 describe("стили берут значения только из шкал", () => {
@@ -180,6 +199,36 @@ describe("стили берут значения только из шкал", ()
     expect(zProblems(decls)).toEqual([]);
   });
 
+  it("цвета вне :root — только из токенов", () => {
+    expect(colourProblems(decls)).toEqual([]);
+  });
+});
+
+describe("варианты палитры", () => {
+  const rootTokens = (selector: (s: string) => boolean) =>
+    new Map(decls.filter((d) => isRoot(d.selector) && selector(d.selector) && d.prop.startsWith("--")).map((d) => [d.prop, d.value]));
+  const base = rootTokens((s) => s === ":root");
+  /** Цветовые токены основы: те, в чьих значениях есть цвет числом. */
+  const colourTokens = [...base].filter(([, v]) => COLOUR_LITERAL.test(v)).map(([k]) => k);
+  const variants = [...new Set([...rawCss.matchAll(/:root\[data-palette="([^"]+)"\]/g)].map((m) => m[1]))];
+
+  it("основа задаёт цвета токенами, и их хватает на весь интерфейс", () => {
+    for (const t of ["--bg", "--glass", "--card", "--line", "--ink", "--ink-dim", "--ink-faint", "--accent", "--accent-ink", "--content", "--content-soft", "--label", "--danger", "--shadow-1", "--shadow-2", "--shadow-3", "--glass-edge"]) {
+      expect(colourTokens, t).toContain(t);
+    }
+  });
+
+  it("три варианта: a, b, c", () => {
+    expect(variants.sort()).toEqual(["a", "b", "c"]);
+  });
+
+  it("каждый вариант задаёт все цветовые токены и ничего, кроме них", () => {
+    for (const v of variants) {
+      const own = rootTokens((s) => s.split(",").some((part) => part.trim() === `:root[data-palette="${v}"]`));
+      for (const t of colourTokens) expect([...own.keys()], `${v}: ${t}`).toContain(t);
+      for (const t of own.keys()) expect(colourTokens, `${v}: лишний ${t}`).toContain(t);
+    }
+  });
 });
 
 describe("сторож ловит нарушения", () => {
@@ -206,6 +255,24 @@ describe("сторож ловит нарушения", () => {
     expect(zProblems(css(".x { z-index: calc(var(--z-ui) + 1); }"))).toHaveLength(1);
     expect(zProblems(css(".x { z-index: 11; }"))).toHaveLength(1);
     expect(zProblems(css(".x { z-index: var(--z-ui-raised); }"))).toEqual([]);
+  });
+
+  it("цвет числом или словом вне :root не проходит", () => {
+    const bad = [
+      ".x { color: #fff; }",
+      ".x { background: rgba(0, 0, 0, 0.5); }",
+      ".x { box-shadow: 0 2px 4px hsl(0 0% 0% / 0.4); }",
+      ".x { border: 1px solid white; }",
+      ".x { background-image: linear-gradient(#000, transparent); }",
+      ".x { outline-color: oklch(0.7 0.1 30); }",
+      ".x { fill: red; }",
+      ".x { scrollbar-color: rgba(255, 255, 255, 0.2) transparent; }",
+      ".x { text-shadow: 0 1px 2px black; }",
+      ".x { --tone: #123456; }",
+    ];
+    for (const b of bad) expect(colourProblems(css(b)), b).toHaveLength(1);
+    const good = ":root { --a: #fff; } .x { color: var(--a); background: color-mix(in srgb, var(--a) 10%, transparent); border-color: currentColor; fill: inherit; outline: 0; }";
+    expect(colourProblems(css(good))).toEqual([]);
   });
 
   it("точка с запятой и скобки внутри значения не ломают разбор", () => {

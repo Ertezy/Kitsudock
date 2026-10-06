@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import apiSource from "../lib/api.ts?raw";
 import viteConfig from "../../vite.config.ts?raw";
+import stylesCss from "../styles.css?raw";
 import type { GameView, HubData } from "../types";
 import type { Scenario } from "./backend";
 
@@ -76,6 +77,15 @@ describe("адрес стенда", () => {
   it("незнакомое значение заменяется значением по умолчанию", async () => {
     const { readParams, DEFAULT_PARAMS } = await import("./backend");
     expect(readParams("?scenario=bogus&lang=de&motion=maybe&palette=nope")).toEqual(DEFAULT_PARAMS);
+  });
+
+  it("предлагает нынешнюю палитру и три варианта, у каждого варианта есть стили", async () => {
+    const { readParams, PALETTES } = await import("./backend");
+    expect([...PALETTES]).toEqual(["current", "a", "b", "c"]);
+    for (const p of PALETTES) expect(readParams(`?palette=${p}`).palette).toBe(p);
+    // `current` — это стили без атрибута; у остальных — свой блок `:root[data-palette]`.
+    const blocks = new Set([...stylesCss.matchAll(/:root\[data-palette="([^"]+)"\]/g)].map((m) => m[1]));
+    expect([...blocks].sort()).toEqual(PALETTES.filter((p) => p !== "current"));
   });
 });
 

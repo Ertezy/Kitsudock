@@ -27,8 +27,11 @@ export type Scenario = "normal" | "loading" | "offline" | "stale" | "firstRun";
 
 export const SCENARIOS: readonly Scenario[] = ["normal", "loading", "offline", "stale", "firstRun"];
 
-/** Варианты палитры. Следующие задачи дописывают сюда значения, больше ничего. */
-export const PALETTES: readonly string[] = ["current"];
+/**
+ * Варианты палитры: `current` — нынешние стили без атрибута, `a`, `b`, `c` —
+ * блоки `:root[data-palette]` в `src/styles.css` (спека полировки, §4.2).
+ */
+export const PALETTES: readonly string[] = ["current", "a", "b", "c"];
 
 /** Всё состояние стенда — это адрес: `?scenario=normal&lang=ru&motion=on&palette=current`. */
 export interface PreviewParams {

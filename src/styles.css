@@ -1,10 +1,20 @@
 /* Два акцента, разведённые по работе.
  *
- * Жёлтый — цвет ДЕЙСТВИЯ: то, что нажимают или на что надо среагировать.
- * Розовый — цвет СОДЕРЖИМОГО: то, что просто читают.
+ * Цвет ДЕЙСТВИЯ (--accent, сейчас жёлтый): то, что нажимают или на что надо
+ * среагировать. Цвет СОДЕРЖИМОГО (--content, сейчас розовый): то, что просто
+ * читают.
  *
- * Разделение не украшение: жёлтый и розовый рядом дерутся за внимание и оба
- * проигрывают. Пока они не встречаются на одном элементе, оба работают. */
+ * Разделение не украшение: два акцента рядом дерутся за внимание и оба
+ * проигрывают. Пока они не встречаются на одном элементе, оба работают.
+ *
+ * Палитра пересматривается (спека полировки, §4.2): блок `:root` ниже —
+ * нынешняя, а под ним три варианта `:root[data-palette="a" | "b" | "c"]`, их
+ * включает переключатель стенда предпросмотра. Владелец выбирает один, его
+ * значения переезжают сюда, остальные варианты удаляются. Правило двух ролей
+ * от выбора не зависит.
+ *
+ * Любой цвет вне `:root` — только токеном: так вариант палитры меняет весь
+ * интерфейс разом. Число цвета в правиле не пропускает `src/styles.test.ts`. */
 :root {
   /* Основа. Почти чёрный фон, панель и карточки — синевато-серые поверх него. */
   --bg: #070707;
@@ -28,6 +38,24 @@
   --label: #fdcff3;
 
   --danger: #ff8a76;
+  /* Метка премьеры на превью видео — красная, как принято у видеосервисов. */
+  --premiere: #c0392b;
+
+  /* Светлое поверх тёмного: дорожка полосы баннера, точки карусели (обычная и
+     будущего баннера), полоса прокрутки, подпись-заглушка вместо картинки. */
+  --track: rgba(255, 255, 255, 0.14);
+  --dot: rgba(255, 255, 255, 0.25);
+  --dot-dim: rgba(255, 255, 255, 0.12);
+  --scrollbar: rgba(255, 255, 255, 0.22);
+  --fallback-ink: rgba(255, 255, 255, 0.55);
+
+  /* Тёмные подложки поверх арта: мелкий текст и значки на картинке читаются на
+     любом фоне. Подпись над кнопкой PLAY; стрелки карусели в покое и под
+     курсором; длительность видео. */
+  --plate: rgba(14, 15, 20, 0.66);
+  --plate-soft: rgba(10, 10, 14, 0.45);
+  --plate-strong: rgba(10, 10, 14, 0.7);
+  --plate-badge: rgba(0, 0, 0, 0.75);
 
   /* Шрифт: пять размеров на весь интерфейс. Любой другой размер в стилях —
      ошибка, её ловит `src/styles.test.ts`. Размеры, которые считаются от
@@ -77,6 +105,8 @@
   --shadow-2: 0 6px 18px rgba(10, 6, 16, 0.45);
   --shadow-3: 0 18px 48px rgba(10, 6, 16, 0.55);
   --glass-edge: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  /* Тень под подписью, лежащей прямо на картинке (имя персонажа на баннере). */
+  --shadow-text: 0 2px 8px rgba(0, 0, 0, 0.6);
 
   /* Слои. Арт — внизу, интерфейс поверх него; остальное — на вырост. Кнопка
      PLAY лежит на слой выше дока: по дизайну она на переднем плане. */
@@ -87,6 +117,115 @@
   --z-overlay: 30;
   --z-grain: 40;
   --z-toast: 50;
+}
+
+/* Три варианта палитры на выбор владельцу (стенд предпросмотра:
+   `?palette=a|b|c`). Каждый задаёт все цветовые токены сам и ничего не
+   наследует от нынешней — это проверяет `src/styles.test.ts`. Внутри варианта
+   серые, линии, тени и подложки подкрашены одним оттенком, светлое поверх
+   тёмного — цветом его же текста. Основной и приглушённый текст — не ниже
+   4.5:1 и на фоне, и на стекле. */
+
+/* Вариант A «Лисий огонь». Сливово-чёрный фон и сливовые серые — в тон
+   контура лисы на иконке; действие — мягкий огненно-оранжевый (рядом с
+   иконкой он дополняет её голубой круг), содержимое — сакура, как розовые уши.
+   Опасное сдвинуто к розово-красному, чтобы не спорить с оранжевым. */
+:root[data-palette="a"] {
+  --bg: #0f0a12;
+  --glass: rgba(71, 58, 77, 0.55);
+  --card: rgba(71, 58, 77, 0.4);
+  --line: rgba(202, 181, 212, 0.16);
+  --ink: #f7f1f9;
+  --ink-dim: rgba(247, 241, 249, 0.64);
+  --ink-faint: rgba(247, 241, 249, 0.44);
+  --accent: #fba355;
+  --accent-ink: #2c1705;
+  --content: #e4a6c9;
+  --content-soft: #c8a3b7;
+  --label: #ffd2eb;
+  --danger: #f56b76;
+  --premiere: #c23345;
+  --track: rgba(247, 241, 249, 0.14);
+  --dot: rgba(247, 241, 249, 0.25);
+  --dot-dim: rgba(247, 241, 249, 0.12);
+  --scrollbar: rgba(247, 241, 249, 0.22);
+  --fallback-ink: rgba(247, 241, 249, 0.55);
+  --plate: rgba(19, 13, 21, 0.66);
+  --plate-soft: rgba(6, 1, 9, 0.45);
+  --plate-strong: rgba(6, 1, 9, 0.7);
+  --plate-badge: rgba(6, 1, 9, 0.75);
+  --shadow-1: 0 1px 2px rgba(6, 1, 9, 0.35);
+  --shadow-2: 0 6px 18px rgba(6, 1, 9, 0.45);
+  --shadow-3: 0 18px 48px rgba(6, 1, 9, 0.55);
+  --glass-edge: inset 0 1px 0 rgba(247, 241, 249, 0.07);
+  --shadow-text: 0 2px 8px rgba(6, 1, 9, 0.6);
+}
+
+/* Вариант B «Янтарь и сирень». Цвета самой иконки: действие — янтарь
+   звезды на лбу лисы, содержимое и все серые — сирень её круга. */
+:root[data-palette="b"] {
+  --bg: #0c0a11;
+  --glass: rgba(66, 60, 79, 0.55);
+  --card: rgba(66, 60, 79, 0.4);
+  --line: rgba(193, 183, 218, 0.16);
+  --ink: #f4f2fb;
+  --ink-dim: rgba(244, 242, 251, 0.64);
+  --ink-faint: rgba(244, 242, 251, 0.44);
+  --accent: #f2b84b;
+  --accent-ink: #281a02;
+  --content: #c0a1e4;
+  --content-soft: #ad9cc3;
+  --label: #ebd8ff;
+  --danger: #ff8a76;
+  --premiere: #c0392b;
+  --track: rgba(244, 242, 251, 0.14);
+  --dot: rgba(244, 242, 251, 0.25);
+  --dot-dim: rgba(244, 242, 251, 0.12);
+  --scrollbar: rgba(244, 242, 251, 0.22);
+  --fallback-ink: rgba(244, 242, 251, 0.55);
+  --plate: rgba(16, 14, 23, 0.66);
+  --plate-soft: rgba(4, 2, 11, 0.45);
+  --plate-strong: rgba(4, 2, 11, 0.7);
+  --plate-badge: rgba(4, 2, 11, 0.75);
+  --shadow-1: 0 1px 2px rgba(4, 2, 11, 0.35);
+  --shadow-2: 0 6px 18px rgba(4, 2, 11, 0.45);
+  --shadow-3: 0 18px 48px rgba(4, 2, 11, 0.55);
+  --glass-edge: inset 0 1px 0 rgba(244, 242, 251, 0.07);
+  --shadow-text: 0 2px 8px rgba(4, 2, 11, 0.6);
+}
+
+/* Вариант C «Нынешняя, спокойнее». Те же жёлтый и розовый, что сейчас, но
+   мягче; серые почти нейтральные, с еле заметным фиолетовым; фон не чёрный,
+   а очень тёмный фиолетово-серый. */
+:root[data-palette="c"] {
+  --bg: #0b0a0d;
+  --glass: rgba(65, 64, 71, 0.55);
+  --card: rgba(65, 64, 71, 0.4);
+  --line: rgba(191, 186, 208, 0.16);
+  --ink: #f4f2f8;
+  --ink-dim: rgba(244, 242, 248, 0.64);
+  --ink-faint: rgba(244, 242, 248, 0.44);
+  --accent: #f4c358;
+  --accent-ink: #271b01;
+  --content: #d993bf;
+  --content-soft: #bb92ab;
+  --label: #fed2ed;
+  --danger: #ff8a76;
+  --premiere: #c0392b;
+  --track: rgba(244, 242, 248, 0.14);
+  --dot: rgba(244, 242, 248, 0.25);
+  --dot-dim: rgba(244, 242, 248, 0.12);
+  --scrollbar: rgba(244, 242, 248, 0.22);
+  --fallback-ink: rgba(244, 242, 248, 0.55);
+  --plate: rgba(16, 14, 23, 0.66);
+  --plate-soft: rgba(4, 2, 11, 0.45);
+  --plate-strong: rgba(4, 2, 11, 0.7);
+  --plate-badge: rgba(4, 2, 11, 0.75);
+  --shadow-1: 0 1px 2px rgba(4, 2, 11, 0.35);
+  --shadow-2: 0 6px 18px rgba(4, 2, 11, 0.45);
+  --shadow-3: 0 18px 48px rgba(4, 2, 11, 0.55);
+  --glass-edge: inset 0 1px 0 rgba(244, 242, 248, 0.07);
+  --shadow-text: 0 2px 8px rgba(4, 2, 11, 0.6);
 }
 
 * {
@@ -149,7 +288,7 @@ body {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 .panel-section {
@@ -217,9 +356,9 @@ body {
   top: 16px;
   left: 16px;
   right: 16px;
-  /* Значение совпадает с --danger (#ff8a76): CSS не умеет собрать rgba из
-     шестнадцатеричной переменной. Так же сделано для .settings-error. */
-  background: rgba(255, 138, 118, 0.2);
+  /* Подложка — тот же --danger, разбавленный прозрачностью: следует за
+     палитрой сама. Так же у .play-error и .settings-error. */
+  background: color-mix(in srgb, var(--danger) 20%, transparent);
   border: 1px solid var(--danger);
   border-radius: var(--r-md);
   padding: 10px 12px;
@@ -298,7 +437,7 @@ body {
   margin-right: 8px;
   padding: 6px 14px;
   border-radius: var(--r-pill);
-  background: rgba(14, 15, 20, 0.66);
+  background: var(--plate);
   backdrop-filter: blur(12px);
   box-shadow: var(--glass-edge);
   font-size: var(--text-md);
@@ -338,7 +477,7 @@ body {
 
 .play-error {
   max-width: 420px;
-  background: rgba(255, 138, 118, 0.22);
+  background: color-mix(in srgb, var(--danger) 22%, transparent);
   border: 1px solid var(--danger);
   border-radius: var(--r-md);
   padding: 9px 12px;
@@ -525,7 +664,8 @@ body {
   bottom: calc(100% + 10px);
   padding: 4px 9px;
   border-radius: var(--r-sm);
-  background: rgba(7, 7, 7, 0.86);
+  /* Цвет фона окна, чуть прозрачнее. */
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
   border: 1px solid var(--line);
   font: 500 var(--text-sm)/1.2 "Golos Text Variable", "Segoe UI", sans-serif;
   color: var(--ink);
@@ -571,7 +711,7 @@ body {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 .code-card {
@@ -631,13 +771,13 @@ body {
 
 .banner-names {
   position: absolute; left: 10px; bottom: 8px;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  text-shadow: var(--shadow-text);
 }
 .banner-who { font-size: var(--text-md); font-weight: 600; }
 .banner-rarity { font-size: var(--text-xs); color: var(--content); }
 
 .banner-foot { padding: 8px 10px 9px; background: var(--card); }
-.banner-bar { height: 4px; border-radius: var(--r-pill); background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+.banner-bar { height: 4px; border-radius: var(--r-pill); background: var(--track); overflow: hidden; }
 .banner-bar-fill { height: 100%; background: var(--content); }
 .banner-line {
   display: flex; justify-content: space-between; gap: 8px;
@@ -657,7 +797,7 @@ body {
 .carousel-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
 .carousel-dots .dot {
   width: 5px; height: 5px; border-radius: 50%; padding: 0;
-  border: 0; background: rgba(255, 255, 255, 0.25); cursor: pointer;
+  border: 0; background: var(--dot); cursor: pointer;
 }
 .carousel-dots .dot.active { background: var(--content); }
 
@@ -677,14 +817,14 @@ body {
 .carousel-arrow {
   pointer-events: auto;
   width: 28px; height: 28px; border-radius: 50%; border: 0;
-  background: rgba(10, 10, 14, 0.45); color: var(--ink);
+  background: var(--plate-soft); color: var(--ink);
   font-size: var(--text-lg); line-height: 1; cursor: pointer; opacity: 0.55;
   transition: opacity var(--move) var(--ease-out), background var(--move) var(--ease-out);
 }
 .carousel-arrow:hover,
-.carousel-arrow:focus-visible { opacity: 1; background: rgba(10, 10, 14, 0.7); }
+.carousel-arrow:focus-visible { opacity: 1; background: var(--plate-strong); }
 
-.carousel-dots .dot.upcoming { background: rgba(255, 255, 255, 0.12); }
+.carousel-dots .dot.upcoming { background: var(--dot-dim); }
 /* Текущая точка всегда яркая, даже у будущего баннера: иначе пропадает,
    где ты в карусели. */
 .carousel-dots .dot.active.upcoming { background: var(--content); }
@@ -697,11 +837,11 @@ body {
 
 .video-badge {
   position: absolute; right: 6px; bottom: 6px;
-  background: rgba(0, 0, 0, 0.75); border-radius: var(--r-sm);
+  background: var(--plate-badge); border-radius: var(--r-sm);
   padding: 1px 5px; font-size: var(--text-xs); letter-spacing: 0.02em;
   font-variant-numeric: tabular-nums;
 }
-.video-badge.premiere { background: #c0392b; }
+.video-badge.premiere { background: var(--premiere); }
 
 /* Слово из данных без пробелов должно переноситься, а не раздвигать панель. */
 .video-title { font-size: var(--text-sm); margin-top: 6px; line-height: 1.35; overflow-wrap: anywhere; }
@@ -715,7 +855,7 @@ body {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   padding: 10px; text-align: center;
-  font-size: var(--text-sm); color: rgba(255, 255, 255, 0.55);
+  font-size: var(--text-sm); color: var(--fallback-ink);
 }
 
 /* Шестерёнка настроек: крупная, без подписи, при наведении плавно
@@ -1028,9 +1168,7 @@ body {
 }
 
 .settings-error {
-  /* Значение совпадает с --danger (#ff8a76): CSS не умеет собрать rgba из
-     шестнадцатеричной переменной. */
-  background: rgba(255, 138, 118, 0.16);
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
   border: 1px solid var(--danger);
   border-radius: var(--s-control-radius);
   padding: 10px 14px;

@@ -10,7 +10,8 @@ const params = readParams(window.location.search);
 
 // Мост подменяется до загрузки настоящего входа: тот сразу спрашивает язык.
 installPreviewBackend(params.scenario, { lang: params.lang, motion: params.motion });
-// Вариант палитры виден стилям атрибутом корня; пока он один — `current`.
+// Вариант палитры виден стилям атрибутом корня: у `current` своего блока нет,
+// и действуют нынешние значения из `:root`.
 document.documentElement.dataset.palette = params.palette;
 
 if (params.controls) {
