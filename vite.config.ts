@@ -15,7 +15,7 @@ export default defineConfig({
     },
   },
   envPrefix: ["VITE_", "TAURI_ENV_"],
-  // Vitest по умолчанию подменяет CSS пустой строкой, даже при `?raw`. Сторожу
-  // стилей (`src/styles.test.ts`) нужен настоящий текст файла.
+  // Vitest replaces CSS with an empty string by default, even with `?raw`. The
+  // stylesheet guard (`src/styles.test.ts`) needs the real file contents.
   test: { css: { include: [/styles\.css/] } },
 });
