@@ -131,8 +131,17 @@ function zProblems(decls: Decl[]): string[] {
     .map((d) => `${d.selector} { z-index: ${d.value} }`);
 }
 
+// Именованные цвета CSS Color 4: https://www.w3.org/TR/css-color-4/#named-colors
 const NAMED =
-  "black|white|red|green|blue|yellow|orange|pink|purple|violet|brown|gold|silver|gray|grey|maroon|navy|teal|aqua|cyan|magenta|fuchsia|lime|olive|indigo|crimson|coral|salmon|plum|lavender";
+  "aliceblue|antiquewhite|aqua|aquamarine|azure|beige|bisque|black|blanchedalmond|blue|blueviolet|brown|burlywood|cadetblue|chartreuse|chocolate|coral|cornflowerblue|" +
+  "cornsilk|crimson|cyan|darkblue|darkcyan|darkgoldenrod|darkgray|darkgreen|darkgrey|darkkhaki|darkmagenta|darkolivegreen|darkorange|darkorchid|darkred|darksalmon|darkseagreen|darkslateblue|" +
+  "darkslategray|darkslategrey|darkturquoise|darkviolet|deeppink|deepskyblue|dimgray|dimgrey|dodgerblue|firebrick|floralwhite|forestgreen|fuchsia|gainsboro|ghostwhite|gold|goldenrod|gray|" +
+  "green|greenyellow|grey|honeydew|hotpink|indianred|indigo|ivory|khaki|lavender|lavenderblush|lawngreen|lemonchiffon|lightblue|lightcoral|lightcyan|lightgoldenrodyellow|lightgray|" +
+  "lightgreen|lightgrey|lightpink|lightsalmon|lightseagreen|lightskyblue|lightslategray|lightslategrey|lightsteelblue|lightyellow|lime|limegreen|linen|magenta|maroon|mediumaquamarine|mediumblue|mediumorchid|" +
+  "mediumpurple|mediumseagreen|mediumslateblue|mediumspringgreen|mediumturquoise|mediumvioletred|midnightblue|mintcream|mistyrose|moccasin|navajowhite|navy|oldlace|olive|olivedrab|orange|orangered|orchid|" +
+  "palegoldenrod|palegreen|paleturquoise|palevioletred|papayawhip|peachpuff|peru|pink|plum|powderblue|purple|rebeccapurple|red|rosybrown|royalblue|saddlebrown|salmon|sandybrown|" +
+  "seagreen|seashell|sienna|silver|skyblue|slateblue|slategray|slategrey|snow|springgreen|steelblue|tan|teal|thistle|tomato|turquoise|violet|wheat|" +
+  "white|whitesmoke|yellow|yellowgreen";
 const COLOUR_LITERAL = new RegExp(
   `#[0-9a-f]{3,8}(?![\\w-])|(?<![\\w-])(rgba?|hsla?|hwb|lab|lch|oklab|oklch|color)\\(|(?<![\\w-])(${NAMED})(?![\\w-])`,
   "i",
@@ -260,6 +269,9 @@ describe("сторож ловит нарушения", () => {
   it("цвет числом или словом вне :root не проходит", () => {
     const bad = [
       ".x { color: #fff; }",
+      ".x { color: rebeccapurple; }",
+      ".x { border-color: lightsalmon; }",
+      ".x { fill: darkslategrey; }",
       ".x { background: rgba(0, 0, 0, 0.5); }",
       ".x { box-shadow: 0 2px 4px hsl(0 0% 0% / 0.4); }",
       ".x { border: 1px solid white; }",
