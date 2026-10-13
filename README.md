@@ -44,10 +44,38 @@ and cached pictures too, tick "Delete the application data" in the uninstaller, 
 
 ## Privacy
 
-No account, no telemetry, nothing is sent about you. The app downloads the data file
-from GitHub Pages, and pictures for the panel and backgrounds from the game wikis
-(Fandom, wiki.gg), YouTube, Steam, Epic Games and the official HoYoPlay launcher's
-servers (background pictures and videos of HoYoverse games).
+Kitsudock has no account system or telemetry and does not upload logs automatically.
+Settings, caches and logs are stored locally. Servers receiving downloads can see
+your IP address and ordinary request metadata.
+
+The app makes HTTPS GET requests for the data file from GitHub Pages, or from the
+custom data source URL set in Settings. It downloads banner pictures, YouTube
+thumbnails and background media from URLs in that file, including game wikis
+(Fandom, wiki.gg), YouTube image servers and the official HoYoPlay launcher's
+servers. Steam and Epic Games artwork
+can come from local launcher caches or be downloaded from their image servers.
+Media destinations depend on the data source and installed launchers. Clicking a
+video or a promo-code redemption link opens the external site in your browser.
+
+## Is it safe?
+
+- **Game launching:** Kitsudock does not sign in to game accounts, ask for their
+  passwords, modify game files or inject code into game processes. It reads local installation
+  information and can read a game's executable to extract its icon. Steam and Epic
+  games launch through their launch links; other games launch by running their
+  `.exe`. Games requiring administrator rights use the standard Windows elevation
+  prompt. The game or store launcher may ask you to sign in.
+- **Network access:** the downloads and external links are described in
+  [Privacy](#privacy); logs are not sent automatically.
+- **Source and builds:** the source is available under the [MIT license](LICENSE).
+  Installers are built by the [release workflow](.github/workflows/release.yml) in
+  GitHub Actions from this repository.
+- **Windows warnings and downloads:** installers are currently unsigned, so
+  SmartScreen may warn about an unrecognized app. Download only from this
+  repository's [Releases page](https://github.com/Ertezy/Kitsudock/releases), and
+  check that the address belongs to `github.com/Ertezy/Kitsudock` before downloading.
+  The warning alone is not a verdict on safety. See the
+  [code signing policy](#code-signing-policy).
 
 ## Code signing policy
 
@@ -59,8 +87,8 @@ unsigned (see [Install](#install)).*
   signed, and every release is approved by hand before signing.
 - Committers and reviewers: [Ertezy](https://github.com/Ertezy)
 - Approvers: [Ertezy](https://github.com/Ertezy)
-- Privacy policy: see [Privacy](#privacy). The app sends nothing about you; it only
-  downloads the public data and pictures listed there.
+- Privacy policy: see [Privacy](#privacy). No telemetry or automatic log uploads;
+  downloads expose ordinary request metadata to the receiving servers.
 
 ## Features
 
@@ -68,7 +96,7 @@ unsigned (see [Install](#install)).*
   the Kuro launcher and GRYPHLINK, or added by pointing at the game's `.exe`.
   Reorder them by drag in Settings → Games.
 - **Play** launches through the store the game was installed from, or directly — like
-  double-clicking the game's `.exe`. Kitsudock never touches game files and doesn't
+  double-clicking the game's `.exe`. Kitsudock does not modify game files or
   interact with a running game.
 - **Side panel** for the selected game: promo codes with expiry, current and upcoming
   banners (the carousel slides on its own), and the latest official videos.
