@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
+import { COPY_FEEDBACK_MS, copyFeedbackOver, isCopied, type Copied } from "../../lib/copyFeedback";
 import { activeCodes, plainSpaces } from "../../lib/panel";
 import { burnsToday, timeLeft } from "../../lib/time";
 import { useLang, useT } from "../../i18n";
@@ -20,7 +21,11 @@ interface Props {
  * для ссылки «забрать»: шаблон адреса лежит в записи игры.
  */
 export default function PromoCodes({ codes, games, nowSec }: Props) {
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied] = useState<Copied | null>(null);
+  // Номер копирования: у каждого свой срок галочки (`lib/copyFeedback.ts`).
+  const copies = useRef(0);
+  const timer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
   const lang = useLang();
   const t = useT();
 
@@ -32,8 +37,11 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
 
   const copy = async (code: string) => {
     await api.copyText(code);
-    setCopied(code);
-    window.setTimeout(() => setCopied((c) => (c === code ? null : c)), 1500);
+    const id = ++copies.current;
+    setCopied({ code, id });
+    // Срок прежнего копирования больше не нужен: галочку держит новое.
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setCopied((c) => copyFeedbackOver(c, id)), COPY_FEEDBACK_MS);
   };
 
   const redeem = async (code: Code) => {
@@ -94,15 +102,25 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
 
               <div className="code-side">
                 <div className="code-buttons">
+                  {/* Значок копирования на время становится галочкой: оба
+                      лежат в кнопке друг на друге и меняются растяжением и
+                      прозрачностью. Экранному диктору значки не нужны — ему
+                      строка состояния ниже. */}
                   <button
                     type="button"
+                    className={isCopied(copied, c.code) ? "code-copy is-copied" : "code-copy"}
                     aria-label={t.panel.copyCode}
                     onClick={(e) => {
                       e.stopPropagation();
                       void copy(c.code);
                     }}
                   >
-                    {copied === c.code ? "✓" : "⧉"}
+                    <span className="code-copy-icon is-copy" aria-hidden="true">
+                      ⧉
+                    </span>
+                    <span className="code-copy-icon is-check" aria-hidden="true">
+                      ✓
+                    </span>
                   </button>
                   {game?.redeemUrl && (
                     <button
@@ -123,6 +141,12 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
           );
         })}
       </div>
+
+      {/* Что код скопирован, экранный диктор слышит словами: строка
+          состояния вежливо объявляет каждое копирование. */}
+      <span className="sr-only" role="status">
+        {copied ? t.panel.codeCopied(copied.code) : ""}
+      </span>
     </section>
   );
 }

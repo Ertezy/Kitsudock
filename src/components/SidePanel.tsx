@@ -1,8 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PromoCodes from "./panel/PromoCodes";
 import Banners from "./panel/Banners";
 import Videos from "./panel/Videos";
+import Skeleton from "./panel/Skeleton";
 import { codesFor, panelIsEmpty, sourceLabel, videosFor } from "../lib/panel";
+import { entryEnded, hubChanged, isEntryAnimation, panelMounted, skeletonShown } from "../lib/panelEntry";
 import { hubFreshness } from "../lib/time";
 import { api } from "../lib/api";
 import { availableUpdate } from "../lib/update";
@@ -46,6 +48,39 @@ export default function SidePanel({ hub, selectedContentId, onOpenSettings, appV
     return () => window.clearInterval(id);
   }, []);
 
+  // Вход разделов (`lib/panelEntry.ts`): лесенкой — при появлении панели и
+  // когда данные пришли впервые, но не от каждого их обновления. Пришли
+  // данные — состояние поправляется прямо в отрисовке, а не эффектом: разделы
+  // должны появиться в разметке уже с отметкой входа, а не кадром позже.
+  const loaded = hub !== null;
+  const [entry, setEntry] = useState(() => panelMounted(loaded));
+  const nextEntry = hubChanged(entry, loaded);
+  if (nextEntry !== entry) setEntry(nextEntry);
+
+  // Вход кончается, когда доиграли его анимации: снятая раньше отметка
+  // оборвала бы их на середине, оставленная — подняла бы раздел, появившийся
+  // потом при смене игры. Длительность здесь не пишется — её знают только
+  // стили (переменные движения), поэтому ждём сами анимации. Без них (тумблер
+  // «Анимация» выключен) вход кончается сразу. Смена игры посреди входа
+  // собирает их заново: у новой игры могли появиться свои разделы.
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (entry.kind === null || !panel) return;
+    const run = entry.run;
+    let alive = true;
+    const running = panel
+      .getAnimations({ subtree: true })
+      .filter((a) => a instanceof CSSAnimation && isEntryAnimation(a.animationName));
+    // Прерванная анимация (тумблер выключили посреди входа) тоже конец.
+    void Promise.allSettled(running.map((a) => a.finished)).then(() => {
+      if (alive) setEntry((e) => entryEnded(e, run));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [entry.kind, entry.run, selectedContentId]);
+
   const age = hub ? nowSec - hub.updatedAt : 0;
 
   // Старше недели — коды и баннеры прячутся целиком. Код, который наверняка
@@ -73,10 +108,12 @@ export default function SidePanel({ hub, selectedContentId, onOpenSettings, appV
   const update = availableUpdate(hub, appVersion);
 
   return (
-    <aside className="panel">
+    <aside className="panel" ref={panelRef} data-entry={entry.kind ?? undefined}>
       {/* Секции прокручиваются внутри себя, шестерёнка остаётся прибитой
-          к низу (спека §2.4). */}
-      <div className="panel-scroll">
+          к низу (спека §2.4). Пока данных нет, на месте секций стоят
+          заглушки, а область помечена занятой. */}
+      <div className="panel-scroll" aria-busy={!loaded}>
+        {skeletonShown(loaded, selectedContentId) && <Skeleton />}
         {hub && <PromoCodes codes={codes} games={hub.games} nowSec={nowSec} />}
         <Banners banners={banners} nowSec={nowSec} />
         <Videos videos={videos} nowSec={nowSec} />

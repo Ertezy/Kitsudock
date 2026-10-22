@@ -35,6 +35,7 @@ export const ru: Dictionary = {
     timeRemaining: (t: string) => `осталось ${t}`,
     regionOnly: (region: string) => `только ${region}`,
     copyCode: "Копировать код",
+    codeCopied: (code: string) => `Код ${code} скопирован`,
     redeem: "Забрать на сайте",
     banners: "Баннеры",
     previousBanner: "Предыдущий баннер",

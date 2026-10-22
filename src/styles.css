@@ -56,6 +56,8 @@
   --dot-dim: rgba(247, 241, 249, 0.12);
   --scrollbar: rgba(247, 241, 249, 0.22);
   --fallback-ink: rgba(247, 241, 249, 0.55);
+  /* Заглушки панели, пока грузятся данные и картинки: еле светлее стекла. */
+  --skeleton: rgba(247, 241, 249, 0.08);
 
   /* Тёмные подложки поверх арта: мелкий текст и значки на картинке читаются на
      любом фоне. Подпись над кнопкой PLAY; стрелки карусели в покое и под
@@ -170,11 +172,26 @@ body {
   background: var(--glass);
   backdrop-filter: blur(12px);
   border-right: 1px solid var(--line);
-  box-shadow: var(--glass-edge);
+  /* Вторая тень — полоса того же стекла слева, за краем окна. Пружина входа
+     на миг заносит панель чуть правее места, и без полосы у левого края окна
+     проступила бы тонкая тёмная щель. За стеклом там только ровный фон окна,
+     поэтому полоса без размытия неотличима от самой панели. */
+  box-shadow: var(--glass-edge), -16px 0 0 var(--glass);
   display: flex;
   flex-direction: column;
   padding: 14px 13px 12px;
   overflow: hidden;
+  /* Панель выезжает слева с лёгкой пружиной и проявляется — при запуске и при
+     возвращении из настроек: это появление самого экрана. Разделы внутри
+     следом поднимаются лесенкой (ниже). */
+  animation: panel-in var(--move-slow) var(--ease-spring) backwards;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
 }
 
 /* Прокручиваемая часть панели. `min-height: 0` обязателен: без него
@@ -212,10 +229,203 @@ body {
   margin-bottom: 8px;
 }
 
+/* Вход разделов (`lib/panelEntry.ts`): по очереди поднимаются и проявляются.
+   Отметку `data-entry` панель держит, только пока вход идёт, — при её
+   появлении и когда данные пришли впервые. Раздел, появившийся при смене игры
+   или от обновления данных, встаёт сразу, как и содержимое соседних.
+   Появление панели: разделы (или заглушки) ждут, пока она почти выедет. Пришли
+   данные: встают сразу, на место пропавших заглушек, без пустой паузы. Разделов
+   в ряду не больше трёх. */
+.panel[data-entry] .panel-scroll > * {
+  animation: panel-rise var(--move-slow) var(--ease-out) backwards;
+}
+.panel[data-entry="mount"] .panel-scroll > :nth-child(1) {
+  animation-delay: var(--move-fast);
+}
+.panel[data-entry="mount"] .panel-scroll > :nth-child(2) {
+  animation-delay: calc(var(--move-fast) * 1.5);
+}
+.panel[data-entry="mount"] .panel-scroll > :nth-child(n + 3) {
+  animation-delay: calc(var(--move-fast) * 2);
+}
+.panel[data-entry="data"] .panel-scroll > :nth-child(2) {
+  animation-delay: calc(var(--move-fast) * 0.5);
+}
+.panel[data-entry="data"] .panel-scroll > :nth-child(n + 3) {
+  animation-delay: var(--move-fast);
+}
+/* Строки внизу панели, которые тоже ждали данных, просто проявляются. */
+.panel[data-entry="data"] :is(.panel-stale, .panel-update) {
+  animation: panel-fade var(--move-slow) var(--ease-out) backwards;
+}
+
+/* Только `backwards`, как у подъёма кнопки PLAY: доигравший вход ничего не
+   держит. */
+@keyframes panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes panel-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Заглушки разделов, пока данных нет (`panel/Skeleton.tsx`): очертания будущих
+   карточек тех же размеров. Мерцают одной прозрачностью, спокойно и медленно,
+   волной сверху вниз — у каждого следующего раздела чуть позже. Прокрутки у
+   заглушек нет: нижняя просто срезается краем, как и настоящая лента видео. */
+.panel-scroll[aria-busy="true"] {
+  overflow: hidden;
+}
+
+.skeleton-block {
+  background: var(--skeleton);
+  border-radius: var(--r-pill);
+  animation: skeleton-pulse calc(var(--move-scene) * 3) var(--ease-out) infinite;
+}
+.skeleton-section:nth-child(2) .skeleton-block {
+  animation-delay: calc(var(--move-fast) * 1.5);
+}
+.skeleton-section:nth-child(3) .skeleton-block {
+  animation-delay: calc(var(--move-fast) * 3);
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Подпись раздела: полоска на месте строки подписи. */
+.skeleton-label {
+  width: 72px;
+  height: 7px;
+  margin: 3px 0 11px;
+}
+
+/* Строка кода: та же карточка, что у настоящего кода; полоски — код, срок и
+   награды, справа две кнопки. */
+.skeleton-code {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 7px 8px;
+  margin-bottom: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--glass-edge), var(--shadow-1);
+}
+.skeleton-code-main {
+  flex: 1;
+  min-width: 0;
+}
+.skeleton-code .skeleton-line {
+  height: 7px;
+}
+.skeleton-code .is-code {
+  width: 46%;
+  height: 10px;
+  margin: 4px 0 9px;
+}
+.skeleton-code .is-short {
+  width: 30%;
+  margin-bottom: 9px;
+}
+.skeleton-code .is-long {
+  width: 64%;
+  margin-bottom: 3px;
+}
+.skeleton-code:nth-child(3) .is-code { width: 38%; }
+.skeleton-code:nth-child(3) .is-long { width: 50%; }
+.skeleton-code:nth-child(4) .is-code { width: 54%; }
+.skeleton-code:nth-child(4) .is-long { width: 42%; }
+.skeleton-code-side {
+  display: flex;
+  gap: 4px;
+}
+.skeleton-button {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+}
+
+/* Карточка баннера: арт и подвал с полосой срока. */
+.skeleton-banner {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+.skeleton-art {
+  aspect-ratio: 16 / 9;
+  border-radius: 0;
+}
+.skeleton-banner-foot {
+  padding: 8px 10px 9px;
+  background: var(--card);
+}
+.skeleton-bar {
+  height: 4px;
+}
+.skeleton-banner-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 9px;
+}
+.skeleton-banner-line .skeleton-line {
+  height: 7px;
+  margin-bottom: 3px;
+}
+.skeleton-banner-line .is-title { width: 44%; }
+.skeleton-banner-line .is-tail { width: 14%; }
+
+/* Превью видео: кадр, заголовок и дата. */
+.skeleton-video {
+  margin-bottom: 9px;
+}
+.skeleton-thumb {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-lg);
+}
+.skeleton-video .skeleton-line {
+  height: 7px;
+}
+.skeleton-video .is-long {
+  width: 82%;
+  height: 8px;
+  margin-top: 11px;
+}
+.skeleton-video .is-short {
+  width: 30%;
+  margin-top: 10px;
+}
+
+/* Только для экранного диктора: на экране строки нет, а читается она как
+   обычный текст. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Карточка кода — стекло на стекле: светлая кромка сверху и лёгкая тень. */
 .code-card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
+  box-shadow: var(--glass-edge), var(--shadow-1);
   padding: 7px 8px;
   margin-bottom: 6px;
 }
@@ -870,8 +1080,51 @@ body {
   border-color: transparent;
 }
 
+/* Копирование: значок на время становится галочкой. Оба значка лежат в одной
+   клетке друг на друге; уходящий сжимается и гаснет, приходящий вырастает с
+   лёгкой пружиной. Через полторы секунды (`lib/copyFeedback.ts`) — обратно. */
+.code-copy {
+  display: grid;
+  place-items: center;
+}
+.code-copy-icon {
+  grid-area: 1 / 1;
+  transition:
+    transform var(--move) var(--ease-spring),
+    opacity var(--move-fast) var(--ease-out);
+}
+.code-copy-icon.is-check,
+.code-copy.is-copied .code-copy-icon.is-copy {
+  opacity: 0;
+  transform: scale(0.5);
+}
+.code-copy.is-copied .code-copy-icon.is-check {
+  opacity: 1;
+  transform: none;
+}
+
+/* Картинка панели (`panel/CachedImage.tsx`), пока качается, — заглушка того
+   же тона и с тем же мерцанием, что заглушки разделов. Скачанная, но ещё не
+   прочитанная — прозрачна; прочитанная проявляется, а не выскакивает. */
+.img-pending {
+  background: var(--skeleton);
+  animation: skeleton-pulse calc(var(--move-scene) * 3) var(--ease-out) infinite;
+}
+.img-reading {
+  opacity: 0;
+}
+.img-shown {
+  animation: img-in var(--move-slow) var(--ease-out) backwards;
+}
+
+@keyframes img-in {
+  from {
+    opacity: 0;
+  }
+}
+
 /* Баннер */
-.banner-card { border: 1px solid var(--line); border-radius: var(--r-md); overflow: hidden; }
+.banner-card { border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
 .banner-art-wrap { position: relative; aspect-ratio: 16 / 9; }
 
 .banner-art {
@@ -904,15 +1157,19 @@ body {
 .banner-left { flex: none; }
 
 .carousel-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
+/* Текущая точка чуть крупнее соседних и дорастает до размера с пружинкой. */
 .carousel-dots .dot {
   width: 5px; height: 5px; border-radius: 50%; padding: 0;
   border: 0; background: var(--dot); cursor: pointer;
+  transition: transform var(--move) var(--ease-spring);
 }
-.carousel-dots .dot.active { background: var(--content); }
+.carousel-dots .dot.active { background: var(--content); transform: scale(1.4); }
 
-/* Карусель — лента карточек со сдвигом (спека этапа 7 §3.3). */
-.carousel-viewport { position: relative; overflow: hidden; border-radius: var(--r-md); }
-.carousel-track { display: flex; transition: transform var(--move-slow) var(--ease-out); }
+/* Карусель — лента карточек со сдвигом (спека этапа 7 §3.3). Лента едет на
+   сценической скорости, как смена фона: быстро трогается и долго, мягко
+   доезжает. */
+.carousel-viewport { position: relative; overflow: hidden; border-radius: var(--r-lg); }
+.carousel-track { display: flex; transition: transform var(--move-scene) var(--ease-out); }
 .carousel-track.instant { transition: none; }
 .carousel-slide { flex: 0 0 100%; min-width: 0; }
 
@@ -928,7 +1185,9 @@ body {
   width: 28px; height: 28px; border-radius: 50%; border: 0;
   background: var(--plate-soft); color: var(--ink);
   font-size: var(--text-lg); line-height: 1; cursor: pointer; opacity: 0.55;
-  transition: opacity var(--move) var(--ease-out), background var(--move) var(--ease-out);
+  /* Плавно меняется только прозрачность (спека полировки, §2). Подложка
+     темнеет сразу — за одновременным проявлением самой кнопки этого не видно. */
+  transition: opacity var(--move) var(--ease-out);
 }
 .carousel-arrow:hover,
 .carousel-arrow:focus-visible { opacity: 1; background: var(--plate-strong); }
@@ -939,10 +1198,34 @@ body {
 .carousel-dots .dot.active.upcoming { background: var(--content); }
 .banner-soon { font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--content); }
 
-/* Видео */
-.video-card { margin-bottom: 9px; cursor: pointer; }
-.video-thumb-wrap { position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-md); overflow: hidden; }
-.video-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Видео. Под курсором кадр чуть приближается внутри своей рамки, а тень под
+   рамкой становится глубже — превью будто приподнимается. Тень — отдельный
+   слой под рамкой, у которого меняется только прозрачность: сама тень не
+   пересчитывается. */
+.video-card { position: relative; margin-bottom: 9px; cursor: pointer; }
+.video-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move-slow) var(--ease-out);
+}
+.video-card:hover::before,
+.video-card:focus-visible::before { opacity: 1; }
+.video-thumb-wrap {
+  position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-lg); overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+.video-thumb {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform var(--move-slow) var(--ease-out);
+}
+.video-card:hover .video-thumb,
+.video-card:focus-visible .video-thumb { transform: scale(1.04); }
 
 .video-badge {
   position: absolute; right: 6px; bottom: 6px;
@@ -1044,6 +1327,27 @@ body {
 .panel-disclaimer {
   font-size: var(--text-xs); color: var(--ink-faint);
   line-height: 1.35; margin-top: 6px;
+}
+
+/* Тумблер «Анимация» выключен — панель не выезжает, разделы не поднимаются,
+   заглушки и качающиеся картинки не мерцают: бесконечное мерцание с нулевой
+   длительностью было бы не остановкой, а вырожденным циклом. Начатые переходы
+   обрываются сразу, как у дока. Приближение превью под курсором без анимации
+   было бы скачком — его нет. Галочка копирования и крупная текущая точка
+   карусели остаются: это состояние, а не движение. */
+:root[data-motion="off"] .panel,
+:root[data-motion="off"] .panel .panel-scroll > *,
+:root[data-motion="off"] .panel :is(.panel-stale, .panel-update),
+:root[data-motion="off"] :is(.skeleton-block, .img-pending, .img-shown) {
+  animation: none;
+}
+:root[data-motion="off"] :is(.code-copy-icon, .carousel-dots .dot, .video-thumb),
+:root[data-motion="off"] .video-card::before {
+  transition: none;
+}
+:root[data-motion="off"] .video-card:hover .video-thumb,
+:root[data-motion="off"] .video-card:focus-visible .video-thumb {
+  transform: none;
 }
 
 /* Экран настроек (спека этапа 5, §7). Размеры — переменными здесь, а не

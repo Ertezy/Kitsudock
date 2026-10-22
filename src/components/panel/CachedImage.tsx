@@ -16,15 +16,22 @@ interface Props {
  * Отсутствие картинки — обычное дело, а не поломка: у баннеров ХСР арта нет
  * вовсе, а любая загрузка может не удаться. В этом случае рисуется градиент
  * из названия — узнаваемый и стабильный, а не серая дырка.
+ *
+ * Пока картинка качается, на её месте мерцает заглушка того же тона, что и
+ * заглушки разделов панели; пришедшая картинка проявляется, а не выскакивает.
  */
 export default function CachedImage({ url, fallbackText, className }: Props) {
   const [src, setSrc] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  // Файл в кеше уже есть, но браузер его ещё не прочёл: до этого картинка
+  // прозрачна, иначе она проступала бы по кускам.
+  const [shown, setShown] = useState(false);
 
   useEffect(() => {
     let alive = true;
     setSrc(null);
     setFailed(false);
+    setShown(false);
     if (!url) {
       setFailed(true);
       return;
@@ -42,7 +49,7 @@ export default function CachedImage({ url, fallbackText, className }: Props) {
     };
   }, [url]);
 
-  if (failed || !src) {
+  if (failed) {
     return (
       <div
         className={className}
@@ -50,10 +57,25 @@ export default function CachedImage({ url, fallbackText, className }: Props) {
         role="img"
         aria-label={fallbackText}
       >
-        {failed && <span className="img-fallback-text">{fallbackText}</span>}
+        <span className="img-fallback-text">{fallbackText}</span>
       </div>
     );
   }
 
-  return <img className={className} src={src} alt={fallbackText} loading="lazy" />;
+  if (!src) {
+    return <div className={`${className ?? ""} img-pending`} role="img" aria-label={fallbackText} />;
+  }
+
+  return (
+    <img
+      className={`${className ?? ""} ${shown ? "img-shown" : "img-reading"}`}
+      src={src}
+      alt={fallbackText}
+      loading="lazy"
+      onLoad={() => setShown(true)}
+      // Файл из кеша не прочёлся — как не скачался: градиент с названием, а
+      // не значок битой картинки.
+      onError={() => setFailed(true)}
+    />
+  );
 }

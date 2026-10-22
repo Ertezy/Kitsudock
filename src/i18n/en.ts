@@ -33,6 +33,7 @@ export const en = {
     timeRemaining: (t: string) => `${t} left`,
     regionOnly: (region: string) => `${region} only`,
     copyCode: "Copy code",
+    codeCopied: (code: string) => `Code ${code} copied`,
     redeem: "Redeem on the website",
     banners: "Banners",
     previousBanner: "Previous banner",
