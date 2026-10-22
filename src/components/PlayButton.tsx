@@ -18,13 +18,28 @@ interface Props {
    *  повторный провал того же текста не отличался бы от предыдущего и эффект
    *  ниже не сработал бы повторно (правка финальной ревизии этапа 7). */
   externalFailure?: { id: number; text: string } | null;
+  /** Фон игры начал проявляться. До этого подпись и кнопка ждут невидимыми и
+   *  поднимаются вслед за фоном, а не раньше него. */
+  artShown: boolean;
 }
 
-export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, externalFailure }: Props) {
+/** Дольше этого подпись и кнопка фон не ждут: главное действие экрана не
+ *  должно зависеть от того, как быстро грузится картинка или ролик. */
+const ART_WAIT_MS = 1500;
+
+export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, externalFailure, artShown }: Props) {
   const [busy, setBusy] = useState(false);
   const [fixing, setFixing] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  const [waitedEnough, setWaitedEnough] = useState(false);
   const t = useT();
+
+  useEffect(() => {
+    if (artShown) return;
+    const timer = window.setTimeout(() => setWaitedEnough(true), ART_WAIT_MS);
+    return () => window.clearTimeout(timer);
+  }, [artShown]);
+  const waiting = !artShown && !waitedEnough;
 
   useEffect(() => {
     if (externalFailure) setFailure(externalFailure.text);
@@ -66,7 +81,7 @@ export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, 
     });
 
   return (
-    <div className="play-area">
+    <div className={waiting ? "play-area is-waiting" : "play-area"}>
       {failure && (
         <>
           <div className="play-error">{failure}</div>

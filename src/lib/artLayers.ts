@@ -51,6 +51,28 @@ export function settleLayer<L>(stack: ArtEntry<L>[], id: number): ArtEntry<L>[] 
 }
 
 /**
+ * Начал ли проявляться фон с этим ключом. Пока нет — подпись и кнопка PLAY
+ * ждут: они поднимаются вслед за фоном, а не раньше него, даже если большая
+ * картинка грузится долго. Сразу после выбора игры слой под неё ещё не лёг
+ * (это делает эффект), поэтому ключ сверяется, а не только готовность.
+ */
+export function isShown<L>(stack: ArtEntry<L>[], key: string): boolean {
+  const top = stack[stack.length - 1];
+  return top !== undefined && top.key === key && top.ready;
+}
+
+/** Анимация проявления слоя (`@keyframes` в `styles.css`). */
+export const ENTER = "art-enter";
+
+/**
+ * Событие анимации — конец (или обрыв) проявления самого слоя. Дрейф
+ * картинки внутри слоя тоже анимация, и его события всплывают сюда же.
+ */
+export function isOwnEnter(e: { target: unknown; currentTarget: unknown; animationName: string }): boolean {
+  return e.target === e.currentTarget && e.animationName === ENTER;
+}
+
+/**
  * Анимацию выключили посреди перетекания: перетекание обрывается, и остаётся
  * верхний показанный слой (и ещё не загрузившийся над ним, если такой есть).
  */

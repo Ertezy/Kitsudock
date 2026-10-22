@@ -195,6 +195,11 @@ export default function App() {
 
   const selected = games.find((g) => g.id === selectedId) ?? games[0] ?? null;
 
+  // Фон какой игры уже начал проявляться. Подпись и кнопка PLAY поднимаются
+  // вслед за фоном своей игры, а не сразу после выбора: большая картинка
+  // может грузиться заметно дольше, чем длится их появление.
+  const [artShownFor, setArtShownFor] = useState<string | null>(null);
+
   const select = useCallback((id: string) => {
     setSelectedId(id);
   }, []);
@@ -245,7 +250,7 @@ export default function App() {
         appVersion={appVersion}
       />
       <main className="stage">
-        <GameArt game={selected} />
+        <GameArt game={selected} onShown={setArtShownFor} />
         {selected && (
           <PlayButton
             // key: при смене игры кнопка пересоздаётся, а не переиспользуется —
@@ -253,6 +258,7 @@ export default function App() {
             // (правка ревью 1).
             key={selected.id}
             gameId={selected.id}
+            artShown={artShownFor === selected.id}
             note={launchNote(t, selected)}
             onLaunch={launch}
             onFixed={load}

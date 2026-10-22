@@ -1,14 +1,17 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { gradientFor } from "../lib/gradient";
 import { layerFor, layerKey, type Layer } from "../lib/background";
-import { markReady, pushLayer, settleAll, settleLayer, type ArtEntry } from "../lib/artLayers";
+import { isOwnEnter, isShown, markReady, pushLayer, settleAll, settleLayer, type ArtEntry } from "../lib/artLayers";
 import { motionOn, useMotionOn } from "../lib/motion";
 import { useWindowVisible } from "../lib/windowVisible";
 import type { GameView } from "../types";
 
 interface Props {
   game: GameView | null;
+  /** Фон этой игры начал проявляться (`null` — фона на экране нет): по
+   *  этому сигналу поднимаются подпись и кнопка PLAY. */
+  onShown?: (gameId: string | null) => void;
 }
 
 /** Слой фона и заливка на случай, если слой — заливка: она выводится из названия игры. */
@@ -17,7 +20,7 @@ interface Scene {
   fill: string;
 }
 
-export default function GameArt({ game }: Props) {
+export default function GameArt({ game, onShown }: Props) {
   const reduced = !useMotionOn();
   const visible = useWindowVisible();
   const layer: Layer = game ? layerFor(game, reduced) : { kind: "fill" };
@@ -50,6 +53,17 @@ export default function GameArt({ game }: Props) {
     if (reduced) setStack(settleAll);
   }, [reduced]);
 
+  // Сообщается до отрисовки (`useLayoutEffect`): подпись и кнопка начинают
+  // подниматься в том же кадре, что и фон, а не кадром позже.
+  const shown = isShown(stack, key);
+  const gameId = game?.id ?? null;
+  useLayoutEffect(() => {
+    if (shown) onShown?.(gameId);
+  }, [shown, gameId]);
+  // Ушли с главного экрана — фона больше нет; вернулись — подпись и кнопка
+  // снова ждут его.
+  useEffect(() => () => onShown?.(null), []);
+
   const onReady = useCallback((id: number) => setStack((s) => markReady(s, id, !motionOn())), []);
   const onEntered = useCallback((id: number) => setStack((s) => settleLayer(s, id)), []);
 
@@ -76,15 +90,28 @@ function ArtLayer({
   const { id } = entry;
   const { layer, fill } = entry.layer;
   const ready = () => onReady(id);
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Слой проявился — всё под ним уходит. Оборванное проявление (`animationcancel`:
+  // анимацию сняли посреди хода) кончается тем же: без анимации слой просто
+  // непрозрачен, и закрытое им больше не видно. Иначе нижние слои копились бы.
+  // Слушатели свои, а не через React: обрыва анимации в его событиях нет.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const finish = (e: AnimationEvent) => {
+      if (isOwnEnter(e)) onEntered(id);
+    };
+    el.addEventListener("animationend", finish);
+    el.addEventListener("animationcancel", finish);
+    return () => {
+      el.removeEventListener("animationend", finish);
+      el.removeEventListener("animationcancel", finish);
+    };
+  }, [id, onEntered]);
 
   return (
-    <div
-      className={entry.ready ? "art-layer is-in" : "art-layer"}
-      onAnimationEnd={(e) => {
-        // Событие всплывает и от дрейфа картинки внутри — нужно только своё.
-        if (e.target === e.currentTarget && e.animationName === "art-enter") onEntered(id);
-      }}
-    >
+    <div ref={ref} className={entry.ready ? "art-layer is-in" : "art-layer"}>
       {layer.kind === "fill" && (
         // Надписи поверх нет: имя игры всплывает над её иконкой в доке
         // (спека этапа 5, §11).

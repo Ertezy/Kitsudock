@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { markReady, pushLayer, settleAll, settleLayer, type ArtEntry } from "./artLayers";
+import rawCss from "../styles.css?raw";
+import { ENTER, isOwnEnter, isShown, markReady, pushLayer, settleAll, settleLayer, type ArtEntry } from "./artLayers";
 
 const entry = (id: number, key: string, ready = false): ArtEntry<string> => ({ id, key, layer: key, ready });
 const ids = (stack: ArtEntry<string>[]) => stack.map((e) => `${e.id}${e.ready ? "+" : "-"}`);
@@ -75,6 +76,57 @@ describe("settleLayer", () => {
     expect(settleLayer(stack, 2)).toBe(stack);
     expect(settleLayer(stack, 1)).toBe(stack);
     expect(settleLayer(stack, 9)).toBe(stack);
+  });
+});
+
+describe("isShown", () => {
+  it("пустая стопка — фона ещё нет", () => {
+    expect(isShown([], "a")).toBe(false);
+  });
+
+  it("выбрали другую игру, а слой под неё ещё не лёг — её фона на экране нет", () => {
+    expect(isShown([entry(1, "a", true)], "b")).toBe(false);
+  });
+
+  it("слой лёг, но ещё грузится — фона нет", () => {
+    expect(isShown([entry(1, "a", true), entry(2, "b")], "b")).toBe(false);
+  });
+
+  it("слой загрузился и проявляется — фон есть, даже пока прежний лежит под ним", () => {
+    expect(isShown([entry(1, "a", true), entry(2, "b", true)], "b")).toBe(true);
+  });
+
+  it("заливка готова сразу, как только легла", () => {
+    expect(isShown(pushLayer([entry(1, "a", true)], entry(2, "fill", true), false), "fill")).toBe(true);
+  });
+
+  it("возврат к фону, который ещё на экране, — фон есть сразу", () => {
+    const back = pushLayer([entry(1, "a", true), entry(2, "b")], entry(3, "a"), false);
+    expect(isShown(back, "a")).toBe(true);
+  });
+});
+
+describe("isOwnEnter", () => {
+  const own = {};
+  const inner = {};
+
+  it("проявление самого слоя — его событие", () => {
+    expect(isOwnEnter({ target: own, currentTarget: own, animationName: ENTER })).toBe(true);
+  });
+
+  it("всплывший дрейф картинки внутри слоя — не его", () => {
+    expect(isOwnEnter({ target: inner, currentTarget: own, animationName: "art-drift" })).toBe(false);
+    expect(isOwnEnter({ target: inner, currentTarget: own, animationName: ENTER })).toBe(false);
+  });
+
+  it("другая анимация на самом слое — не проявление", () => {
+    expect(isOwnEnter({ target: own, currentTarget: own, animationName: "art-drift" })).toBe(false);
+  });
+
+  it("анимация, которой ждёт стопка, есть в стилях и висит на проявляющемся слое", () => {
+    const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, "");
+    expect(css).toContain(`@keyframes ${ENTER} {`);
+    expect(css).toMatch(new RegExp(`\\.art-layer\\.is-in\\s*\\{[^}]*animation:\\s*${ENTER}\\s`));
   });
 });
 
