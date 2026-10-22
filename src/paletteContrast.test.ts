@@ -65,32 +65,27 @@ describe("расчёт контраста", () => {
   });
 });
 
-describe("читаемость палитр", () => {
-  for (const palette of ["current", "a", "b", "c"]) {
-    const values = tokens(":root");
-    if (palette !== "current") {
-      for (const [name, value] of tokens(':root[data-palette="' + palette + '"]')) values.set(name, value);
-    }
-    const get = (name: string) => {
-      const value = values.get(name);
-      if (!value) throw new Error(palette + ": missing " + name);
-      return colour(value);
-    };
-    const bg = get("--bg");
-    const glass = over(get("--glass"), bg);
-    const card = over(get("--card"), glass);
+describe("читаемость палитры", () => {
+  const values = tokens(":root");
+  const get = (name: string) => {
+    const value = values.get(name);
+    if (!value) throw new Error("missing " + name);
+    return colour(value);
+  };
+  const bg = get("--bg");
+  const glass = over(get("--glass"), bg);
+  const card = over(get("--card"), glass);
 
-    const pairs: [string, Colour, Colour][] = [
-      ["основной текст на фоне", get("--ink"), bg],
-      ["основной текст на стекле", get("--ink"), glass],
-      ["приглушённый текст на стекле", get("--ink-dim"), glass],
-      ["приглушённый текст на карточке поверх стекла", get("--ink-dim"), card],
-      ["текст действия на акценте", get("--accent-ink"), get("--accent")],
-    ];
-    for (const [name, foreground, background] of pairs) {
-      it(palette + ": " + name + " не ниже 4.5:1", () => {
-        expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
-      });
-    }
+  const pairs: [string, Colour, Colour][] = [
+    ["основной текст на фоне", get("--ink"), bg],
+    ["основной текст на стекле", get("--ink"), glass],
+    ["приглушённый текст на стекле", get("--ink-dim"), glass],
+    ["приглушённый текст на карточке поверх стекла", get("--ink-dim"), card],
+    ["текст действия на акценте", get("--accent-ink"), get("--accent")],
+  ];
+  for (const [name, foreground, background] of pairs) {
+    it(name + " не ниже 4.5:1", () => {
+      expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
+    });
   }
 });

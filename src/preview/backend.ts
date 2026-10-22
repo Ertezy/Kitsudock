@@ -27,18 +27,11 @@ export type Scenario = "normal" | "loading" | "offline" | "stale" | "firstRun";
 
 export const SCENARIOS: readonly Scenario[] = ["normal", "loading", "offline", "stale", "firstRun"];
 
-/**
- * Варианты палитры: `current` — нынешние стили без атрибута, `a`, `b`, `c` —
- * блоки `:root[data-palette]` в `src/styles.css` (спека полировки, §4.2).
- */
-export const PALETTES: readonly string[] = ["current", "a", "b", "c"];
-
-/** Всё состояние стенда — это адрес: `?scenario=normal&lang=ru&motion=on&palette=current`. */
+/** Всё состояние стенда — это адрес: `?scenario=normal&lang=ru&motion=on`. */
 export interface PreviewParams {
   scenario: Scenario;
   lang: Lang;
   motion: boolean;
-  palette: string;
   /** Показывать ли плашку с переключателями; `controls=off` убирает её для снимков. */
   controls: boolean;
 }
@@ -47,7 +40,6 @@ export const DEFAULT_PARAMS: PreviewParams = {
   scenario: "normal",
   lang: "ru",
   motion: true,
-  palette: "current",
   controls: true,
 };
 
@@ -62,7 +54,6 @@ export function readParams(search: string): PreviewParams {
     scenario: pick("scenario", SCENARIOS, DEFAULT_PARAMS.scenario),
     lang: pick<Lang>("lang", ["ru", "en"], DEFAULT_PARAMS.lang),
     motion: pick("motion", ["on", "off"], "on") === "on",
-    palette: pick("palette", PALETTES, DEFAULT_PARAMS.palette),
     controls: q.get("controls") !== "off",
   };
 }
@@ -73,7 +64,6 @@ export function toSearch(p: PreviewParams): string {
     scenario: p.scenario,
     lang: p.lang,
     motion: p.motion ? "on" : "off",
-    palette: p.palette,
   });
   if (!p.controls) q.set("controls", "off");
   return `?${q.toString()}`;

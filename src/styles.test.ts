@@ -213,13 +213,10 @@ describe("стили берут значения только из шкал", ()
   });
 });
 
-describe("варианты палитры", () => {
-  const rootTokens = (selector: (s: string) => boolean) =>
-    new Map(decls.filter((d) => isRoot(d.selector) && selector(d.selector) && d.prop.startsWith("--")).map((d) => [d.prop, d.value]));
-  const base = rootTokens((s) => s === ":root");
+describe("палитра", () => {
+  const base = new Map(decls.filter((d) => d.selector === ":root" && d.prop.startsWith("--")).map((d) => [d.prop, d.value]));
   /** Цветовые токены основы: те, в чьих значениях есть цвет числом. */
   const colourTokens = [...base].filter(([, v]) => COLOUR_LITERAL.test(v)).map(([k]) => k);
-  const variants = [...new Set([...rawCss.matchAll(/:root\[data-palette="([^"]+)"\]/g)].map((m) => m[1]))];
 
   it("основа задаёт цвета токенами, и их хватает на весь интерфейс", () => {
     for (const t of ["--bg", "--glass", "--card", "--line", "--ink", "--ink-dim", "--ink-faint", "--accent", "--accent-ink", "--content", "--content-soft", "--label", "--danger", "--shadow-1", "--shadow-2", "--shadow-3", "--glass-edge"]) {
@@ -227,16 +224,9 @@ describe("варианты палитры", () => {
     }
   });
 
-  it("три варианта: a, b, c", () => {
-    expect(variants.sort()).toEqual(["a", "b", "c"]);
-  });
-
-  it("каждый вариант задаёт все цветовые токены и ничего, кроме них", () => {
-    for (const v of variants) {
-      const own = rootTokens((s) => s.split(",").some((part) => part.trim() === `:root[data-palette="${v}"]`));
-      for (const t of colourTokens) expect([...own.keys()], `${v}: ${t}`).toContain(t);
-      for (const t of own.keys()) expect(colourTokens, `${v}: лишний ${t}`).toContain(t);
-    }
+  it("палитра одна: блоков [data-palette] в стилях нет", () => {
+    expect(rawCss.replace(/\/\*[\s\S]*?\*\//g, "")).not.toContain("data-palette");
+    expect(decls.filter((d) => /data-palette/.test(d.selector))).toEqual([]);
   });
 });
 

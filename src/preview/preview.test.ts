@@ -1,7 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import apiSource from "../lib/api.ts?raw";
 import viteConfig from "../../vite.config.ts?raw";
-import stylesCss from "../styles.css?raw";
 import type { GameView, HubData } from "../types";
 import type { Scenario } from "./backend";
 
@@ -59,7 +58,7 @@ describe("адрес стенда", () => {
     for (const scenario of SCENARIOS) {
       for (const lang of ["ru", "en"] as const) {
         for (const motion of [true, false]) {
-          const params = { scenario, lang, motion, palette: "current", controls: true };
+          const params = { scenario, lang, motion, controls: true };
           expect(readParams(toSearch(params))).toEqual(params);
         }
       }
@@ -76,16 +75,13 @@ describe("адрес стенда", () => {
 
   it("незнакомое значение заменяется значением по умолчанию", async () => {
     const { readParams, DEFAULT_PARAMS } = await import("./backend");
-    expect(readParams("?scenario=bogus&lang=de&motion=maybe&palette=nope")).toEqual(DEFAULT_PARAMS);
+    expect(readParams("?scenario=bogus&lang=de&motion=maybe")).toEqual(DEFAULT_PARAMS);
   });
 
-  it("предлагает нынешнюю палитру и три варианта, у каждого варианта есть стили", async () => {
-    const { readParams, PALETTES } = await import("./backend");
-    expect([...PALETTES]).toEqual(["current", "a", "b", "c"]);
-    for (const p of PALETTES) expect(readParams(`?palette=${p}`).palette).toBe(p);
-    // `current` — это стили без атрибута; у остальных — свой блок `:root[data-palette]`.
-    const blocks = new Set([...stylesCss.matchAll(/:root\[data-palette="([^"]+)"\]/g)].map((m) => m[1]));
-    expect([...blocks].sort()).toEqual(PALETTES.filter((p) => p !== "current"));
+  it("палитры на стенде больше нет: старый параметр из ссылки ничего не меняет", async () => {
+    const { readParams, toSearch, DEFAULT_PARAMS } = await import("./backend");
+    expect(readParams("?palette=a")).toEqual(DEFAULT_PARAMS);
+    expect(toSearch(readParams("?palette=a"))).not.toContain("palette");
   });
 });
 

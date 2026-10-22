@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { PALETTES, SCENARIOS, toSearch, type PreviewParams, type Scenario } from "./backend";
+import { SCENARIOS, toSearch, type PreviewParams, type Scenario } from "./backend";
 import type { Lang } from "../i18n/native";
 
 // Плашка с переключателями стенда: живёт в отдельном корне поверх приложения и
@@ -112,12 +112,6 @@ export default function Controls({ params }: { params: PreviewParams }) {
         ]}
         value={params.motion ? "on" : "off"}
         onPick={(motion) => go({ motion: motion === "on" })}
-      />
-      <Row
-        name="palette"
-        options={PALETTES.map((p) => ({ value: p, text: p }))}
-        value={params.palette}
-        onPick={(palette) => go({ palette })}
       />
       <button type="button" style={{ ...pill(false), padding: "5px 8px" }} onClick={openSettings}>
         Settings
