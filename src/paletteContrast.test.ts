@@ -5,20 +5,24 @@ import rawCss from "./styles.css?raw";
 // стекла и текста. Наличие токенов само по себе не гарантирует читаемость.
 type Colour = [number, number, number, number];
 
+const COMMENTS = /\/\*[\s\S]*?\*\//g;
+
 function colour(value: string): Colour {
-  const hex = /^#([\da-f]{6})$/i.exec(value.trim());
+  const text = value.trim();
+  const hex = /^#([\da-f]{6})$/i.exec(text);
   if (hex) {
     const n = Number.parseInt(hex[1], 16);
     return [n >> 16, (n >> 8) & 255, n & 255, 1];
   }
-  const rgba = /^rgba?\(([^)]+)\)$/.exec(value.trim());
+  const rgba = /^rgba?\(([^)]*)\)$/.exec(text);
   if (rgba) {
-    const channels = rgba[1].split(",").map(Number);
-    if ((channels.length === 3 || channels.length === 4) && channels.every(Number.isFinite)) {
-      return [channels[0], channels[1], channels[2], channels[3] ?? 1];
+    const parts = rgba[1].split(",").map((part) => part.trim());
+    if ((parts.length === 3 || parts.length === 4) && parts.every((part) => /^\d*\.?\d+$/.test(part))) {
+      const [r, g, b, a = 1] = parts.map(Number);
+      if (r <= 255 && g <= 255 && b <= 255 && a <= 1) return [r, g, b, a];
     }
   }
-  throw new Error("Unsupported palette colour: " + value);
+  throw new Error(`не удалось разобрать цвет «${value}»: ждём #rrggbb, rgb(r, g, b) или rgba(r, g, b, a) через запятые`);
 }
 
 // Фон непрозрачен: смешение происходит в sRGB до расчёта яркости.
@@ -46,11 +50,83 @@ function contrast(foreground: Colour, background: Colour): number {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
-function tokens(selector: string): Map<string, string> {
-  const css = rawCss.replace(/\/\*[\s\S]*?\*\//g, "");
-  const block = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find((match) => match[1].trim() === selector);
-  if (!block) throw new Error("Missing palette block: " + selector);
-  return new Map([...block[2].matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((match) => [match[1], match[2].trim()]));
+/** Объявления блока в токены. Обычные свойства (`color-scheme`) пропускаются, обрывок без двоеточия или пустое значение — ошибка. */
+function readDeclarations(body: string, into: Map<string, string>): void {
+  for (const piece of body.split(";")) {
+    const text = piece.trim();
+    if (!text) continue;
+    const m = /^([\w-]+)\s*:\s*([\s\S]*\S)$/.exec(text);
+    if (!m) throw new Error(`не удалось разобрать объявление в :root: «${text}»`);
+    if (m[1].startsWith("--")) into.set(m[1], m[2]);
+  }
+}
+
+/**
+ * Токены из всех блоков `:root { … }` верхнего уровня, в порядке файла: поздний
+ * блок перекрывает ранний, как в каскаде. Блоки с атрибутом (`:root[data-motion]`),
+ * вложенные в `@media` и любые другие селекторы не берутся: их значения действуют
+ * не всегда. Скобки внутри кавычек блок не закрывают.
+ */
+function rootTokens(css: string): Map<string, string> {
+  const src = css.replace(COMMENTS, "");
+  const tokens = new Map<string, string>();
+  let blocks = 0;
+  let depth = 0;
+  let quote = "";
+  let head = "";
+  let body = "";
+  for (const ch of src) {
+    if (!quote && ch === "{") {
+      depth++;
+      if (depth === 1) continue;
+    } else if (!quote && ch === "}") {
+      depth--;
+      if (depth === 0) {
+        if (head.trim() === ":root") {
+          blocks++;
+          readDeclarations(body, tokens);
+        }
+        head = "";
+        body = "";
+        continue;
+      }
+    } else if (ch === '"' || ch === "'") {
+      quote = quote === ch ? "" : quote || ch;
+    }
+    if (depth === 0) head += ch;
+    else body += ch;
+  }
+  if (!blocks) throw new Error("в стилях нет блока :root: токены палитры не найдены");
+  return tokens;
+}
+
+/** Значение свойства из простого правила `селектор { … }` без вложенных блоков. */
+function ruleValue(css: string, selector: string, prop: string): string {
+  for (const block of css.replace(COMMENTS, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (block[1].trim() !== selector) continue;
+    const declaration = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`).exec(block[2]);
+    if (declaration) return declaration[1].trim();
+  }
+  throw new Error(`в стилях нет правила ${selector} со свойством ${prop}`);
+}
+
+/**
+ * Доля акцента в подложке горящей карточки с кодом. Читается из самого правила
+ * `.code-card.burning`, чтобы проверка не разошлась со стилями.
+ */
+function burningShare(css: string): number {
+  const mix = /^color-mix\(\s*in srgb,\s*var\(--accent\)\s*(\d+(?:\.\d+)?)%\s*,\s*transparent\s*\)$/.exec(
+    ruleValue(css, ".code-card.burning", "background"),
+  );
+  if (!mix) throw new Error("подложка .code-card.burning должна быть вида color-mix(in srgb, var(--accent) N%, transparent)");
+  return Number(mix[1]) / 100;
+}
+
+/** Прозрачность подписи раздела: сама подпись светлая, но правило её приглушает. */
+function labelOpacity(css: string): number {
+  const opacity = Number(ruleValue(css, ".panel-label", "opacity"));
+  if (!(opacity > 0 && opacity <= 1)) throw new Error("у .panel-label нет прозрачности от 0 до 1");
+  return opacity;
 }
 
 describe("расчёт контраста", () => {
@@ -65,27 +141,121 @@ describe("расчёт контраста", () => {
   });
 });
 
-describe("читаемость палитры", () => {
-  const values = tokens(":root");
-  const get = (name: string) => {
-    const value = values.get(name);
-    if (!value) throw new Error("missing " + name);
-    return colour(value);
-  };
-  const bg = get("--bg");
-  const glass = over(get("--glass"), bg);
-  const card = over(get("--card"), glass);
+describe("чтение стилей", () => {
+  it("значения из всех блоков :root собираются вместе, поздний блок перекрывает ранний", () => {
+    const css = ":root { --a: #111111; --b: #222222; }\n.x { color: red; }\n:root { --b: #333333; --c: rgba(1, 2, 3, 0.5); }";
+    expect([...rootTokens(css)]).toEqual([
+      ["--a", "#111111"],
+      ["--b", "#333333"],
+      ["--c", "rgba(1, 2, 3, 0.5)"],
+    ]);
+  });
 
-  const pairs: [string, Colour, Colour][] = [
-    ["основной текст на фоне", get("--ink"), bg],
-    ["основной текст на стекле", get("--ink"), glass],
-    ["приглушённый текст на стекле", get("--ink-dim"), glass],
-    ["приглушённый текст на карточке поверх стекла", get("--ink-dim"), card],
-    ["текст действия на акценте", get("--accent-ink"), get("--accent")],
+  it("чужие блоки не попадают: с атрибутом, внутри @media, обычные селекторы", () => {
+    const css = [
+      ":root { --a: #111111; }",
+      ':root[data-motion="off"] { --a: #999999; --d: 0s; }',
+      "@media (min-width: 1px) { :root { --a: #888888; --e: #777777; } }",
+      ".x { --a: #666666; --f: #555555; }",
+      "html :root { --g: #444444; }",
+    ].join("\n");
+    expect([...rootTokens(css)]).toEqual([["--a", "#111111"]]);
+  });
+
+  it("комментарии, обычные свойства и скобки в кавычках не мешают", () => {
+    const css = '/* :root { --x: #000000; } */ .y::after { content: "}"; } :root { color-scheme: dark; --a: #111111 /* тон */ }';
+    expect([...rootTokens(css)]).toEqual([["--a", "#111111"]]);
+  });
+
+  it("без блока :root — понятная ошибка, а не пустая палитра", () => {
+    expect(() => rootTokens(".x { color: red; }")).toThrow(/нет блока :root/);
+    expect(() => rootTokens(':root[data-motion="off"] { --move: 0s; }')).toThrow(/нет блока :root/);
+  });
+
+  it("обрывок объявления и пустое значение называются в ошибке", () => {
+    expect(() => rootTokens(":root { --a: #111111; oops }")).toThrow(/объявление в :root: «oops»/);
+    expect(() => rootTokens(":root { --a: ; }")).toThrow(/объявление в :root: «--a:»/);
+  });
+
+  it("значение свойства берётся из своего правила, а долю акцента и прозрачность подписи тест читает сам", () => {
+    const css = ".a { opacity: 0.1; } .b, .c { opacity: 0.2; } .c { color: red; opacity: 0.65 }";
+    expect(ruleValue(css, ".c", "opacity")).toBe("0.65");
+    expect(() => ruleValue(css, ".b", "opacity")).toThrow(/нет правила \.b/);
+    expect(() => ruleValue(css, ".a", "color")).toThrow(/нет правила \.a со свойством color/);
+    expect(burningShare(".code-card.burning { background: color-mix(in srgb, var(--accent) 12%, transparent); }")).toBe(0.12);
+    expect(() => burningShare(".code-card.burning { background: var(--card); }")).toThrow(/color-mix/);
+    expect(labelOpacity(".panel-label { color: var(--label); opacity: 0.65; }")).toBe(0.65);
+    expect(() => labelOpacity(".panel-label { opacity: 2; }")).toThrow(/от 0 до 1/);
+  });
+
+  it("цвет, который тест не умеет читать, называется в ошибке", () => {
+    for (const bad of ["#fff", "hsl(0 0% 100%)", "rgba(1, 2)", "rgba(1, , 3)", "rgba(300, 0, 0, 1)", "rgba(0, 0, 0, 2)", "rgb(0 0 0 / 50%)", "red", ""]) {
+      expect(() => colour(bad), bad).toThrow(/не удалось разобрать цвет/);
+    }
+    expect(() => colour("rgba(1, 2)")).toThrow(/«rgba\(1, 2\)»/);
+  });
+});
+
+describe("читаемость палитры", () => {
+  const palette = () => {
+    const tokens = rootTokens(rawCss);
+    const get = (name: string): Colour => {
+      const value = tokens.get(name);
+      if (value === undefined) throw new Error(`в :root нет токена ${name}`);
+      try {
+        return colour(value);
+      } catch (error) {
+        throw new Error(`${name}: ${(error as Error).message}`);
+      }
+    };
+    const bg = get("--bg");
+    const glass = over(get("--glass"), bg);
+    // Карточка в панели лежит на стекле. На экране настроек карточка лежит прямо
+    // на фоне и темнее, поэтому стекло и карточка на стекле — худший случай.
+    const card = over(get("--card"), glass);
+    // Горящая карточка с кодом красится из акцента вместо обычной карточки.
+    const accent = get("--accent");
+    const burning = over([accent[0], accent[1], accent[2], burningShare(rawCss)], glass);
+    return { get, labelOpacity: labelOpacity(rawCss), surfaces: { bg, glass, card, burning, accent } };
+  };
+
+  type Surface = keyof ReturnType<typeof palette>["surfaces"];
+  const pairs: [string, string, Surface][] = [
+    ["основной текст на фоне", "--ink", "bg"],
+    ["основной текст на стекле", "--ink", "glass"],
+    ["приглушённый текст на стекле", "--ink-dim", "glass"],
+    ["приглушённый текст на карточке поверх стекла", "--ink-dim", "card"],
+    ["приглушённый текст на горящей карточке кода", "--ink-dim", "burning"],
+    ["самый тихий текст на стекле", "--ink-faint", "glass"],
+    ["самый тихий текст на карточке поверх стекла", "--ink-faint", "card"],
+    ["самый тихий текст на горящей карточке кода", "--ink-faint", "burning"],
+    ["цвет содержимого на стекле", "--content", "glass"],
+    ["цвет содержимого на карточке поверх стекла", "--content", "card"],
+    ["мягкий цвет содержимого на стекле", "--content-soft", "glass"],
+    ["мягкий цвет содержимого на карточке поверх стекла", "--content-soft", "card"],
+    ["подпись раздела на стекле", "--label", "glass"],
+    ["цвет действия как текст на стекле", "--accent", "glass"],
+    ["цвет действия как текст на горящей карточке кода", "--accent", "burning"],
+    ["цвет опасного на стекле", "--danger", "glass"],
+    ["текст действия на акценте", "--accent-ink", "accent"],
   ];
-  for (const [name, foreground, background] of pairs) {
+  for (const [name, token, surface] of pairs) {
     it(name + " не ниже 4.5:1", () => {
-      expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5);
+      const { get, surfaces } = palette();
+      expect(contrast(get(token), surfaces[surface])).toBeGreaterThanOrEqual(4.5);
     });
   }
+
+  it("подпись раздела на стекле с прозрачностью, которую задаёт .panel-label, не ниже 4.5:1", () => {
+    const { get, labelOpacity, surfaces } = palette();
+    const [r, g, b, a] = get("--label");
+    expect(contrast([r, g, b, a * labelOpacity], surfaces.glass)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("самый тихий текст заметно тише приглушённого: контраст ниже минимум на 0.5", () => {
+    const { get, surfaces } = palette();
+    const faint = contrast(get("--ink-faint"), surfaces.glass);
+    const dim = contrast(get("--ink-dim"), surfaces.glass);
+    expect(dim - faint).toBeGreaterThanOrEqual(0.5);
+  });
 });
