@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState, type Ref } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { gradientFor } from "../lib/gradient";
 import { layerFor, layerKey, type Layer } from "../lib/background";
-import { useMotionOn } from "../lib/motion";
+import { markReady, pushLayer, settleAll, settleLayer, type ArtEntry } from "../lib/artLayers";
+import { motionOn, useMotionOn } from "../lib/motion";
 import { useWindowVisible } from "../lib/windowVisible";
 import type { GameView } from "../types";
 
@@ -10,96 +11,139 @@ interface Props {
   game: GameView | null;
 }
 
+/** Слой фона и заливка на случай, если слой — заливка: она выводится из названия игры. */
+interface Scene {
+  layer: Layer;
+  fill: string;
+}
+
 export default function GameArt({ game }: Props) {
   const reduced = !useMotionOn();
   const visible = useWindowVisible();
   const layer: Layer = game ? layerFor(game, reduced) : { kind: "fill" };
-  const key = layerKey(layer);
+  const fill = gradientFor(game?.title ?? "");
+  // У двух игр без фона заливки разные, поэтому ключ заливки — сама заливка:
+  // иначе переход между такими играми не заметил бы смены фона.
+  const key = layer.kind === "fill" ? `fill:${fill}` : layerKey(layer);
 
-  // Два слоя вместо одной картинки по ключу: раньше при смене игры React в
-  // одном проходе убирал старую картинку и вставлял новую, и между ними на
-  // мгновение проглядывал фон окна вместо настоящего перетекания (спека этапа
-  // 4, §2.5). Нижний слой держит прежний фон неподвижно и непрозрачно, верхний
-  // проявляется поверх него. Для видео так же (спека этапа 5, §6.6).
-  const [top, setTop] = useState<Layer>(layer);
-  const [bottom, setBottom] = useState<Layer | null>(null);
-  const topKey = useRef(key);
-  const videoRef = useRef<HTMLVideoElement>(null);
+  // Слои лежат стопкой (`lib/artLayers.ts`): новый фон ложится сверху
+  // невидимым, проявляется, когда загрузился, и только потом убирает прежний.
+  // Раньше новый фон проявлялся сразу, ещё не загрузившись, а прежний заново
+  // вставлялся нижним слоем — и дрейф у него начинался с начала рывком. Теперь
+  // прежний слой — тот же самый элемент, он просто остаётся на месте.
+  // Заливке грузить нечего, она готова сразу.
+  const nextId = useRef(1);
+  const [stack, setStack] = useState<ArtEntry<Scene>[]>(() => [
+    { id: 0, key, layer: { layer, fill }, ready: layer.kind === "fill" },
+  ]);
 
-  // Зависимость — только ключ: `top` и `layer` берутся из того отрисовывания, в
-  // котором ключ сменился, то есть это ещё прежний верхний слой и уже новый.
+  // Зависимость — только ключ: `layer` и `fill` берутся из того отрисовывания,
+  // в котором ключ сменился. Повторный вызов с тем же ключом стопку не меняет.
   useEffect(() => {
-    if (topKey.current === key) return;
-    topKey.current = key;
-    // Фона нет — оба слоя очищаются сразу. Иначе при переходе к следующей игре
-    // с фоном нижним слоем стал бы фон, который давно ушёл с экрана.
-    setBottom(layer.kind === "fill" || top.kind === "fill" ? null : top);
-    setTop(layer);
+    const id = nextId.current++;
+    setStack((s) => pushLayer(s, { id, key, layer: { layer, fill }, ready: layer.kind === "fill" }, !motionOn()));
   }, [key]);
 
-  // Ролик не крутится впустую, пока окно в трее или свёрнуто (спека §6.3).
+  // Тумблер «Анимация» выключили посреди перетекания: оно обрывается сразу,
+  // а не ждёт конца анимации, которой больше нет.
   useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    if (visible) void video.play().catch(() => {});
-    else video.pause();
-  }, [visible, top]);
+    if (reduced) setStack(settleAll);
+  }, [reduced]);
 
-  if (!game || top.kind === "fill") {
-    // Заливки выводятся из названия устойчиво. Надписи поверх нет: имя игры
-    // всплывает над её иконкой в доке (спека этапа 5, §11).
-    return <div className="art" style={{ background: gradientFor(game?.title ?? "") }} />;
-  }
+  const onReady = useCallback((id: number) => setStack((s) => markReady(s, id, !motionOn())), []);
+  const onEntered = useCallback((id: number) => setStack((s) => settleLayer(s, id)), []);
 
   return (
     <div className="art">
-      {bottom && <LayerView key={`bottom-${layerKey(bottom)}`} layer={bottom} under />}
-      <LayerView key={`top-${layerKey(top)}`} layer={top} videoRef={videoRef} />
+      {stack.map((entry) => (
+        <ArtLayer key={entry.id} entry={entry} visible={visible} onReady={onReady} onEntered={onEntered} />
+      ))}
     </div>
   );
 }
 
-function LayerView({
-  layer,
-  under = false,
-  videoRef,
+function ArtLayer({
+  entry,
+  visible,
+  onReady,
+  onEntered,
 }: {
-  layer: Layer;
-  under?: boolean;
-  videoRef?: Ref<HTMLVideoElement>;
+  entry: ArtEntry<Scene>;
+  visible: boolean;
+  onReady: (id: number) => void;
+  onEntered: (id: number) => void;
 }) {
-  if (layer.kind === "fill") return null;
-  if (layer.kind === "video") {
-    // Нижний слой неподвижен, пока новый фон проявляется поверх, и проигрывать
-    // ролик в нём некому. Если у ролика есть неподвижный кадр, под новым фоном
-    // лежит он, и файл ролика заново не загружается. Классы видео, а не
-    // картинки: у картинки медленный дрейф, и кадр прыгнул бы в масштабе.
-    if (under && layer.still) {
-      return (
-        <img className="art-video art-layer-under" src={convertFileSrc(layer.still)} alt="" />
-      );
-    }
-    // Кадра нет — остаётся сам ролик, иначе на время перетекания проглянул бы
-    // фон окна (спека §6.6). Внизу он не запускается и грузит только метаданные.
-    return (
-      <video
-        ref={videoRef}
-        className={under ? "art-video art-layer-under" : "art-video"}
-        src={convertFileSrc(layer.path)}
-        poster={layer.still ? convertFileSrc(layer.still) : undefined}
-        muted
-        loop
-        playsInline
-        autoPlay={!under}
-        preload={under ? "metadata" : undefined}
-      />
-    );
-  }
+  const { id } = entry;
+  const { layer, fill } = entry.layer;
+  const ready = () => onReady(id);
+
   return (
-    <img
-      className={under ? "art-photo art-photo-under" : "art-photo"}
+    <div
+      className={entry.ready ? "art-layer is-in" : "art-layer"}
+      onAnimationEnd={(e) => {
+        // Событие всплывает и от дрейфа картинки внутри — нужно только своё.
+        if (e.target === e.currentTarget && e.animationName === "art-enter") onEntered(id);
+      }}
+    >
+      {layer.kind === "fill" && (
+        // Надписи поверх нет: имя игры всплывает над её иконкой в доке
+        // (спека этапа 5, §11).
+        <div className="art-fill" style={{ background: fill }} />
+      )}
+      {layer.kind === "image" && (
+        <img
+          className="art-photo"
+          src={convertFileSrc(layer.path)}
+          alt=""
+          // Готов — значит не только загружен, но и раскодирован: иначе
+          // большая картинка раскодировалась бы в первых кадрах перетекания,
+          // и оно бы дёрнулось. Битая картинка тоже «готова»: прежний фон
+          // чужой игры не должен оставаться на экране навсегда.
+          onLoad={(e) => void e.currentTarget.decode().catch(() => {}).finally(ready)}
+          onError={ready}
+        />
+      )}
+      {layer.kind === "video" && <ArtVideo layer={layer} visible={visible} onReady={ready} />}
+    </div>
+  );
+}
+
+/**
+ * Своё видео фона (спека этапа 5, §6). Готово, когда есть первый кадр. Пока
+ * новый фон проявляется поверх, ролик под ним доигрывает те же полсекунды —
+ * это тот же элемент, файл заново не загружается, и кадр не прыгает.
+ */
+function ArtVideo({
+  layer,
+  visible,
+  onReady,
+}: {
+  layer: Extract<Layer, { kind: "video" }>;
+  visible: boolean;
+  onReady: () => void;
+}) {
+  const ref = useRef<HTMLVideoElement>(null);
+
+  // Ролик не крутится впустую, пока окно в трее или свёрнуто (спека §6.3).
+  useEffect(() => {
+    const video = ref.current;
+    if (!video) return;
+    if (visible) void video.play().catch(() => {});
+    else video.pause();
+  }, [visible]);
+
+  return (
+    <video
+      ref={ref}
+      className="art-video"
       src={convertFileSrc(layer.path)}
-      alt=""
+      poster={layer.still ? convertFileSrc(layer.still) : undefined}
+      muted
+      loop
+      playsInline
+      autoPlay
+      onLoadedData={onReady}
+      onError={onReady}
     />
   );
 }

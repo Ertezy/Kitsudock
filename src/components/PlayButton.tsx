@@ -82,11 +82,15 @@ export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, 
       )}
       <div className="play-note">{note}</div>
       <button
-        className="play"
+        className={busy ? "play launching" : "play"}
         disabled={busy || fixing || disabled}
+        aria-busy={busy || undefined}
         onClick={() => void click()}
       >
-        {busy ? t.main.launching : t.main.play}
+        {/* Блик «запускается…» — только пока идёт запуск: появляется вместе с
+            состоянием и начинает проход с начала, а не с середины. */}
+        {busy && <span className="play-sheen" aria-hidden="true" />}
+        <span className="play-label">{busy ? t.main.launching : t.main.play}</span>
       </button>
     </div>
   );

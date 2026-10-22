@@ -31,9 +31,13 @@
   --ink-dim: rgba(247, 241, 249, 0.64);
   --ink-faint: rgba(247, 241, 249, 0.55);
 
-  /* Действие: мягкий огненно-оранжевый. */
+  /* Действие: мягкий огненно-оранжевый. Свечение кнопки PLAY под курсором —
+     тот же цвет, разбавленный прозрачностью: следует за палитрой сам. Блик
+     «запускается…» — цвет текста, тоже разбавленный. */
   --accent: #fba355;
   --accent-ink: #2c1705;
+  --accent-glow: color-mix(in srgb, var(--accent) 55%, transparent);
+  --sheen: color-mix(in srgb, var(--ink) 40%, transparent);
 
   /* Содержимое: сакура. */
   --content: #e4a6c9;
@@ -264,53 +268,50 @@ body {
   inset: 0;
 }
 
-.art-photo {
+/* Слой фона (`GameArt`, стопка из `lib/artLayers.ts`). Пока его картинка не
+   загрузилась, он невидим, а прежний фон лежит под ним как был. Загрузился —
+   проявляется на сценической скорости и при этом чуть «доезжает» масштабом
+   (1.03 → 1): фон не просто сменяется, а встаёт на место. Прежний слой всё это
+   время неподвижен и непрозрачен и уходит, только когда новый закрыл его
+   целиком, — заливка окна между фонами не проглядывает.
+
+   Доезд — на обёртке, а дрейф — на картинке внутри: у обоих `transform`, и на
+   одном элементе одна анимация перебила бы другую. Так дрейф идёт и во время
+   доезда, и после него, без рывка. */
+.art-layer {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  /* Перетекание при смене игры и медленный дрейф — вместе.
-     Дрейф намеренно очень медленный: экран не должен выглядеть мёртвым, но и
-     отвлекать от него нечему. */
-  animation: art-in var(--move) var(--ease-out), art-drift var(--move-ambient) ease-in-out infinite alternate;
+  opacity: 0;
 }
 
-/* Нижний слой перетекания (`GameArt`): уже показанная картинка. Без
-   собственного art-in — он должен быть непрозрачен с первого кадра, иначе у
-   него самого была бы своя вспышка в фон окна в момент, когда он становится
-   нижним слоем. */
-.art-photo-under {
-  animation: art-drift var(--move-ambient) ease-in-out infinite alternate;
+.art-layer.is-in {
   opacity: 1;
+  animation: art-enter var(--move-scene) var(--ease-out) backwards;
 }
 
-/* Своё видео фона (спека этапа 5, §6). Без медленного дрейфа: ролик и так
-   движется, дрейф поверх него укачивал бы. Перетекание при смене игры — то же,
-   что у картинки. */
-.art-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  animation: art-in var(--move) var(--ease-out);
-}
-
-/* Нижний слой перетекания для видео: неподвижен и непрозрачен с первого кадра,
-   по той же причине, что `.art-photo-under`. */
-.art-layer-under {
-  animation: none;
-  opacity: 1;
-}
-
-@keyframes art-in {
+@keyframes art-enter {
   from {
     opacity: 0;
+    transform: scale(1.03);
   }
-  to {
-    opacity: 1;
-  }
+}
+
+.art-photo,
+.art-video,
+.art-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Медленный дрейф картинки. Намеренно очень медленный: экран не должен
+   выглядеть мёртвым, но и отвлекать от него нечему. У своего видео фона
+   (спека этапа 5, §6) и у заливки дрейфа нет: ролик и так движется, дрейф
+   поверх него укачивал бы. */
+.art-photo {
+  animation: art-drift var(--move-ambient) ease-in-out infinite alternate;
 }
 
 @keyframes art-drift {
@@ -338,6 +339,19 @@ body {
   font-weight: 600;
   color: var(--ink);
   letter-spacing: 0.02em;
+  /* Лесенка при смене игры: фон начинает перетекать, следом поднимается
+     подпись, за ней кнопка. `PlayButton` пересоздаётся при каждой смене игры
+     (`key` в `App`), поэтому появление проигрывается само. */
+  animation: play-rise var(--move-slow) var(--ease-out) calc(var(--move) * 0.5) backwards;
+}
+
+/* Только `backwards`, без `forwards`: доигравшая анимация не держит свой
+   `transform`, и нажатие кнопки ниже (`scale`) не перебивается ею. */
+@keyframes play-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 /* Док снизу доходит верхней панелью до кнопки PLAY по дизайну; кнопка должна быть на переднем плане. */
@@ -352,7 +366,11 @@ body {
   z-index: var(--z-ui-raised);
 }
 
+/* Кнопка PLAY. Наведение — мягкое свечение цветом действия; нажатие —
+   ощутимое вдавливание с пружиной на отпускании; «запускается…» — спокойный
+   блик, проходящий по кнопке. */
 .play {
+  position: relative;
   background: var(--accent);
   color: var(--accent-ink);
   font: 600 var(--text-xl)/1 "Golos Text Variable", "Segoe UI", sans-serif;
@@ -362,11 +380,91 @@ body {
   border-radius: var(--r-pill);
   cursor: pointer;
   box-shadow: var(--shadow-2);
+  animation: play-rise var(--move-slow) var(--ease-out) var(--move) backwards;
+  transition: transform var(--move-fast) var(--ease-spring);
 }
 
-.play:disabled {
-  opacity: 0.65;
+/* Свечение — отдельный слой, у которого меняется только прозрачность: сама
+   тень при этом не пересчитывается, и наведение не стоит перерисовки. Своего
+   фона у слоя нет, а тень снаружи кнопки, поэтому надпись он не закрывает. */
+.play::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-pill);
+  box-shadow: 0 6px 30px 2px var(--accent-glow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.play:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.play:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Рамка фокуса светлая, а не цвета действия: оранжевая рамка вокруг оранжевой
+   кнопки читалась бы как кнопка потолще. */
+.play:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* Надпись над бликом: позиционированные слои рисуются в порядке разметки. */
+.play-label {
+  position: relative;
+}
+
+/* Недоступная кнопка — не цвет действия: нажать её нельзя, и оранжевый тут
+   обещал бы то, чего нет. Тёмная подложка, как у подписи над кнопкой, и
+   приглушённый, но читаемый текст. Прозрачность всей кнопки, как раньше,
+   гасила и надпись — на светлом арте она терялась. */
+.play:disabled:not(.launching) {
+  background: var(--plate);
+  color: var(--ink-dim);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--glass-edge);
   cursor: default;
+}
+
+/* «Запускается…»: кнопка недоступна, но не погашена — это работа, а не
+   запрет. */
+.play.launching {
+  cursor: progress;
+}
+
+/* Блик. Обрезается своей «таблеткой», а не кнопкой: у кнопки обрезка срезала
+   бы и свечение вокруг неё. Полоса света проходит слева направо за первые 70%
+   цикла, замедляясь, и пропадает за краем; остаток цикла — пауза, чтобы блик
+   не мельтешил. Первый проход начинается, когда пружина нажатия уже отыграла. */
+.play-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.play-sheen::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(100deg, transparent, var(--sheen), transparent);
+  transform: translateX(-100%);
+  animation: play-sheen calc(var(--move-scene) * 3.6) var(--ease-out) var(--move) infinite;
+}
+
+@keyframes play-sheen {
+  70%,
+  to {
+    transform: translateX(225%);
+  }
 }
 
 .play-error {
@@ -377,6 +475,13 @@ body {
   padding: 9px 12px;
   font-size: var(--text-sm);
   text-align: left;
+}
+
+/* Ошибка запуска и выходы из неё поднимаются так же, как подпись, но без
+   задержки: это ответ на нажатие, ждать нечего. */
+.play-error,
+.play-fix {
+  animation: play-rise var(--move-slow) var(--ease-out) backwards;
 }
 
 /* Выходы из ошибки запуска — тихие, как и в правке игры в настройках.
@@ -429,6 +534,15 @@ body {
      записаны числами по месту. */
   --dock-size: 44px;
   --dock-zoom: 1.64;
+  /* Полный прирост иконки под самым курсором — на столько она вырастает вверх
+     и вширь. Из него стили считают и сдвиг соседей, и подъём подписи. */
+  --dock-grow: calc(var(--dock-size) * (var(--dock-zoom) - 1));
+  /* Подъём иконки при наведении. */
+  --dock-lift: 4px;
+  /* Зазор между иконками и поля ряда вокруг них: из них же считается, где
+     стоит метка выбранной игры. */
+  --dock-gap: 10px;
+  --dock-pad: 12px;
   /* Потолок ширины подписи и запас по бокам ряда под неё. Подпись высовывается
      за край иконки на половину своей ширины, поэтому запас считается из этих
      двух величин и остаётся верным, если поменять любую. */
@@ -457,12 +571,19 @@ body {
   /* 8px отступа сверху и снизу вокруг иконки, плюс рамка в 1px с каждой
      стороны. */
   height: calc(var(--dock-size) + 18px);
-  border-radius: var(--r-lg);
   background: var(--glass);
   backdrop-filter: blur(12px);
   border: 1px solid var(--line);
   box-shadow: var(--glass-edge);
   pointer-events: none;
+  /* Увеличенные иконки раздвигают ряд, и подложка растягивается вширь вместе
+     с ним — тоже растяжением, а не шириной (во сколько раз — считает
+     `GameDock`). Скругление по горизонтали заранее сжато на ту же величину:
+     растянутое, оно снова становится круглым, а не вытягивается в овал. */
+  --glass-scale: 1;
+  border-radius: calc(var(--r-lg) / var(--glass-scale)) / var(--r-lg);
+  transform: scaleX(var(--glass-scale));
+  transition: transform var(--move-fast) var(--ease-out);
 }
 
 .dock {
@@ -473,18 +594,35 @@ body {
   position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 10px;
-  /* Сверху — под подпись: зазор в 10px и сама подпись примерно в 26px.
-     Увеличенная иконка сюда не попадает: она раздвигает ряд по правилам
-     раскладки, а не вылезает за него.
-     По бокам — 12px вокруг иконок, как у подложки, плюс запас под подпись. */
-  padding: 40px calc(var(--dock-room) + 12px) 8px;
+  gap: var(--dock-gap);
+  /* Сверху — под подпись: зазор в 10px и сама подпись примерно в 26px, плюс
+     то, на сколько поднимаются над рядом увеличенная иконка и подпись над ней:
+     увеличение — растяжение, ряд от него не растёт, и всё выросшее должно
+     уместиться в запасе, иначе обрезающая ось его срежет.
+     По бокам — поля вокруг иконок, как у подложки, плюс запас под подпись. */
+  padding: calc(40px + var(--dock-grow) + var(--dock-lift)) calc(var(--dock-room) + var(--dock-pad)) 8px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
 }
 
+/* Иконка растёт **растяжением, а не шириной и высотой**: спека полировки (§2)
+   разрешает анимировать только `transform` и `opacity`. Растяжение не трогает
+   раскладку, и соседи сами не раздвинулись бы — выросшая до 72px иконка
+   полезла бы в зазор в 10px, на соседнюю. Поэтому каждая иконка ещё и
+   сдвигается вбок ровно на прирост иконок перед ней (`lib/dock.ts`), и ряд
+   расходится так же, как расходился, когда рос размер.
+
+   Из обработчика движения мыши приходят два числа: близость к курсору
+   (`--near`, от нуля до единицы) и сдвиг в долях прироста (`--shift`). Во
+   сколько раз расти и сколько это в точках — решают `--dock-zoom` и
+   `--dock-grow` здесь: тогда иконка, сдвиг, подпись и метка считаются от одной
+   и той же величины. */
 .dock-item {
+  --near: 0;
+  --shift: 0;
+  --dock-scale: calc(1 + (var(--dock-zoom) - 1) * var(--near));
+
   position: relative;
   flex: none;
   border: 0;
@@ -492,32 +630,49 @@ body {
   background: none;
   cursor: pointer;
   line-height: 0;
+  transform: translateX(calc(var(--dock-grow) * var(--shift)));
+  transition: transform var(--move-fast) var(--ease-out);
 }
 
-/* Иконка растёт **шириной и высотой, а не растяжением**, и это главное здесь.
-   Растяжение (`transform: scale`) рисует иконку крупнее, но её место в ряду
-   остаётся прежним — соседи не раздвигаются, и выросшая до 72px иконка лезет
-   в зазор в 10px, то есть на соседнюю. Размер же учитывается раскладкой: ряд
-   раздвигается сам, и наложиться иконкам негде.
-
-   Близость к курсору приходит из обработчика движения мыши числом от нуля до
-   единицы. Во сколько раз от этого расти — решает `--dock-zoom` здесь, а не
-   обработчик: тогда и подпись, и скругление, и буква-заглушка считаются от
-   одной и той же величины. */
-.dock-icon {
-  --near: 0;
-  --dock-scale: calc(1 + (var(--dock-zoom) - 1) * var(--near));
-
+/* Подъём при наведении — с пружиной, вдавливание при нажатии — к низу ряда,
+   как будто иконку прижали к доку. Отпускание возвращает её той же пружиной. */
+.dock-lift {
   display: block;
-  width: calc(var(--dock-size) * var(--dock-scale));
-  height: calc(var(--dock-size) * var(--dock-scale));
-  /* Скругление растёт вместе с иконкой: постоянное выглядело бы у крупной
-     иконки заметно острее, чем у мелкой. */
-  border-radius: calc(var(--dock-size) * 0.25 * var(--dock-scale));
+  border-radius: calc(var(--dock-size) * 0.25);
+  transform-origin: 50% 100%;
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.dock-item:hover .dock-lift {
+  transform: translateY(calc(-1 * var(--dock-lift)));
+}
+
+.dock-item:active .dock-lift {
+  transform: translateY(calc(-1 * var(--dock-lift))) scale(0.94);
+  transition-duration: var(--move-fast);
+}
+
+/* Рамка фокуса — вокруг самой иконки, а не вокруг кнопки с подписью над ней. */
+.dock-item:focus-visible {
+  outline: none;
+}
+
+.dock-item:focus-visible .dock-lift {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.dock-icon {
+  display: block;
+  width: var(--dock-size);
+  height: var(--dock-size);
+  /* Скругление растягивается вместе с иконкой и у крупной остаётся таким же
+     мягким, как у мелкой. */
+  border-radius: calc(var(--dock-size) * 0.25);
   object-fit: cover;
-  transition:
-    width var(--move-fast) var(--ease-out),
-    height var(--move-fast) var(--ease-out);
+  transform: scale(var(--dock-scale));
+  transform-origin: 50% 100%;
+  transition: transform var(--move-fast) var(--ease-out);
 }
 
 .dock-letter {
@@ -527,9 +682,7 @@ body {
   font-family: "Golos Text Variable", "Segoe UI", sans-serif;
   font-weight: 600;
   line-height: 1;
-  /* Буква растёт вместе с плашкой — при растяжении это выходило само собой,
-     при росте размера её приходится считать отдельно. */
-  font-size: calc(var(--dock-size) * 0.43 * var(--dock-scale));
+  font-size: calc(var(--dock-size) * 0.43);
   color: var(--ink);
 }
 
@@ -538,23 +691,41 @@ body {
   filter: grayscale(1);
 }
 
-/* Точка под выбранной игрой — как отметка запущенной программы в доке. */
-.dock-dot {
+/* Метка выбранной игры — как отметка запущенной программы в доке. Она одна
+   на весь ряд и при смене игры скользит к новой иконке. Где она стоит, стили
+   считают сами по номеру игры (`--i`): иконки одного размера и стоят через
+   равные зазоры, мерить нечего. Два движения разведены по двум элементам:
+   переход к другой игре — спокойный и медленный, а сдвиг вслед за
+   раздвинувшимся рядом — такой же быстрый, как у самих иконок, иначе метка
+   отставала бы от своей иконки. */
+.dock-mark {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: -6px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--ink);
+  left: calc(var(--dock-room) + var(--dock-pad) + var(--dock-size) / 2);
+  bottom: 2px;
+  pointer-events: none;
+  transform: translateX(calc(var(--i) * (var(--dock-size) + var(--dock-gap))));
+  transition: transform var(--move-slow) var(--ease-out);
 }
 
-/* Название всплывает над иконкой при наведении. */
+.dock-mark::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  bottom: 0;
+  width: 12px;
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  transform: translateX(calc(var(--dock-grow) * var(--shift)));
+  transition: transform var(--move-fast) var(--ease-out);
+}
+
+/* Название всплывает над иконкой при наведении и поднимается вместе с ней,
+   на сколько она выросла и приподнялась. */
 .dock-name {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(calc(-1 * var(--dock-grow) * var(--near)));
   bottom: calc(100% + 10px);
   padding: 4px 9px;
   border-radius: var(--r-sm);
@@ -572,7 +743,9 @@ body {
   text-overflow: ellipsis;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--move) var(--ease-out);
+  transition:
+    opacity var(--move) var(--ease-out),
+    transform var(--move-fast) var(--ease-out);
 }
 
 .dock-item:hover .dock-name,
@@ -580,21 +753,45 @@ body {
   opacity: 1;
 }
 
+.dock-item:hover .dock-name {
+  transform: translateX(-50%) translateY(calc(-1 * (var(--dock-grow) * var(--near) + var(--dock-lift))));
+}
+
 /* Тумблер «Анимация» на вкладке «Вид» вместо системной настройки «уменьшить
    движение» (спека этапа 5, §12) — это по-прежнему первое такое место в
    проекте, и начинать стоило с самого заметного движения в приложении.
+   Обнулённая --move новых переходов не запускает, но уже идущий доиграл бы
+   прежнюю длительность: тумблер, выключенный посреди скольжения метки, ждал
+   бы его конца. `none` обрывает переход сразу. Остальное здесь — то, что без
+   анимации было бы не движением, а скачком.
    Блок стоит последним в группе стилей дока, чтобы его правила побеждали в
    каскаде правила выше — при равной весомости выигрывает то, что встречается
    в файле позже. */
-:root[data-motion="off"] .dock-icon {
+:root[data-motion="off"] :is(.dock-bg, .dock-item, .dock-lift, .dock-icon, .dock-name, .dock-mark),
+:root[data-motion="off"] .dock-mark::before {
   transition: none;
+}
+:root[data-motion="off"] .dock-item,
+:root[data-motion="off"] .dock-mark {
   /* Обработчик движения мыши и так не считает близость при выключенном
      тумблере. Это вторая застава на случай, если первую однажды обойдут:
      правило таблицы побеждает значение, проставленное по месту. */
   --near: 0 !important;
+  --shift: 0 !important;
 }
-:root[data-motion="off"] .dock-name {
-  transition: none;
+:root[data-motion="off"] .dock-bg {
+  --glass-scale: 1 !important;
+}
+/* Подъём при наведении — украшение, без анимации он был бы скачком. Нажатие
+   остаётся: это ответ на клик, и мгновенный он тоже понятен. */
+:root[data-motion="off"] .dock-item:hover .dock-lift {
+  transform: none;
+}
+:root[data-motion="off"] .dock-item:active .dock-lift {
+  transform: scale(0.94);
+}
+:root[data-motion="off"] .dock-item:hover .dock-name {
+  transform: translateX(-50%);
 }
 
 /* Коробка кодов: потолок и своя прокрутка. У одной игры кодов бывает
@@ -1263,4 +1460,17 @@ body {
    выключается явно. */
 :root[data-motion="off"] .art-photo {
   animation: none;
+}
+
+/* Блик «запускается…» по той же причине убирается совсем: остановленная
+   полоса света посреди кнопки выглядела бы пятном. Состояние запуска и без
+   него видно по надписи. */
+:root[data-motion="off"] .play-sheen {
+  display: none;
+}
+
+/* Как у дока: переход, начатый до выключения тумблера, обрывается сразу. */
+:root[data-motion="off"] .play,
+:root[data-motion="off"] .play::before {
+  transition: none;
 }
