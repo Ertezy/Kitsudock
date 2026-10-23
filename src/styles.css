@@ -300,6 +300,12 @@ body {
   }
 }
 
+/* Свой поток блоков: верхний отступ полоски-подписи остаётся внутри раздела,
+   а не выпадает над ним, и раздел заглушек той же высоты, что настоящий. */
+.skeleton-section {
+  display: flow-root;
+}
+
 /* Подпись раздела: полоска на месте строки подписи. */
 .skeleton-label {
   width: 72px;
@@ -307,8 +313,14 @@ body {
   margin: 3px 0 11px;
 }
 
-/* Строка кода: та же карточка, что у настоящего кода; полоски — код, срок и
-   награды, справа две кнопки. */
+/* Строки кодов в коробке с тем же потолком, что у настоящей (`.codes-box`):
+   последняя срезается её краем. Прокрутки у заглушек нет. */
+.skeleton-codes {
+  overflow: hidden;
+}
+
+/* Строка кода: та же карточка, что у настоящего кода с наградами (68 px);
+   полоски — код, срок и награды, справа две кнопки. */
 .skeleton-code {
   display: flex;
   gap: 9px;
@@ -330,20 +342,22 @@ body {
 .skeleton-code .is-code {
   width: 46%;
   height: 10px;
-  margin: 4px 0 9px;
+  margin: 5px 0 10px;
 }
 .skeleton-code .is-short {
   width: 30%;
-  margin-bottom: 9px;
+  margin-bottom: 10px;
 }
 .skeleton-code .is-long {
   width: 64%;
   margin-bottom: 3px;
 }
-.skeleton-code:nth-child(3) .is-code { width: 38%; }
-.skeleton-code:nth-child(3) .is-long { width: 50%; }
-.skeleton-code:nth-child(4) .is-code { width: 54%; }
-.skeleton-code:nth-child(4) .is-long { width: 42%; }
+.skeleton-code:nth-child(2) .is-code { width: 38%; }
+.skeleton-code:nth-child(2) .is-long { width: 50%; }
+.skeleton-code:nth-child(3) .is-code { width: 54%; }
+.skeleton-code:nth-child(3) .is-long { width: 42%; }
+.skeleton-code:nth-child(4) .is-code { width: 42%; }
+.skeleton-code:nth-child(4) .is-long { width: 58%; }
 .skeleton-code-side {
   display: flex;
   gap: 4px;
@@ -354,7 +368,7 @@ body {
   border-radius: var(--r-sm);
 }
 
-/* Карточка баннера: арт и подвал с полосой срока. */
+/* Карточка баннера: арт и подвал с полосой срока; под ней точки карусели. */
 .skeleton-banner {
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
@@ -384,10 +398,22 @@ body {
 }
 .skeleton-banner-line .is-title { width: 44%; }
 .skeleton-banner-line .is-tail { width: 14%; }
+.skeleton-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 8px;
+}
+.skeleton-dot {
+  width: 5px;
+  height: 5px;
+}
 
-/* Превью видео: кадр, заголовок и дата. */
+/* Превью видео: кадр, заголовок и дата. Нижний отступ внутри — запас строки
+   даты под полоской: внешним он слился бы с отступом между превью. */
 .skeleton-video {
   margin-bottom: 9px;
+  padding-bottom: 3px;
 }
 .skeleton-thumb {
   aspect-ratio: 16 / 9;
@@ -1026,8 +1052,12 @@ body {
 /* Коробка кодов: потолок и своя прокрутка. У одной игры кодов бывает
    десяток, а без потолка список выдавил бы баннеры и видео за нижний край
    панели (спека §2.4). */
-.codes-box {
+.codes-box,
+.skeleton-codes {
   max-height: 260px;
+}
+
+.codes-box {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
@@ -1103,12 +1133,36 @@ body {
   transform: none;
 }
 
-/* Картинка панели (`panel/CachedImage.tsx`), пока качается, — заглушка того
-   же тона и с тем же мерцанием, что заглушки разделов. Скачанная, но ещё не
-   прочитанная — прозрачна; прочитанная проявляется, а не выскакивает. */
-.img-pending {
+/* Картинка панели (`panel/CachedImage.tsx`). Пока её нет, в рамке лежит тон
+   заглушки с тем же мерцанием, что у заглушек разделов. Скачанная, но ещё не
+   прочитанная картинка прозрачна, и под ней по-прежнему тон; прочитанная
+   проявляется, а тон в это же время гаснет — без пустого мига между ними.
+   Мерцание — на внутреннем слое, а гаснет внешний: иначе прозрачностью
+   спорили бы анимация и переход. Погасший тон замирает и сквозь прозрачные
+   места картинки не виден. Картинка позиционирована, чтобы лежать над тоном:
+   иначе позиционированный слой тона рисовался бы поверх неё. */
+.img-tone {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity var(--move-slow) var(--ease-out);
+}
+.img-tone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
   background: var(--skeleton);
   animation: skeleton-pulse calc(var(--move-scene) * 3) var(--ease-out) infinite;
+}
+.img-tone.is-gone {
+  opacity: 0;
+}
+.img-tone.is-gone::before {
+  animation-play-state: paused;
+}
+.img-reading,
+.img-shown {
+  position: relative;
 }
 .img-reading {
   opacity: 0;
@@ -1338,10 +1392,11 @@ body {
 :root[data-motion="off"] .panel,
 :root[data-motion="off"] .panel .panel-scroll > *,
 :root[data-motion="off"] .panel :is(.panel-stale, .panel-update),
-:root[data-motion="off"] :is(.skeleton-block, .img-pending, .img-shown) {
+:root[data-motion="off"] :is(.skeleton-block, .img-shown),
+:root[data-motion="off"] .img-tone::before {
   animation: none;
 }
-:root[data-motion="off"] :is(.code-copy-icon, .carousel-dots .dot, .video-thumb),
+:root[data-motion="off"] :is(.code-copy-icon, .carousel-dots .dot, .video-thumb, .img-tone),
 :root[data-motion="off"] .video-card::before {
   transition: none;
 }

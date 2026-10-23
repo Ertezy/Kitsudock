@@ -26,3 +26,17 @@ export function copyFeedbackOver(current: Copied | null, id: number): Copied | n
 export function isCopied(current: Copied | null, code: string): boolean {
   return current?.code === code;
 }
+
+/** Неразрывный пробел: на слух его нет, но строка с ним — другая строка. */
+const SILENT = String.fromCharCode(0x00a0);
+
+/**
+ * Текст строки состояния для копирования с номером `id`. Экранный диктор
+ * объявляет строку, только когда её текст меняется, а повторное копирование
+ * того же кода дало бы тот же текст — и второе копирование прошло бы молча.
+ * Поэтому у чётных копирований в конце неслышный неразрывный пробел: соседние
+ * копирования всегда дают разный текст, а слышно одно и то же.
+ */
+export function copyAnnouncement(text: string, id: number): string {
+  return id % 2 === 0 ? text + SILENT : text;
+}

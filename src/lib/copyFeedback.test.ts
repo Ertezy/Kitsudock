@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { COPY_FEEDBACK_MS, copyFeedbackOver, isCopied, type Copied } from "./copyFeedback";
+import { COPY_FEEDBACK_MS, copyAnnouncement, copyFeedbackOver, isCopied, type Copied } from "./copyFeedback";
 
 describe("отклик копирования", () => {
   it("галочка держится полторы секунды, как раньше", () => {
@@ -31,5 +31,25 @@ describe("отклик копирования", () => {
 
   it("срок без галочки — по-прежнему ничего", () => {
     expect(copyFeedbackOver(null, 1)).toBeNull();
+  });
+});
+
+describe("объявление копирования", () => {
+  const text = "Code EMBERGLOW26 copied";
+
+  it("повторное копирование того же кода меняет текст строки состояния — диктор объявит его снова", () => {
+    for (const id of [1, 2, 3, 10]) expect(copyAnnouncement(text, id + 1)).not.toBe(copyAnnouncement(text, id));
+  });
+
+  it("на слух текст тот же: отличие — только неразрывный пробел в конце", () => {
+    for (const id of [1, 2, 3, 4]) {
+      const said = copyAnnouncement(text, id);
+      expect(said.trim()).toBe(text);
+      expect(["", String.fromCharCode(0xa0)]).toContain(said.slice(text.length));
+    }
+  });
+
+  it("у первого копирования текст ровно из словаря", () => {
+    expect(copyAnnouncement(text, 1)).toBe(text);
   });
 });

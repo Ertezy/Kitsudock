@@ -17,8 +17,12 @@ interface Props {
  * вовсе, а любая загрузка может не удаться. В этом случае рисуется градиент
  * из названия — узнаваемый и стабильный, а не серая дырка.
  *
- * Пока картинка качается, на её месте мерцает заглушка того же тона, что и
+ * Пока картинки нет, на её месте мерцает заглушка того же тона, что и
  * заглушки разделов панели; пришедшая картинка проявляется, а не выскакивает.
+ * Тон — отдельный слой под картинкой, в рамке вокруг неё (у баннера и у
+ * превью рамка своя и с `position: relative`). Он держится, пока картинка
+ * качается и читается, и гаснет одновременно с её проявлением: между ними нет
+ * пустого мига, а сквозь прозрачные места готовой картинки тон не проступает.
  */
 export default function CachedImage({ url, fallbackText, className }: Props) {
   const [src, setSrc] = useState<string | null>(null);
@@ -62,20 +66,32 @@ export default function CachedImage({ url, fallbackText, className }: Props) {
     );
   }
 
+  // Слой тона первым и в обеих ветках на одном месте: React сохраняет его, пока
+  // ожидание сменяется картинкой, и мерцание не начинается заново.
+  const tone = <span className={shown ? "img-tone is-gone" : "img-tone"} aria-hidden="true" />;
+
   if (!src) {
-    return <div className={`${className ?? ""} img-pending`} role="img" aria-label={fallbackText} />;
+    return (
+      <>
+        {tone}
+        <div className={className} role="img" aria-label={fallbackText} />
+      </>
+    );
   }
 
   return (
-    <img
-      className={`${className ?? ""} ${shown ? "img-shown" : "img-reading"}`}
-      src={src}
-      alt={fallbackText}
-      loading="lazy"
-      onLoad={() => setShown(true)}
-      // Файл из кеша не прочёлся — как не скачался: градиент с названием, а
-      // не значок битой картинки.
-      onError={() => setFailed(true)}
-    />
+    <>
+      {tone}
+      <img
+        className={`${className ?? ""} ${shown ? "img-shown" : "img-reading"}`}
+        src={src}
+        alt={fallbackText}
+        loading="lazy"
+        onLoad={() => setShown(true)}
+        // Файл из кеша не прочёлся — как не скачался: градиент с названием, а
+        // не значок битой картинки.
+        onError={() => setFailed(true)}
+      />
+    </>
   );
 }

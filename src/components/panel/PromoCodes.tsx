@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
-import { COPY_FEEDBACK_MS, copyFeedbackOver, isCopied, type Copied } from "../../lib/copyFeedback";
+import { COPY_FEEDBACK_MS, copyAnnouncement, copyFeedbackOver, isCopied, type Copied } from "../../lib/copyFeedback";
 import { activeCodes, plainSpaces } from "../../lib/panel";
 import { burnsToday, timeLeft } from "../../lib/time";
 import { useLang, useT } from "../../i18n";
@@ -25,7 +25,18 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
   // Номер копирования: у каждого свой срок галочки (`lib/copyFeedback.ts`).
   const copies = useRef(0);
   const timer = useRef<number | undefined>(undefined);
-  useEffect(() => () => window.clearTimeout(timer.current), []);
+  // Копирование ждёт буфер обмена, а секция за это время может исчезнуть
+  // (сменили игру). Тогда ни галочки, ни срока: уборка их уже не снимет.
+  // Флаг ставится в самом эффекте, а не при объявлении: строгий режим
+  // разработки разбирает и собирает эффекты заново.
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      window.clearTimeout(timer.current);
+    };
+  }, []);
   const lang = useLang();
   const t = useT();
 
@@ -37,6 +48,7 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
 
   const copy = async (code: string) => {
     await api.copyText(code);
+    if (!mounted.current) return;
     const id = ++copies.current;
     setCopied({ code, id });
     // Срок прежнего копирования больше не нужен: галочку держит новое.
@@ -143,9 +155,10 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
       </div>
 
       {/* Что код скопирован, экранный диктор слышит словами: строка
-          состояния вежливо объявляет каждое копирование. */}
+          состояния вежливо объявляет каждое копирование, и повторное того
+          же кода тоже (`copyAnnouncement`). */}
       <span className="sr-only" role="status">
-        {copied ? t.panel.codeCopied(copied.code) : ""}
+        {copied ? copyAnnouncement(t.panel.codeCopied(copied.code), copied.id) : ""}
       </span>
     </section>
   );
