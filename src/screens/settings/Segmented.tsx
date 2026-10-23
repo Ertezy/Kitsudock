@@ -53,9 +53,10 @@ export default function Segmented<V extends string>({ options, value, label, dis
           }}
         >
           <span className="segmented-label">{o.label}</span>
-          <span className="segmented-label is-on" aria-hidden="true">
-            {o.label}
-          </span>
+          {/* Тёмная копия подписи — без текста в разметке: буквы рисуют стили
+              (`content: attr(data-label)`), поэтому копия не попадает ни в
+              выделение, ни в поиск по странице, ни к экранному диктору. */}
+          <span className="segmented-label is-on" data-label={o.label} aria-hidden="true" />
         </button>
       ))}
     </div>

@@ -15,7 +15,7 @@ interface Props {
 export default function Settings({ onClose }: Props) {
   const [tab, setTab] = useState<Tab>("games");
   const t = useT();
-  const nav = useRef<HTMLElement>(null);
+  const tabs = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
 
   const TABS: { id: Tab; label: string }[] = [
@@ -27,8 +27,11 @@ export default function Settings({ onClose }: Props) {
   ];
 
   // Подложка выбранной вкладки одна на весь ряд и скользит к новой вкладке
-  // (`lib/pill.ts`), как метка выбранной игры в доке.
-  const slots = useSlots(nav, ":scope > .settings-tab", "y", TABS.map((tb) => tb.label).join("\n"));
+  // (`lib/pill.ts`), как метка выбранной игры в доке. Ряд вкладок — свой
+  // элемент: замер идёт от его начала, и кнопка «Назад» над ним на место
+  // подложки не влияет. Нужны только сдвиг и высота вкладки: ширину подложка
+  // берёт у ряда, растяжение ей не нужно.
+  const slots = useSlots(tabs, ":scope > .settings-tab", "y", TABS.map((tb) => tb.label).join("\n"));
   const pill = slots && pillPlacement(slots, TABS.findIndex((tb) => tb.id === tab));
 
   // Экран открылся по шестерёнке, и она пропала вместе с главным экраном —
@@ -37,7 +40,7 @@ export default function Settings({ onClose }: Props) {
   useEffect(() => {
     const active = document.activeElement;
     if (active && active !== document.body) return;
-    nav.current?.querySelector<HTMLElement>(".settings-tab.active")?.focus({ preventScroll: true });
+    tabs.current?.querySelector<HTMLElement>(".settings-tab.active")?.focus({ preventScroll: true });
   }, []);
 
   // Новая вкладка начинается сверху: её содержимое поднимается на место, а
@@ -49,28 +52,30 @@ export default function Settings({ onClose }: Props) {
 
   return (
     <div className="settings">
-      <nav className="settings-nav" ref={nav}>
-        {pill && (
-          <span
-            className="settings-tab-pill"
-            aria-hidden="true"
-            style={{ "--pill-y": `${pill.offset}px`, "--pill-size": `${pill.size}px` } as React.CSSProperties}
-          />
-        )}
+      <nav className="settings-nav">
         <button type="button" className="settings-back" onClick={onClose}>
           {t.settings.back}
         </button>
-        {TABS.map((tb) => (
-          <button
-            key={tb.id}
-            type="button"
-            className={tb.id === tab ? "settings-tab active" : "settings-tab"}
-            aria-current={tb.id === tab ? "page" : undefined}
-            onClick={() => setTab(tb.id)}
-          >
-            {tb.label}
-          </button>
-        ))}
+        <div className="settings-tabs" ref={tabs}>
+          {pill && (
+            <span
+              className="settings-tab-pill"
+              aria-hidden="true"
+              style={{ "--pill-y": `${pill.offset}px`, "--pill-size": `${pill.size}px` } as React.CSSProperties}
+            />
+          )}
+          {TABS.map((tb) => (
+            <button
+              key={tb.id}
+              type="button"
+              className={tb.id === tab ? "settings-tab active" : "settings-tab"}
+              aria-current={tb.id === tab ? "page" : undefined}
+              onClick={() => setTab(tb.id)}
+            >
+              {tb.label}
+            </button>
+          ))}
+        </div>
       </nav>
 
       {/* Каждый раздел — свой корневой элемент: при смене вкладки он появляется

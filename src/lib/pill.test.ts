@@ -23,8 +23,12 @@ describe("место «таблетки» под выбранным вариан
     expect(pillPlacement(slots, 2)?.scale).toBeCloseTo(0.64, 10);
   });
 
-  it("основу можно задать свою — для вертикального ряда вкладок", () => {
-    expect(pillPlacement([{ start: 0, size: 40 }, { start: 42, size: 40 }], 1, 40)).toEqual({ offset: 42, size: 40, scale: 1 });
+  it("в ряду вкладок подложка встаёт на начало вкладки и берёт её высоту — как их ставит экран настроек", () => {
+    // Замер ряда вкладок от его начала: вкладки по 37 точек через зазор в 2.
+    const tabs: Slot[] = [0, 39, 78, 117, 156].map((start) => ({ start, size: 37 }));
+    const pill = pillPlacement(tabs, 3);
+    expect(pill?.offset).toBe(117);
+    expect(pill?.size).toBe(37);
   });
 
   it("выбранного варианта нет среди вариантов — таблетки нет", () => {
@@ -36,11 +40,6 @@ describe("место «таблетки» под выбранным вариан
   it("варианты ещё не разложены (скрытая вкладка, нулевой размер) — таблетки нет, а не таблетка нулевой ширины", () => {
     expect(pillPlacement([{ start: 0, size: 0 }], 0)).toBeNull();
     expect(pillPlacement([{ start: Number.NaN, size: 20 }], 0)).toBeNull();
-  });
-
-  it("основа должна быть положительной", () => {
-    expect(pillPlacement(slots, 0, 0)).toBeNull();
-    expect(pillPlacement(slots, 0, -5)).toBeNull();
   });
 });
 

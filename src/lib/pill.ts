@@ -26,15 +26,18 @@ export interface PillPlacement {
 }
 
 /**
- * Место таблетки под вариантом `index`. `base` — длина таблетки до растяжения.
- * Нет такого варианта или он ещё не разложен (скрытая вкладка, нулевой размер) —
- * `null`: таблетки нулевой ширины не бывает, её просто нет, пока мерить нечего.
+ * Место таблетки под вариантом `index`: сдвиг от начала ряда, длина варианта и
+ * растяжение таблетки длиной `PILL_BASE` до неё. Выбор языка берёт сдвиг и
+ * растяжение; подложка вкладок — сдвиг и длину (высоту вкладки), а ширину ей
+ * даёт сам ряд. Нет такого варианта или он ещё не разложен (скрытая вкладка,
+ * нулевой размер) — `null`: таблетки нулевой ширины не бывает, её просто нет,
+ * пока мерить нечего.
  */
-export function pillPlacement(slots: readonly Slot[], index: number, base: number = PILL_BASE): PillPlacement | null {
+export function pillPlacement(slots: readonly Slot[], index: number): PillPlacement | null {
   const slot = slots[index];
-  if (!slot || !(base > 0)) return null;
+  if (!slot) return null;
   if (!Number.isFinite(slot.start) || !(slot.size > 0)) return null;
-  return { offset: slot.start, size: slot.size, scale: slot.size / base };
+  return { offset: slot.start, size: slot.size, scale: slot.size / PILL_BASE };
 }
 
 /** Те же ли это замеры: одинаковые не перезаписывают состояние и не вызывают лишнюю отрисовку. */

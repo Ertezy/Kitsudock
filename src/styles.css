@@ -1456,7 +1456,6 @@ body {
 }
 
 .settings-nav {
-  position: relative;
   width: 220px;
   flex: none;
   display: flex;
@@ -1479,7 +1478,17 @@ body {
   }
 }
 
-/* Подложка выбранной вкладки — одна на всю колонку (`Settings.tsx`,
+/* Ряд вкладок под кнопкой «Назад» — та же колонка с тем же зазором. Свой
+   элемент нужен подложке: она лежит внутри ряда, её место считается от его
+   начала, а ширина — ширина ряда, то есть вкладки. */
+.settings-tabs {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Подложка выбранной вкладки — одна на весь ряд (`Settings.tsx`,
    `lib/pill.ts`): при смене вкладки она скользит к новой, как метка в доке, а
    не перескакивает. Встаёт по замеру вкладок; высота — высота вкладки. Чуть
    приподнята кромкой и тенью, как карточка: выбранная вкладка не путается с
@@ -1487,8 +1496,8 @@ body {
 .settings-tab-pill {
   position: absolute;
   top: 0;
-  left: 12px;
-  right: 12px;
+  left: 0;
+  right: 0;
   height: var(--pill-size);
   border-radius: var(--s-control-radius);
   background: var(--card);
@@ -1581,7 +1590,12 @@ body {
 }
 
 /* Первый запуск: колонки вкладок нет, и содержимое стоит посередине окна, а не
-   прижато к левому краю. */
+   прижато к левому краю. Место под полосу прокрутки занято с обеих сторон:
+   занятое только справа сдвигало бы колонку на половину полосы влево. */
+.settings.is-first-run .settings-body {
+  scrollbar-gutter: stable both-edges;
+}
+
 .settings.is-first-run .settings-body > * {
   margin-inline: auto;
 }
@@ -2066,9 +2080,16 @@ body {
     transform var(--move) var(--ease-spring);
 }
 
+/* Буквы тёмной копии — из `data-label`: в разметке у неё текста нет, и в
+   выделение и поиск по странице попадает одна подпись, а не две. */
 .segmented-label.is-on {
   color: var(--accent-ink);
   opacity: 0;
+  user-select: none;
+}
+
+.segmented-label.is-on::before {
+  content: attr(data-label);
 }
 
 .segmented-option.active .segmented-label {
