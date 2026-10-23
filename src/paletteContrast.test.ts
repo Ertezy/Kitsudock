@@ -153,6 +153,44 @@ function burningShare(css: string): number {
   return Number(mix[1]) / 100;
 }
 
+/**
+ * `color-mix(in srgb, …)` двух цветов, как его считает браузер: с
+ * предумноженной прозрачностью, поэтому прозрачный край смеси не темнит.
+ */
+function mix(a: Colour, b: Colour, share: number): Colour {
+  const alpha = a[3] * share + b[3] * (1 - share);
+  if (alpha === 0) return [0, 0, 0, 0];
+  const channel = (i: number) => (a[i] * a[3] * share + b[i] * b[3] * (1 - share)) / alpha;
+  return [channel(0), channel(1), channel(2), alpha];
+}
+
+/** Смесь вида `color-mix(in srgb, var(--a) N%, var(--b) | transparent)` из правила стилей. */
+function mixOf(value: string, get: (name: string) => Colour): Colour {
+  const m = /^color-mix\(\s*in srgb,\s*var\((--[\w-]+)\)\s*(\d+(?:\.\d+)?)%\s*,\s*(transparent|var\((--[\w-]+)\))\s*\)$/.exec(value);
+  if (!m) throw new Error(`смесь «${value}» должна быть вида color-mix(in srgb, var(--a) N%, var(--b) или transparent)`);
+  return mix(get(m[1]), m[4] ? get(m[4]) : [0, 0, 0, 0], Number(m[2]) / 100);
+}
+
+/** Токен цвета внутри значения: последний `var(--x)` — `2px solid var(--ink)` → `--ink`. */
+function colourToken(value: string): string {
+  const all = [...value.matchAll(/var\((--[\w-]+)\)/g)].map((m) => m[1]);
+  const last = all[all.length - 1];
+  if (!last) throw new Error(`в «${value}» нет токена цвета`);
+  return last;
+}
+
+/**
+ * Слой зерна (`body::after`): цвет токеном и непрозрачность из правила. Шум
+ * в маске прозрачнее этой непрозрачности почти везде, а проверка берёт его
+ * сплошным слоем поверх и текста, и того, на чём текст лежит, — с запасом.
+ */
+function grainVeil(css: string, get: (name: string) => Colour): Colour {
+  const opacity = Number(ruleValue(css, "body::after", "opacity"));
+  if (!(opacity > 0 && opacity < 0.1)) throw new Error("у зерна нет прозрачности от 0 до 0.1");
+  const [r, g, b] = get(colourToken(ruleValue(css, "body::after", "background")));
+  return [r, g, b, opacity];
+}
+
 /** Прозрачность подписи раздела: сама подпись светлая, но правило её приглушает. */
 function labelOpacity(css: string): number {
   const opacity = Number(ruleValue(css, ".panel-label", "opacity"));
@@ -212,6 +250,17 @@ describe("чтение стилей", () => {
     expect([...rootTokens(css)]).toEqual([["--a", "#111111"]]);
   });
 
+  it("смесь цветов считается с предумноженной прозрачностью", () => {
+    const get = (name: string): Colour => (name === "--a" ? [200, 100, 0, 1] : [0, 0, 100, 0.5]);
+    expect(mixOf("color-mix(in srgb, var(--a) 25%, transparent)", get)).toEqual([200, 100, 0, 0.25]);
+    const m = mixOf("color-mix(in srgb, var(--a) 50%, var(--b))", get);
+    expect(m[3]).toBeCloseTo(0.75, 8);
+    expect(m[0]).toBeCloseTo(133.333, 2);
+    expect(m[2]).toBeCloseTo(33.333, 2);
+    expect(() => mixOf("var(--a)", get)).toThrow(/color-mix/);
+    expect(colourToken("var(--focus-width) solid var(--ink)")).toBe("--ink");
+  });
+
   it("без блока :root — понятная ошибка, а не пустая палитра", () => {
     expect(() => rootTokens(".x { color: red; }")).toThrow(/нет блока :root/);
     expect(() => rootTokens(':root[data-motion="off"] { --move: 0s; }')).toThrow(/нет блока :root/);
@@ -267,8 +316,23 @@ describe("читаемость палитры", () => {
     const settingsCard = over(get("--card"), bg);
     const hoveredRow = over(get("--hover"), settingsCard);
     const hoveredOption = over(get("--hover"), over(get("--card"), settingsCard));
-    return { get, labelOpacity: labelOpacity(rawCss), surfaces: { bg, glass, card, burning, accent, hoveredRow, hoveredOption } };
+    // Карточка кода, которую не удалось скопировать: на миг красится из --danger.
+    const copyFailed = over(mixOf(ruleValue(rawCss, ".code-card.copy-failed", "background"), get), glass);
+    // Подложки поверх арта: подпись над PLAY и ошибки на главном экране. Арт
+    // бывает каким угодно, худший случай — белый.
+    const white: Colour = [255, 255, 255, 1];
+    const plateOnArt = over(get("--plate"), white);
+    const errorOnArt = over(mixOf(ruleValue(rawCss, ".banner, .play-error", "background"), get), white);
+    return {
+      get,
+      grain: grainVeil(rawCss, get),
+      labelOpacity: labelOpacity(rawCss),
+      surfaces: { bg, glass, card, burning, accent, settingsCard, hoveredRow, hoveredOption, copyFailed, plateOnArt, errorOnArt },
+    };
   };
+
+  /** Контраст под зерном: слой зерна лежит поверх всего окна — и текста, и подложки. */
+  const underGrain = (fg: Colour, surface: Colour, grain: Colour) => contrast(over(grain, over(fg, surface)), over(grain, surface));
 
   type Surface = keyof ReturnType<typeof palette>["surfaces"];
   const pairs: [string, string, Surface][] = [
@@ -293,18 +357,32 @@ describe("читаемость палитры", () => {
     ["приглушённый текст на строке настроек под курсором", "--ink-dim", "hoveredRow"],
     ["самый тихий текст на строке настроек под курсором", "--ink-faint", "hoveredRow"],
     ["приглушённый текст на варианте выбора под курсором", "--ink-dim", "hoveredOption"],
+    ["основной текст на карточке кода, которую не удалось скопировать", "--ink", "copyFailed"],
+    ["приглушённый текст на карточке кода, которую не удалось скопировать", "--ink-dim", "copyFailed"],
+    ["самый тихий текст на карточке кода, которую не удалось скопировать", "--ink-faint", "copyFailed"],
+    ["подпись над PLAY на подложке поверх белого арта", "--ink", "plateOnArt"],
+    ["текст ошибки на её подложке поверх белого арта", "--ink", "errorOnArt"],
   ];
   for (const [name, token, surface] of pairs) {
-    it(name + " не ниже 4.5:1", () => {
-      const { get, surfaces } = palette();
+    it(name + " не ниже 4.5:1, и под зерном тоже", () => {
+      const { get, grain, surfaces } = palette();
       expect(contrast(get(token), surfaces[surface])).toBeGreaterThanOrEqual(4.5);
+      expect(underGrain(get(token), surfaces[surface], grain)).toBeGreaterThanOrEqual(4.5);
     });
   }
 
-  it("подпись раздела на стекле с прозрачностью, которую задаёт .panel-label, не ниже 4.5:1", () => {
-    const { get, labelOpacity, surfaces } = palette();
+  it("подпись раздела на стекле с прозрачностью, которую задаёт .panel-label, не ниже 4.5:1, и под зерном тоже", () => {
+    const { get, grain, labelOpacity, surfaces } = palette();
     const [r, g, b, a] = get("--label");
     expect(contrast([r, g, b, a * labelOpacity], surfaces.glass)).toBeGreaterThanOrEqual(4.5);
+    expect(underGrain([r, g, b, a * labelOpacity], surfaces.glass, grain)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("зерно светлое и еле заметное: 3–4 % цвета текста", () => {
+    const { get, grain } = palette();
+    expect(grain.slice(0, 3)).toEqual(get("--ink").slice(0, 3));
+    expect(grain[3]).toBeGreaterThanOrEqual(0.03);
+    expect(grain[3]).toBeLessThanOrEqual(0.04);
   });
 
   it("самый тихий текст заметно тише приглушённого: контраст ниже минимум на 0.5", () => {
@@ -312,5 +390,43 @@ describe("читаемость палитры", () => {
     const faint = contrast(get("--ink-faint"), surfaces.glass);
     const dim = contrast(get("--ink-dim"), surfaces.glass);
     expect(dim - faint).toBeGreaterThanOrEqual(0.5);
+  });
+
+  // Рамка фокуса — не текст, ей хватает 3:1 к тому, рядом с чем она лежит
+  // (WCAG 1.4.11). Лежит она с отступом, поэтому рядом — то, на чём стоит
+  // элемент: фон, стекло, карточки, подсвеченные строки. Поверх арта зазор под
+  // рамкой закрывает тёмная подложка (`--focus-halo`): светлая рамка на светлом
+  // арте иначе пропала бы.
+  const ring = () => {
+    const tokens = rootTokens(rawCss);
+    const { get, surfaces } = palette();
+    const ringToken = colourToken(tokens.get("--focus-ring") ?? "");
+    const haloToken = colourToken(tokens.get("--focus-halo") ?? "");
+    return { ringToken, colour: get(ringToken), haloOnArt: over(get(haloToken), [255, 255, 255, 1]), surfaces };
+  };
+
+  it("рамка фокуса — не цвет действия: оранжевая вокруг оранжевой кнопки читалась бы как кнопка потолще", () => {
+    expect(ring().ringToken).not.toBe("--accent");
+  });
+
+  const ringSurfaces: [string, Surface][] = [
+    ["на фоне", "bg"],
+    ["на стекле", "glass"],
+    ["на карточке поверх стекла", "card"],
+    ["на горящей карточке кода", "burning"],
+    ["на карточке настроек", "settingsCard"],
+    ["на строке настроек под курсором", "hoveredRow"],
+    ["на варианте выбора под курсором", "hoveredOption"],
+  ];
+  for (const [name, surface] of ringSurfaces) {
+    it(`рамка фокуса ${name} не ниже 3:1`, () => {
+      const { colour, surfaces } = ring();
+      expect(contrast(colour, surfaces[surface])).toBeGreaterThanOrEqual(3);
+    });
+  }
+
+  it("рамка фокуса поверх белого арта, на своей подложке, не ниже 3:1", () => {
+    const { colour, haloOnArt } = ring();
+    expect(contrast(colour, haloOnArt)).toBeGreaterThanOrEqual(3);
   });
 });

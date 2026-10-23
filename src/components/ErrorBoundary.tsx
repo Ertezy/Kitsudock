@@ -7,19 +7,23 @@ import { api } from "../lib/api";
  * дерево, и человек остаётся с пустым окном без объяснения и без выхода.
  *
  * Словарь берётся через `currentT()`, а не хуком: экран не должен зависеть от
- * того, что могло упасть. Классы взяты от экрана настроек, отдельных стилей у
- * него нет.
+ * того, что могло упасть. Каркас и кнопка — от экрана настроек (внутри
+ * `.settings` у кнопки свои размеры); значок ошибки и сообщение посередине окна
+ * — свои стили `.crash`.
  */
 export function CrashScreen() {
   const t = currentT().crash;
   return (
-    <div className="settings">
+    <div className="settings is-crash">
       <div className="settings-body">
-        <h2 className="settings-section-title">{t.title}</h2>
-        <p className="settings-hint">{t.hint}</p>
-        <button type="button" className="button accent" onClick={() => window.location.reload()}>
-          {t.reload}
-        </button>
+        <div className="crash">
+          <span className="crash-mark" aria-hidden="true" />
+          <h2 className="settings-section-title">{t.title}</h2>
+          <p className="settings-hint">{t.hint}</p>
+          <button type="button" className="button accent" onClick={() => window.location.reload()}>
+            {t.reload}
+          </button>
+        </div>
       </div>
     </div>
   );

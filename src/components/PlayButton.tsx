@@ -106,7 +106,13 @@ export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, 
         {/* Блик «запускается…» — только пока идёт запуск: появляется вместе с
             состоянием и начинает проход с начала, а не с середины. */}
         {busy && <span className="play-sheen" aria-hidden="true" />}
-        <span className="play-label">{busy ? t.main.launching : t.main.play}</span>
+        {/* Обе надписи всегда в разметке, видна одна: кнопка шириной с
+            длинную и не прыгает, когда «Играть» сменяется на «Запускаю…».
+            Спрятанную стили убирают и от экранного диктора. */}
+        <span className="play-label">
+          <span className={busy ? "is-off" : undefined}>{t.main.play}</span>
+          <span className={busy ? undefined : "is-off"}>{t.main.launching}</span>
+        </span>
       </button>
     </div>
   );

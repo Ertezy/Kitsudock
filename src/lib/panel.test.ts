@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { activeCodes, bannerKeys, codesFor, dataStatus, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
+import { activeCodes, bannerKeys, codesFor, dataStatus, emptyReason, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
 import type { Banner, Code, HubData, Video } from "../types";
@@ -69,6 +69,19 @@ describe("panelIsEmpty", () => {
   });
   it("не пусто, когда идёт баннер", () => {
     expect(panelIsEmpty([], [banner(NOW - 10, NOW + 10)], [], NOW)).toBe(false);
+  });
+});
+
+describe("emptyReason", () => {
+  it("игра не связана с данными — так и говорится, что бы ни было с данными", () => {
+    expect(emptyReason(null, false)).toBe("unlinked");
+    expect(emptyReason(null, true)).toBe("unlinked");
+  });
+  it("данные старше недели — коды и баннеры спрятаны, причина в этом", () => {
+    expect(emptyReason("genshin", true)).toBe("stale");
+  });
+  it("данные свежие, просто сейчас ничего нет", () => {
+    expect(emptyReason("genshin", false)).toBe("quiet");
   });
 });
 

@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
-import { currentLang, dictionary, setLanguage, useLang, useT, type Lang } from "../../i18n";
+import { currentLang, currentT, dictionary, setLanguage, useLang, useT, type Lang } from "../../i18n";
 import { errorText } from "../../i18n/errors";
 import { LANGS, LANG_SHORT, LANGUAGE_BLOCK_TITLE } from "../../i18n/native";
 import Segmented from "./Segmented";
+import EmptyState from "../../components/EmptyState";
 import type { FoundGame } from "../../types";
 
 interface Props {
@@ -11,7 +12,9 @@ interface Props {
 }
 
 export default function FirstRunView({ onDone }: Props) {
-  const [found, setFound] = useState<FoundGame[]>([]);
+  // `null` — поиск ещё идёт: пустой список до ответа значил бы «ничего не
+  // нашлось», и это сообщение мелькнуло бы перед находками.
+  const [found, setFound] = useState<FoundGame[] | null>(null);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -39,7 +42,15 @@ export default function FirstRunView({ onDone }: Props) {
 
   useEffect(() => {
     void (async () => {
-      const list = await api.scanInstalled();
+      // Поиск не удался — говорим об этом и показываем то же, что при пустом
+      // поиске: на этом экране нет кнопки «назад», и он не должен застрять на
+      // строке «ищу…».
+      let list: FoundGame[] = [];
+      try {
+        list = await api.scanInstalled();
+      } catch (e) {
+        setError(errorText(currentT(), e));
+      }
       setFound(list);
       // По умолчанию отмечены только игры, про которые у нас есть контент,
       // и только те, которых ещё нет в списке (§6.3 общей спеки).
@@ -51,8 +62,10 @@ export default function FirstRunView({ onDone }: Props) {
     })();
   }, []);
 
-  const known = found.filter((g) => g.contentId !== null);
-  const rest = found.filter((g) => g.contentId === null);
+  const scanned = found ?? [];
+  const known = scanned.filter((g) => g.contentId !== null);
+  const rest = scanned.filter((g) => g.contentId === null);
+  const nothing = found !== null && found.length === 0;
 
   const toggle = (title: string) =>
     setChecked((prev) => {
@@ -116,8 +129,27 @@ export default function FirstRunView({ onDone }: Props) {
 
       {error && <div className="settings-error">{error}</div>}
 
-      <p className="settings-hint">{t.settings.firstRun.knownHint}</p>
-      {rows(known)}
+      {found === null && (
+        <p className="settings-hint" role="status">
+          {t.settings.firstRun.scanning}
+        </p>
+      )}
+
+      {nothing && (
+        <EmptyState
+          className="settings-empty"
+          art="search"
+          title={t.settings.firstRun.nothingTitle}
+          hint={t.settings.firstRun.nothingHint}
+        />
+      )}
+
+      {known.length > 0 && (
+        <>
+          <p className="settings-hint">{t.settings.firstRun.knownHint}</p>
+          {rows(known)}
+        </>
+      )}
 
       {rest.length > 0 && (
         <>
@@ -126,38 +158,48 @@ export default function FirstRunView({ onDone }: Props) {
         </>
       )}
 
+      {/* Ничего не нашлось — добавлять нечего, и главная кнопка просто ведёт
+          дальше. */}
       <div className="settings-actions">
-        <button
-          type="button"
-          className="button accent"
-          disabled={busy}
-          onClick={() =>
-            void (async () => {
-              setBusy(true);
-              setError("");
-              try {
-                for (const g of found) {
-                  if (!checked.has(g.title) || g.alreadyAdded) continue;
-                  // Путь берётся из того же поиска, что заполнил список.
-                  await api.addGameFromScan(g.title);
-                }
-                await markSeededAndClose();
-              } catch (e) {
-                setError(errorText(t, e));
-              } finally {
-                // Разблокировать кнопки при любом исходе: иначе провал
-                // на середине списка запирает экран первого запуска
-                // без кнопки «назад» и без иного способа выйти.
-                setBusy(false);
+        {nothing ? (
+          <button type="button" className="button accent" disabled={busy} onClick={skip}>
+            {t.settings.firstRun.continue}
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="button accent"
+              disabled={busy || found === null}
+              onClick={() =>
+                void (async () => {
+                  setBusy(true);
+                  setError("");
+                  try {
+                    for (const g of scanned) {
+                      if (!checked.has(g.title) || g.alreadyAdded) continue;
+                      // Путь берётся из того же поиска, что заполнил список.
+                      await api.addGameFromScan(g.title);
+                    }
+                    await markSeededAndClose();
+                  } catch (e) {
+                    setError(errorText(t, e));
+                  } finally {
+                    // Разблокировать кнопки при любом исходе: иначе провал
+                    // на середине списка запирает экран первого запуска
+                    // без кнопки «назад» и без иного способа выйти.
+                    setBusy(false);
+                  }
+                })()
               }
-            })()
-          }
-        >
-          {t.settings.firstRun.addChecked}
-        </button>
-        <button type="button" className="button" disabled={busy} onClick={skip}>
-          {t.settings.firstRun.skip}
-        </button>
+            >
+              {t.settings.firstRun.addChecked}
+            </button>
+            <button type="button" className="button" disabled={busy} onClick={skip}>
+              {t.settings.firstRun.skip}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

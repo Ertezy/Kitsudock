@@ -196,6 +196,96 @@ function colourProblems(decls: Decl[]): string[] {
     .map((d) => `${d.selector} { ${d.prop}: ${d.value} }`);
 }
 
+/**
+ * Рамка фокуса одна на всё приложение: толщина, цвет и отступ — из токенов
+ * `--focus-ring` и `--focus-offset`. Своя рамка по месту — снова разнобой, от
+ * которого ушли (оранжевая у дока, светлая у PLAY, приглушённая в настройках).
+ */
+function focusProblems(decls: Decl[]): string[] {
+  return decls
+    .filter((d) => !isRoot(d.selector))
+    .filter((d) => {
+      if (d.prop === "outline") return d.value !== "none" && d.value !== "0" && d.value !== "var(--focus-ring)";
+      if (d.prop === "outline-offset") return d.value !== "var(--focus-offset)";
+      return d.prop.startsWith("outline-");
+    })
+    .map((d) => `${d.selector} { ${d.prop}: ${d.value} }`);
+}
+
+/** Псевдокласс сразу за частью селектора — с возможными `:not(…)` и другими между ними. */
+const followedBy = (part: string, pseudo: string) => {
+  const escaped = part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const between = String.raw`(?::[\w-]+(?:\((?:[^()]|\([^()]*\))*\))?)*`;
+  return new RegExp(`(?:^|[\\s,>+~(])${escaped}${between}:${pseudo}(?![\\w-])`);
+};
+
+/**
+ * У всего, что нажимается (`cursor: pointer`), есть наведение и нажатие (спека
+ * полировки, §5 «Везде»). Нажатие может откликаться на родителе — тогда это
+ * записано здесь же, с причиной.
+ */
+const PRESSED_BY: Record<string, string> = {
+  // Вдавливается вся свёрнутая строка игры, а не одна её шапка.
+  ".game-row-head": ".game-row",
+};
+
+function pointerProblems(decls: Decl[]): string[] {
+  const selectors = decls.filter((d) => !isRoot(d.selector)).map((d) => d.selector);
+  const parts = new Set(
+    decls
+      .filter((d) => d.prop === "cursor" && d.value === "pointer" && !isRoot(d.selector))
+      .flatMap((d) => d.selector.split(",").map((s) => s.trim())),
+  );
+  const bad: string[] = [];
+  for (const part of parts) {
+    if (!selectors.some((s) => followedBy(part, "hover").test(s))) bad.push(`${part}: нет :hover`);
+    const pressed = PRESSED_BY[part] ?? part;
+    if (!selectors.some((s) => followedBy(pressed, "active").test(s))) bad.push(`${part}: нет :active`);
+  }
+  return bad;
+}
+
+/**
+ * Всё, что прокручивается, — с тонкой полосой в цветах палитры (или вовсе без
+ * полосы, как док). Стандартная широкая серая полоса чужая на тёмном стекле.
+ */
+function scrollbarProblems(decls: Decl[]): string[] {
+  const scrolling = new Set(
+    decls
+      .filter((d) => /^overflow(-[xy])?$/.test(d.prop) && /\b(auto|scroll)\b/.test(d.value) && !isRoot(d.selector))
+      .map((d) => d.selector),
+  );
+  const bad: string[] = [];
+  for (const selector of scrolling) {
+    const own = decls.filter((d) => d.selector === selector);
+    const width = own.find((d) => d.prop === "scrollbar-width")?.value;
+    const colour = own.find((d) => d.prop === "scrollbar-color")?.value;
+    if (width === "none") continue;
+    if (width !== "thin") bad.push(`${selector}: scrollbar-width ${width ?? "не задана"}`);
+    else if (!colour || !/^var\(--[\w-]+\) (transparent|var\(--[\w-]+\))$/.test(colour)) bad.push(`${selector}: scrollbar-color ${colour ?? "не задан"}`);
+  }
+  return bad;
+}
+
+/**
+ * Зерно (спека полировки, §4.4): ровно один слой на уровне `--z-grain`,
+ * неподвижный, сквозной для мыши, поверх всего окна, 3–4 % непрозрачности.
+ */
+function grainProblems(decls: Decl[]): string[] {
+  const layers = [...new Set(decls.filter((d) => d.prop === "z-index" && d.value === "var(--z-grain)").map((d) => d.selector))];
+  if (layers.length !== 1) return [`слоёв зерна: ${layers.length}`];
+  const own = new Map(decls.filter((d) => d.selector === layers[0]).map((d) => [d.prop, d.value]));
+  const bad: string[] = [];
+  if (own.get("position") !== "fixed") bad.push("не position: fixed");
+  if (own.get("inset") !== "0") bad.push("не на всё окно (inset: 0)");
+  if (own.get("pointer-events") !== "none") bad.push("перехватывает мышь");
+  const opacity = Number(own.get("opacity"));
+  if (!(opacity >= 0.03 && opacity <= 0.04)) bad.push(`непрозрачность ${own.get("opacity")}`);
+  if (!/^url\("data:image\/svg\+xml,/.test(own.get("mask-image") ?? "")) bad.push("шум не из data:-картинки SVG");
+  for (const p of ["animation", "transition", "will-change"]) if (own.has(p)) bad.push(`есть ${p}`);
+  return bad;
+}
+
 const decls = parse(rawCss);
 
 describe("стили берут значения только из шкал", () => {
@@ -247,6 +337,33 @@ describe("стили берут значения только из шкал", ()
 
   it("цвета вне :root — только из токенов", () => {
     expect(colourProblems(decls)).toEqual([]);
+  });
+
+  it("рамка фокуса одна: из токенов --focus-ring и --focus-offset", () => {
+    expect(focusProblems(decls)).toEqual([]);
+    expect(decls.filter((d) => d.prop === "outline" && d.value === "var(--focus-ring)").length).toBeGreaterThan(3);
+  });
+
+  it("у всего нажимаемого есть наведение и нажатие", () => {
+    expect(pointerProblems(decls)).toEqual([]);
+  });
+
+  it("всё, что прокручивается, — с тонкой полосой в цветах палитры", () => {
+    expect(scrollbarProblems(decls)).toEqual([]);
+  });
+
+  it("зерно — один неподвижный слой поверх окна, сквозной для мыши", () => {
+    expect(grainProblems(decls)).toEqual([]);
+  });
+});
+
+describe("токены фокуса", () => {
+  const root = new Map(decls.filter((d) => d.selector === ":root").map((d) => [d.prop, d.value]));
+
+  it("рамка — 2px, цветом из токена, с отступом около 3px", () => {
+    expect(root.get("--focus-ring")).toMatch(/^var\(--focus-width\) solid var\(--[\w-]+\)$/);
+    expect(root.get("--focus-width")).toBe("2px");
+    expect(root.get("--focus-offset")).toBe("3px");
   });
 });
 
@@ -378,6 +495,39 @@ describe("сторож ловит нарушения", () => {
     expect(colourProblems(css(".x { filter: url(#fade); }"))).toEqual([]);
     expect(colourProblems(css(svg("%3Crect fill='%23fade'/%3E")))).toHaveLength(1);
     expect(colourProblems(css(svg("%3Crect fill='url(%23fade)' stroke='%23cafe'/%3E")))).toHaveLength(1);
+  });
+
+  it("своя рамка фокуса по месту не проходит", () => {
+    expect(focusProblems(css(".x:focus-visible { outline: 2px solid var(--accent); }"))).toHaveLength(1);
+    expect(focusProblems(css(".x:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }"))).toHaveLength(1);
+    expect(focusProblems(css(".x:focus-visible { outline-color: var(--ink); }"))).toHaveLength(1);
+    expect(focusProblems(css(".x:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); } .y:focus-visible { outline: none; }"))).toEqual([]);
+  });
+
+  it("нажимаемое без наведения или без нажатия не проходит", () => {
+    expect(pointerProblems(css(".x { cursor: pointer; } .x:hover { color: var(--ink); }"))).toEqual([".x: нет :active"]);
+    expect(pointerProblems(css(".x { cursor: pointer; } .x:active { transform: scale(0.97); }"))).toEqual([".x: нет :hover"]);
+    expect(pointerProblems(css(".a .b { cursor: pointer; } .a .b:not(:has(i:disabled)):hover::before { opacity: 1; } .a .b:active:not(:disabled) { opacity: 1; }"))).toEqual([]);
+    // `.x-y:hover` — не наведение у `.x`.
+    expect(pointerProblems(css(".x { cursor: pointer; } .x-y:hover, .x-y:active { opacity: 1; }"))).toHaveLength(2);
+    expect(pointerProblems(css(".game-row-head { cursor: pointer; } .game-row-head:hover { opacity: 1; } .game-row:not(.is-open):active { opacity: 1; }"))).toEqual([]);
+  });
+
+  it("прокрутка без тонкой полосы или с полосой числом не проходит", () => {
+    expect(scrollbarProblems(css(".x { overflow-y: auto; }"))).toHaveLength(1);
+    expect(scrollbarProblems(css(".x { overflow: auto; scrollbar-width: thin; }"))).toHaveLength(1);
+    expect(scrollbarProblems(css(".x { overflow: auto; scrollbar-width: thin; scrollbar-color: #888 transparent; }"))).toHaveLength(1);
+    expect(scrollbarProblems(css(".x { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; } .d { overflow-x: auto; scrollbar-width: none; } .h { overflow: hidden; }"))).toEqual([]);
+  });
+
+  it("зерно с анимацией, ловящее мышь или слишком плотное — не проходит", () => {
+    const noise = 'url("data:image/svg+xml,%3Csvg/%3E")';
+    const layer = (extra: string) => css(`.g { position: fixed; inset: 0; z-index: var(--z-grain); pointer-events: none; opacity: 0.035; mask-image: ${noise}; ${extra} }`);
+    expect(grainProblems(layer(""))).toEqual([]);
+    expect(grainProblems(layer("animation: g var(--move) var(--ease-out);"))).toHaveLength(1);
+    expect(grainProblems(css(`.g { position: fixed; inset: 0; z-index: var(--z-grain); opacity: 0.035; mask-image: ${noise}; }`))).toHaveLength(1);
+    expect(grainProblems(css(`.g { position: fixed; inset: 0; z-index: var(--z-grain); pointer-events: none; opacity: 0.1; mask-image: ${noise}; }`))).toHaveLength(1);
+    expect(grainProblems(css(".a { z-index: var(--z-grain); } .b { z-index: var(--z-grain); }"))).toEqual(["слоёв зерна: 2"]);
   });
 
   it("точка с запятой и скобки внутри значения не ломают разбор", () => {

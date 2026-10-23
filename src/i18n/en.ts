@@ -19,7 +19,13 @@ export const en = {
   },
   panel: {
     noDataYet: "Codes, banners and videos will appear once the data service is up.",
-    panelEmpty: "No codes, banners or videos yet. They will appear once the data service is up.",
+    // Пустая панель (`EmptyState`): заголовок — что случилось, подсказка — что
+    // делать; причин три (`lib/panel.ts`, `emptyReason`).
+    panelEmpty: "No codes, banners or videos yet",
+    emptyQuietHint: "New ones will show up here as soon as they're out.",
+    emptyStaleHint: "The data is over a week old, so codes and banners are hidden. They'll be back after the next update.",
+    unlinkedTitle: "No data for this game",
+    unlinkedHint: "You can link the game to data in its settings: \"Codes, banners and videos of\".",
     sources: { remote: "online", override: "local override", cache: "from cache", bundled: "bundled" },
     unknownSource: "unknown",
     dataStatus: (source: string, freshness: string) => `Source: ${source}, ${freshness}.`,
@@ -34,6 +40,9 @@ export const en = {
     regionOnly: (region: string) => `${region} only`,
     copyCode: "Copy code",
     codeCopied: (code: string) => `Code ${code} copied`,
+    // Буфер обмена не принял код: строка на карточке коротко, диктору — полностью.
+    copyFailed: "Couldn't copy",
+    codeCopyFailed: (code: string) => `Couldn't copy code ${code}. Try again.`,
     redeem: "Redeem on the website",
     banners: "Banners",
     previousBanner: "Previous banner",
@@ -126,6 +135,11 @@ export const en = {
       alreadyAdded: "already added",
       addChecked: "Add checked",
       skip: "Skip",
+      // Поиск ещё идёт, и поиск ничего не нашёл.
+      scanning: "Looking for installed games…",
+      nothingTitle: "No installed games found",
+      nothingHint: "You can add a game manually in Settings, on the Games tab.",
+      continue: "Continue",
     },
     games: {
       hint: "The order in the list is the order in the dock at the bottom of the main screen. Drag a row to change it.",
@@ -133,6 +147,8 @@ export const en = {
       scanInstalled: "Find installed games",
       defaultTitle: "Game",
       fileMissing: "file missing",
+      emptyTitle: "No games yet",
+      emptyHint: "Add a game manually or find the installed ones with the buttons below.",
     },
     editor: {
       name: "Name",
@@ -159,7 +175,8 @@ export const en = {
       storeArtHint: "For Genshin Impact, Honkai: Star Rail and Zenless Zone Zero the current background of the official HoYoPlay launcher is used (a video when animation is on); for other games from Steam and Epic Games, the store's artwork. A custom image or video always takes priority.",
       animation: "Animation",
       animationHint: "Background video, slow image movement, dock icon zoom and the gear spinning. The Windows setting doesn't affect the app.",
-      noGames: "No games yet — add them in the Games section.",
+      noGames: "No games yet",
+      noGamesHint: "Add them on the Games tab, and their backgrounds will show up here.",
       pickImage: "Image…",
       pickVideo: "Video…",
       removeBackground: "Remove",

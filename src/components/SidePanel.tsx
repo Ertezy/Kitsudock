@@ -3,7 +3,8 @@ import PromoCodes from "./panel/PromoCodes";
 import Banners from "./panel/Banners";
 import Videos from "./panel/Videos";
 import Skeleton from "./panel/Skeleton";
-import { codesFor, panelIsEmpty, sourceLabel, videosFor } from "../lib/panel";
+import EmptyState from "./EmptyState";
+import { codesFor, emptyReason, panelIsEmpty, sourceLabel, videosFor } from "../lib/panel";
 import { entryEnded, hubChanged, isEntryAnimation, panelMounted, skeletonShown } from "../lib/panelEntry";
 import { hubFreshness } from "../lib/time";
 import { api } from "../lib/api";
@@ -99,6 +100,11 @@ export default function SidePanel({ hub, selectedContentId, onOpenSettings, appV
   // тихая пауза до первого ответа, а не сообщение «кодов нет», которое
   // тут же сменится настоящими данными и будет выглядеть как ложная тревога.
   const empty = hub !== null && panelIsEmpty(codes, banners, videos, nowSec);
+  // Пустая панель говорит, почему пуста и что с этим сделать.
+  const reason = emptyReason(selectedContentId, tooOld);
+  const emptyTitle = reason === "unlinked" ? t.panel.unlinkedTitle : t.panel.panelEmpty;
+  const emptyHint =
+    reason === "unlinked" ? t.panel.unlinkedHint : reason === "stale" ? t.panel.emptyStaleHint : t.panel.emptyQuietHint;
 
   // Источник данных виден в интерфейсе — требование общей спеки §9.4.
   // Без него невозможно отличить «сеть отвалилась, показываю прошлогодний
@@ -117,7 +123,7 @@ export default function SidePanel({ hub, selectedContentId, onOpenSettings, appV
         {hub && <PromoCodes codes={codes} games={hub.games} nowSec={nowSec} />}
         <Banners banners={banners} nowSec={nowSec} />
         <Videos videos={videos} nowSec={nowSec} />
-        {empty && <p className="panel-empty">{t.panel.panelEmpty}</p>}
+        {empty && <EmptyState className="panel-empty" title={emptyTitle} hint={emptyHint} />}
       </div>
 
       <div className="panel-foot">

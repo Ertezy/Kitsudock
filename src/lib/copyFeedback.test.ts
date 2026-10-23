@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { COPY_FEEDBACK_MS, copyAnnouncement, copyFeedbackOver, isCopied, type Copied } from "./copyFeedback";
+import { COPY_FAILED_MS, COPY_FEEDBACK_MS, copyAnnouncement, copyFeedbackOver, feedbackMs, isCopied, isCopyFailed, type Copied } from "./copyFeedback";
 
 describe("отклик копирования", () => {
   it("галочка держится полторы секунды, как раньше", () => {
@@ -51,5 +51,28 @@ describe("объявление копирования", () => {
 
   it("у первого копирования текст ровно из словаря", () => {
     expect(copyAnnouncement(text, 1)).toBe(text);
+  });
+});
+
+describe("копирование не удалось", () => {
+  it("ошибка держится дольше галочки: её надо успеть прочитать", () => {
+    expect(COPY_FAILED_MS).toBeGreaterThan(COPY_FEEDBACK_MS);
+    expect(feedbackMs({ code: "A", id: 1 })).toBe(COPY_FEEDBACK_MS);
+    expect(feedbackMs({ code: "A", id: 1, failed: true })).toBe(COPY_FAILED_MS);
+  });
+
+  it("неудача отмечает свою карточку ошибкой, а не галочкой", () => {
+    const state: Copied = { code: "A", id: 1, failed: true };
+    expect(isCopyFailed(state, "A")).toBe(true);
+    expect(isCopied(state, "A")).toBe(false);
+    expect(isCopyFailed(state, "B")).toBe(false);
+    expect(isCopyFailed({ code: "A", id: 1 }, "A")).toBe(false);
+    expect(isCopyFailed(null, "A")).toBe(false);
+  });
+
+  it("удачное копирование после неудачного снимает ошибку, срок неудачи его не трогает", () => {
+    const ok: Copied = { code: "A", id: 2 };
+    expect(isCopyFailed(ok, "A")).toBe(false);
+    expect(copyFeedbackOver(ok, 1)).toBe(ok);
   });
 });

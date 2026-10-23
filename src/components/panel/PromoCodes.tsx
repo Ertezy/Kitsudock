@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
-import { COPY_FEEDBACK_MS, copyAnnouncement, copyFeedbackOver, isCopied, type Copied } from "../../lib/copyFeedback";
+import { copyAnnouncement, copyFeedbackOver, feedbackMs, isCopied, isCopyFailed, type Copied } from "../../lib/copyFeedback";
 import { activeCodes, plainSpaces } from "../../lib/panel";
 import { burnsToday, timeLeft } from "../../lib/time";
 import { useLang, useT } from "../../i18n";
@@ -46,14 +46,23 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
 
   const gameOf = (id: string) => games.find((g) => g.id === id) ?? null;
 
+  // Буфер обмена может не принять код (его держит другая программа): тогда
+  // вместо галочки карточка на время принимает вид ошибки, и строка состояния
+  // говорит об этом экранному диктору.
   const copy = async (code: string) => {
-    await api.copyText(code);
+    let failed = false;
+    try {
+      await api.copyText(code);
+    } catch {
+      failed = true;
+    }
     if (!mounted.current) return;
     const id = ++copies.current;
-    setCopied({ code, id });
-    // Срок прежнего копирования больше не нужен: галочку держит новое.
+    const next: Copied = failed ? { code, id, failed } : { code, id };
+    setCopied(next);
+    // Срок прежнего копирования больше не нужен: отклик держит новое.
     window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setCopied((c) => copyFeedbackOver(c, id)), COPY_FEEDBACK_MS);
+    timer.current = window.setTimeout(() => setCopied((c) => copyFeedbackOver(c, id)), feedbackMs(next));
   };
 
   const redeem = async (code: Code) => {
@@ -75,10 +84,11 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
         {active.map((c) => {
           const game = gameOf(c.gameId);
           const soon = c.expiresAt !== null && burnsToday(c.expiresAt, nowSec);
+          const failed = isCopyFailed(copied, c.code);
           return (
             <div
               key={`${c.gameId}:${c.code}`}
-              className={soon ? "code-card burning" : "code-card"}
+              className={["code-card", soon && "burning", failed && "copy-failed"].filter(Boolean).join(" ")}
               onClick={() => void copy(c.code)}
               role="button"
               tabIndex={0}
@@ -99,12 +109,16 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
             >
               <div className="code-main">
                 <code>{c.code}</code>
-                <div className={soon ? "code-timer soon" : "code-timer"}>
-                  {c.expiresAt === null
-                    ? t.panel.noExpiry
-                    : soon
-                      ? t.panel.expiresIn(timeLeft(c.expiresAt, nowSec, lang))
-                      : t.panel.timeRemaining(timeLeft(c.expiresAt, nowSec, lang))}
+                {/* Не скопировалось — строка срока на время говорит об этом:
+                    та же строка, поэтому карточка не меняет высоту. */}
+                <div className={failed ? "code-timer is-failed" : soon ? "code-timer soon" : "code-timer"}>
+                  {failed
+                    ? t.panel.copyFailed
+                    : c.expiresAt === null
+                      ? t.panel.noExpiry
+                      : soon
+                        ? t.panel.expiresIn(timeLeft(c.expiresAt, nowSec, lang))
+                        : t.panel.timeRemaining(timeLeft(c.expiresAt, nowSec, lang))}
                 </div>
                 {c.rewards && <div className="code-meta">{plainSpaces(c.rewards)}</div>}
                 {c.region !== "all" && (
@@ -154,11 +168,13 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
         })}
       </div>
 
-      {/* Что код скопирован, экранный диктор слышит словами: строка
-          состояния вежливо объявляет каждое копирование, и повторное того
-          же кода тоже (`copyAnnouncement`). */}
+      {/* Что код скопирован — или что не удалось, — экранный диктор слышит
+          словами: строка состояния вежливо объявляет каждое копирование, и
+          повторное того же кода тоже (`copyAnnouncement`). */}
       <span className="sr-only" role="status">
-        {copied ? copyAnnouncement(t.panel.codeCopied(copied.code), copied.id) : ""}
+        {copied
+          ? copyAnnouncement(copied.failed ? t.panel.codeCopyFailed(copied.code) : t.panel.codeCopied(copied.code), copied.id)
+          : ""}
       </span>
     </section>
   );

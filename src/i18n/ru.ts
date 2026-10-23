@@ -17,11 +17,17 @@ export const ru: Dictionary = {
     fresh: "данные свежие",
     dataFrom: (date: string) => `данные от ${date}`,
   },
-  // Строки прежней панели дословно (было в src/lib/panel.ts и компонентах
-  // src/components/panel/*, src/components/SidePanel.tsx).
+  // Строки прежней панели (было в src/lib/panel.ts и компонентах
+  // src/components/panel/*, src/components/SidePanel.tsx). Пустая панель
+  // (`EmptyState`): заголовок — что случилось, подсказка — что делать; причин
+  // три (`lib/panel.ts`, `emptyReason`).
   panel: {
     noDataYet: "Коды, баннеры и видео появятся, когда заработает сервис данных.",
-    panelEmpty: "Пока нет кодов, баннеров и видео. Они появятся, когда заработает сервис данных.",
+    panelEmpty: "Пока нет кодов, баннеров и видео",
+    emptyQuietHint: "Новые появятся здесь сами, как только выйдут.",
+    emptyStaleHint: "Данные старше недели, поэтому коды и баннеры скрыты. Они вернутся после обновления.",
+    unlinkedTitle: "Для этой игры нет данных",
+    unlinkedHint: "Привязать игру к данным можно в её настройках: «Коды, баннеры и видео игры».",
     sources: { remote: "из сети", override: "из локальной подмены", cache: "из кеша", bundled: "из комплекта" },
     unknownSource: "неизвестно",
     dataStatus: (source: string, freshness: string) => `Источник — ${source}, ${freshness}.`,
@@ -36,6 +42,8 @@ export const ru: Dictionary = {
     regionOnly: (region: string) => `только ${region}`,
     copyCode: "Копировать код",
     codeCopied: (code: string) => `Код ${code} скопирован`,
+    copyFailed: "Не удалось скопировать",
+    codeCopyFailed: (code: string) => `Не удалось скопировать код ${code}. Попробуйте ещё раз.`,
     redeem: "Забрать на сайте",
     banners: "Баннеры",
     previousBanner: "Предыдущий баннер",
@@ -45,9 +53,8 @@ export const ru: Dictionary = {
     videos: "Видео",
     premiere: "премьера",
   },
-  // Строки главного экрана, дока игр и общих обёрток — дословно как в коде до
-  // перевода (было в App.tsx, PlayButton.tsx, GameDock.tsx, lib/launch.ts,
-  // lib/background.ts, lib/api.ts).
+  // Строки главного экрана, дока игр и общих обёрток (было в App.tsx,
+  // PlayButton.tsx, GameDock.tsx, lib/launch.ts, lib/background.ts, lib/api.ts).
   main: {
     launch: {
       note: { steam: "Запустится через Steam", epic: "Запустится через Epic Games", exe: "Запустится напрямую" },
@@ -116,8 +123,8 @@ export const ru: Dictionary = {
     hint: "Окно не удалось показать. Обычно помогает перезагрузка. Игры и настройки это не затрагивает.",
     reload: "Перезагрузить",
   },
-  // Экран настроек и первый запуск — дословно как было в коде (было в
-  // Settings.tsx и src/screens/settings/*, Task 6).
+  // Экран настроек и первый запуск (было в Settings.tsx и
+  // src/screens/settings/*, Task 6).
   settings: {
     tabs: { games: "Игры", look: "Вид", behaviour: "Поведение", data: "Данные", about: "О программе" },
     back: "← Назад",
@@ -132,6 +139,10 @@ export const ru: Dictionary = {
       alreadyAdded: "уже добавлена",
       addChecked: "Добавить отмеченные",
       skip: "Пропустить",
+      scanning: "Ищу установленные игры…",
+      nothingTitle: "Установленных игр не нашлось",
+      nothingHint: "Игру можно добавить вручную в настройках, на вкладке «Игры».",
+      continue: "Продолжить",
     },
     games: {
       hint: "Порядок в списке — это порядок в доке внизу главного экрана. Перетащите строку, чтобы поменять.",
@@ -139,6 +150,8 @@ export const ru: Dictionary = {
       scanInstalled: "Найти установленные игры",
       defaultTitle: "Игра",
       fileMissing: "файл пропал",
+      emptyTitle: "Игр пока нет",
+      emptyHint: "Добавьте игру вручную или найдите установленные — кнопки ниже.",
     },
     editor: {
       name: "Название",
@@ -165,7 +178,8 @@ export const ru: Dictionary = {
       storeArtHint: "Для Genshin Impact, Honkai: Star Rail и Zenless Zone Zero берётся текущий фон официального лаунчера HoYoPlay (видео, если включена анимация), для остальных игр из Steam и Epic Games — картинка из магазина. Своя картинка или видео всегда важнее.",
       animation: "Анимация",
       animationHint: "Видео фона, медленное движение картинки, увеличение иконок в доке и поворот шестерёнки. Настройка Windows на приложение не влияет.",
-      noGames: "Игр пока нет — добавьте их в разделе «Игры».",
+      noGames: "Игр пока нет",
+      noGamesHint: "Добавьте их на вкладке «Игры», и здесь появятся их фоны.",
       pickImage: "Картинка…",
       pickVideo: "Видео…",
       removeBackground: "Убрать",
