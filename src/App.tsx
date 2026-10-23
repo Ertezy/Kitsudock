@@ -216,10 +216,24 @@ export default function App() {
 
   // Возврат из настроек обязан перечитать список игр: человек мог там всё
   // поменять (добавить, убрать, переименовать, отвязать от хаба, сменить фон).
+  const backFromSettings = useRef(false);
   const closeSettings = useCallback(() => {
+    backFromSettings.current = true;
     setScreen("main");
     void load();
   }, [load]);
+
+  // Кнопка «Назад» пропала вместе с настройками — фокус возвращается на
+  // шестерёнку, которой их открыли, а не теряется в начале страницы. Если фокус
+  // уже где-то стоит, его не трогаем.
+  const mainRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (screen !== "main" || !backFromSettings.current) return;
+    backFromSettings.current = false;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    mainRef.current?.querySelector<HTMLElement>(".panel-gear")?.focus({ preventScroll: true });
+  }, [screen]);
 
   if (screen === "loading") {
     return <div className="screen" />;
@@ -227,9 +241,10 @@ export default function App() {
 
   if (screen === "firstRun") {
     // Тот же визуальный каркас, что и у настроек, но без навигации по
-    // вкладкам: настраивать пока нечего, кроме списка игр.
+    // вкладкам: настраивать пока нечего, кроме списка игр. Без колонки вкладок
+    // слева содержимое стоит посередине окна, а не прижато к краю.
     return (
-      <div className="settings">
+      <div className="settings is-first-run">
         <div className="settings-body">
           <FirstRunView onDone={finishFirstRun} />
         </div>
@@ -242,7 +257,7 @@ export default function App() {
   }
 
   return (
-    <div className="screen">
+    <div className="screen" ref={mainRef}>
       <SidePanel
         hub={hub}
         selectedContentId={selected?.contentId ?? null}

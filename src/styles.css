@@ -58,6 +58,10 @@
   --fallback-ink: rgba(247, 241, 249, 0.55);
   /* Заглушки панели, пока грузятся данные и картинки: еле светлее стекла. */
   --skeleton: rgba(247, 241, 249, 0.08);
+  /* Подсветка строки, вкладки или варианта под курсором — слой, который
+     проявляется прозрачностью. Тоньше заглушки: даже самый тихий текст на
+     подсвеченной строке не ниже 4.5:1 (`src/paletteContrast.test.ts`). */
+  --hover: rgba(247, 241, 249, 0.06);
 
   /* Тёмные подложки поверх арта: мелкий текст и значки на картинке читаются на
      любом фоне. Подпись над кнопкой PLAY; стрелки карусели в покое и под
@@ -118,7 +122,11 @@
   --shadow-text: 0 2px 8px rgba(6, 1, 9, 0.6);
 
   /* Слои. Арт — внизу, интерфейс поверх него; остальное — на вырост. Кнопка
-     PLAY лежит на слой выше дока: по дизайну она на переднем плане. */
+     PLAY лежит на слой выше дока: по дизайну она на переднем плане.
+     «Под содержимым» — подсветка наведения внутри своего элемента: тот
+     изолирован (`isolation: isolate`), и слой ложится над его фоном, но под его
+     текстом, не уходя под соседей. */
+  --z-below: -1;
   --z-art: 0;
   --z-ui: 10;
   --z-ui-raised: calc(var(--z-ui) + 1);
@@ -1306,8 +1314,12 @@ body {
 
 /* Шестерёнка настроек: крупная, без подписи, при наведении плавно
    поворачивается на пол-оборота и возвращается, когда курсор уходит. Восемь
-   зубцов, поэтому после пол-оборота значок выглядит так же, как в покое. */
+   зубцов, поэтому после пол-оборота значок выглядит так же, как в покое.
+   Подложка под курсором — отдельный слой, который проявляется прозрачностью:
+   плавно меняются только `transform` и `opacity` (спека полировки, §2). */
 .panel-gear {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1320,7 +1332,17 @@ body {
   background: none;
   color: var(--ink);
   cursor: pointer;
-  transition: background-color var(--move) var(--ease-out);
+}
+
+.panel-gear::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-md);
+  background: var(--card);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
 }
 
 .panel-gear svg {
@@ -1329,8 +1351,8 @@ body {
   transition: transform var(--move-scene) var(--ease-out);
 }
 
-.panel-gear:hover {
-  background: var(--card);
+.panel-gear:hover::before {
+  opacity: 1;
 }
 
 .panel-gear:hover svg,
@@ -1344,8 +1366,9 @@ body {
 }
 
 /* Тумблер «Анимация» выключен — шестерёнка не поворачивается (спека этапа 5,
-   §12). */
-:root[data-motion="off"] .panel-gear svg {
+   §12), подложка под курсором появляется сразу. */
+:root[data-motion="off"] .panel-gear svg,
+:root[data-motion="off"] .panel-gear::before {
   transition: none;
 }
 :root[data-motion="off"] .panel-gear:hover svg,
@@ -1415,16 +1438,25 @@ body {
   --s-control-h: 34px;
   --s-card-radius: var(--r-lg);
   --s-control-radius: var(--r-md);
+  /* Скругления слоёв внутри карточки и кнопки: на толщину рамки меньше, чтобы
+     слой лёг ровно в её внутренний край. */
+  --s-row-radius: calc(var(--s-card-radius) - 1px);
+  --s-control-inner: calc(var(--s-control-radius) - 1px);
   --s-body-max: 760px;
 
   display: flex;
   height: 100%;
   background: var(--bg);
   font-size: var(--s-text);
-  animation: screen-in var(--move) var(--ease-out);
+  /* Переход между экранами (спека полировки, §5): настройки проявляются на
+     медленной скорости, колонка вкладок чуть выезжает слева, раздел поднимается
+     на место. Главный экран при возвращении входит сам: панель выезжает,
+     разделы встают лесенкой, фон проявляется (шаги 5 и 6). */
+  animation: screen-in var(--move-slow) var(--ease-out);
 }
 
 .settings-nav {
+  position: relative;
   width: 220px;
   flex: none;
   display: flex;
@@ -1434,10 +1466,45 @@ body {
   background: var(--glass);
   border-right: 1px solid var(--line);
   box-shadow: var(--glass-edge);
+  animation: settings-nav-in var(--move-slow) var(--ease-out) backwards;
 }
 
+/* Только `backwards`: доигравший вход ничего не держит. Кривая — плавное
+   торможение без перелёта, поэтому щели у левого края окна не бывает (панели
+   главного экрана, которая въезжает с пружиной, для этого нужна полоса стекла
+   за краем). */
+@keyframes settings-nav-in {
+  from {
+    transform: translateX(-10px);
+  }
+}
+
+/* Подложка выбранной вкладки — одна на всю колонку (`Settings.tsx`,
+   `lib/pill.ts`): при смене вкладки она скользит к новой, как метка в доке, а
+   не перескакивает. Встаёт по замеру вкладок; высота — высота вкладки. Чуть
+   приподнята кромкой и тенью, как карточка: выбранная вкладка не путается с
+   той, что просто под курсором. */
+.settings-tab-pill {
+  position: absolute;
+  top: 0;
+  left: 12px;
+  right: 12px;
+  height: var(--pill-size);
+  border-radius: var(--s-control-radius);
+  background: var(--card);
+  box-shadow: var(--glass-edge), var(--shadow-1);
+  transform: translateY(var(--pill-y));
+  transition: transform var(--move-slow) var(--ease-out);
+}
+
+/* Вкладки и «Назад» лежат над подложкой. Подсветка под курсором — свой слой
+   внутри кнопки, он проявляется прозрачностью: плавно меняются только
+   `transform` и `opacity` (спека полировки, §2). Нажатие чуть вдавливает
+   кнопку, отпускание возвращает её с пружинкой. */
 .settings-back,
 .settings-tab {
+  position: relative;
+  isolation: isolate;
   background: none;
   border: 0;
   border-radius: var(--s-control-radius);
@@ -1447,32 +1514,76 @@ body {
   cursor: pointer;
   font: inherit;
   font-size: var(--s-tab);
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.settings-back::before,
+.settings-tab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--s-control-radius);
+  background: var(--hover);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+/* На стекле колонки полная подсветка была бы почти как подложка выбранной
+   вкладки — здесь она вдвое тише. */
+.settings-back:hover::before,
+.settings-tab:hover:not(.active)::before {
+  opacity: 0.55;
+}
+
+.settings-back:hover,
+.settings-tab:hover,
+.settings-tab.active {
+  color: var(--ink);
+}
+
+.settings-back:active,
+.settings-tab:active {
+  transform: scale(0.98);
+  transition-duration: var(--move-fast);
 }
 
 .settings-back {
   margin-bottom: 12px;
 }
 
-.settings-tab:hover {
-  color: var(--ink);
-}
-
-.settings-tab.active {
-  background: var(--card);
-  color: var(--ink);
-}
-
 .settings-body {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
+  /* Место под полосу прокрутки занято всегда: длинная вкладка с полосой и
+     короткая без неё не сдвигают содержимое при переключении. */
+  scrollbar-gutter: stable;
   padding: 32px 40px;
 }
 
 /* Содержимое не растягивается на всю ширину: на развёрнутом окне строка
-   настройки иначе разъехалась бы между названием и переключателем. */
+   настройки иначе разъехалась бы между названием и переключателем.
+   Раздел поднимается на место и проявляется — при открытии настроек, при смене
+   вкладки (раздел появляется заново) и при переходе к поиску игр и обратно. */
 .settings-body > * {
   max-width: var(--s-body-max);
+  animation: settings-rise var(--move-slow) var(--ease-out) backwards;
+}
+
+/* Только `backwards`, как у подъёма кнопки PLAY: доигравшая анимация не держит
+   `transform`. */
+@keyframes settings-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Первый запуск: колонки вкладок нет, и содержимое стоит посередине окна, а не
+   прижато к левому краю. */
+.settings.is-first-run .settings-body > * {
+  margin-inline: auto;
 }
 
 .settings-section-title {
@@ -1490,11 +1601,13 @@ body {
   margin-bottom: 18px;
 }
 
-/* Карточка: настройки раздела вместе, строки разделены тонкой линией. */
+/* Карточка: настройки раздела вместе, строки разделены тонкой линией. Глубина —
+   как у карточек панели: светлая кромка сверху и лёгкая тень. */
 .settings-card {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--s-card-radius);
+  box-shadow: var(--glass-edge), var(--shadow-1);
   margin-bottom: 14px;
 }
 
@@ -1510,6 +1623,48 @@ body {
 
 .settings-row + .settings-row {
   border-top: 1px solid var(--line);
+}
+
+/* Подсветка под курсором у строк карточки, строки игры и найденной игры. Слой
+   внутри строки, под её содержимым (`--z-below`), проявляется прозрачностью.
+   Строка карточки сама не нажимается — нажимаются её кнопки, — поэтому у неё
+   только подсветка: видно, к какой строке относятся кнопки справа. Слой лежит
+   по внутреннему краю карточки: у первой строки скруглён сверху, у последней —
+   снизу. */
+.settings-card > .settings-row {
+  position: relative;
+  isolation: isolate;
+}
+
+.settings-card > .settings-row::before,
+.game-row-head::before,
+.found-row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  background: var(--hover);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.settings-card > .settings-row:first-child::before {
+  border-radius: var(--s-row-radius) var(--s-row-radius) 0 0;
+}
+
+.settings-card > .settings-row:last-child::before {
+  border-radius: 0 0 var(--s-row-radius) var(--s-row-radius);
+}
+
+.settings-card > .settings-row:only-child::before {
+  border-radius: var(--s-row-radius);
+}
+
+.settings-card > .settings-row:hover::before,
+.game-row-head:hover::before,
+.found-row:not(:has(input:disabled)):hover::before {
+  opacity: 1;
 }
 
 .settings-row-text {
@@ -1582,24 +1737,51 @@ body {
   padding-right: 0;
 }
 
+/* Строка игры. Нажатие на свёрнутую строку чуть вдавливает всю карточку,
+   отпускание возвращает её с пружинкой; развёрнутая слишком большая для
+   этого — ей хватает подсветки шапки. Перетаскивание строк (`GamesSection`)
+   родное, браузерное: картинку под курсором рисует сам браузер, и вдавленная
+   на время нажатия строка ему не мешает. */
 .game-row {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--s-card-radius);
+  box-shadow: var(--glass-edge), var(--shadow-1);
   margin-bottom: 8px;
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.game-row:not(.is-open):active {
+  transform: scale(0.99);
+  transition-duration: var(--move-fast);
 }
 
 .game-row.missing {
   opacity: 0.62;
 }
 
+/* Шапка скруглена по внутреннему краю карточки — по этому же краю идут её
+   подсветка и рамка фокуса. У развёрнутой строки снизу шапки продолжается
+   правка, и низ у неё прямой. */
 .game-row-head {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 52px;
   padding: 0 16px;
+  border-radius: var(--s-row-radius);
   cursor: pointer;
+}
+
+.game-row-head::before {
+  border-radius: var(--s-row-radius);
+}
+
+.game-row.is-open .game-row-head,
+.game-row.is-open .game-row-head::before {
+  border-radius: var(--s-row-radius) var(--s-row-radius) 0 0;
 }
 
 .game-row-grip {
@@ -1643,8 +1825,15 @@ body {
   margin-bottom: 14px;
 }
 
-/* Кнопки и поля. Жёлтая кнопка — только главное действие раздела. */
+/* Кнопки и поля. Оранжевая кнопка — только главное действие раздела.
+   Подсветка под курсором — слой внутри кнопки, он проявляется прозрачностью: у
+   обычной это подложка карточки, у главной — мягкое свечение цветом действия
+   вокруг неё, как у PLAY. Нажатие — лёгкое вдавливание, отпускание — с
+   пружинкой. Недоступная кнопка гаснет плавно: короткое сохранение на долю
+   секунды не мигает всеми кнопками раздела. */
 .button {
+  position: relative;
+  isolation: isolate;
   height: var(--s-control-h);
   padding: 0 14px;
   background: transparent;
@@ -1655,10 +1844,30 @@ body {
   font-size: var(--s-text);
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    transform var(--move) var(--ease-spring),
+    opacity var(--move) var(--ease-out);
 }
 
-.button:hover:not(:disabled) {
+.button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--s-control-inner);
   background: var(--card);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.button:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: var(--move-fast);
 }
 
 .button:disabled {
@@ -1671,6 +1880,15 @@ body {
   border-color: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
+}
+
+/* Свечение — тень снаружи кнопки, своего фона у слоя нет: ни цвет кнопки, ни
+   надпись он не трогает. */
+.button.accent::before {
+  inset: -1px;
+  border-radius: var(--s-control-radius);
+  background: none;
+  box-shadow: 0 4px 16px var(--accent-glow);
 }
 
 .button.danger {
@@ -1695,21 +1913,39 @@ body {
 }
 
 /* Переключатель вместо стандартной галочки: стандартная синяя не из палитры
-   приложения. Включённый — цвет действия. */
+   приложения. Включённый — цвет действия.
+   Бегунок едет с лёгкой пружинкой. Цвет дорожки и бегунка не перекрашивается,
+   а проявляется слоем поверх (спека полировки, §2): у дорожки слой цвета
+   действия выходит и на рамку, у бегунка — тёмный слой. Нажатие чуть сжимает
+   бегунок, как палец, придавивший его. */
 .switch {
   position: relative;
   flex: none;
   width: 40px;
   height: 22px;
+  padding: 0;
   border-radius: var(--r-pill);
   border: 1px solid var(--line);
   background: var(--card);
   cursor: pointer;
-  transition: background var(--move) var(--ease-out);
+  transition: opacity var(--move) var(--ease-out);
 }
 
-.switch::after {
+.switch::before {
   content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.switch[aria-checked="true"]::before {
+  opacity: 1;
+}
+
+.switch-thumb {
   position: absolute;
   top: 2px;
   left: 2px;
@@ -1717,17 +1953,34 @@ body {
   height: 16px;
   border-radius: 50%;
   background: var(--ink-dim);
-  transition: transform var(--move) var(--ease-out), background var(--move) var(--ease-out);
+  transition: transform var(--move) var(--ease-spring);
 }
 
-.switch[aria-checked="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.switch[aria-checked="true"]::after {
-  transform: translateX(18px);
+.switch-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
   background: var(--accent-ink);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.switch[aria-checked="true"] .switch-thumb {
+  transform: translateX(18px);
+}
+
+.switch[aria-checked="true"] .switch-thumb::after {
+  opacity: 1;
+}
+
+.switch:active:not(:disabled) .switch-thumb {
+  transform: scale(0.86);
+  transition-duration: var(--move-fast);
+}
+
+.switch[aria-checked="true"]:active:not(:disabled) .switch-thumb {
+  transform: translateX(18px) scale(0.86);
 }
 
 .switch:disabled {
@@ -1735,8 +1988,15 @@ body {
   cursor: default;
 }
 
-/* Выбор одного из вариантов — язык интерфейса и видео (спека этапа 6 §5.2). */
+/* Выбор одного из вариантов — язык интерфейса и видео (спека этапа 6 §5.2).
+   Выбранный вариант отмечает одна таблетка на весь ряд (`Segmented.tsx`,
+   `lib/pill.ts`): она переезжает к новому варианту и по дороге растягивается до
+   его ширины. И сдвиг, и ширина — в `transform`: у самой таблетки постоянная
+   ширина (`PILL_BASE`, ставится по месту), а скругление по горизонтали заранее
+   сжато на то же растяжение, как у подложки дока, — растянутое, оно снова
+   круглое. */
 .segmented {
+  position: relative;
   display: inline-flex;
   gap: 2px;
   padding: 2px;
@@ -1745,7 +2005,34 @@ body {
   background: var(--card);
 }
 
+.segmented-pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  border-radius: calc(var(--r-sm) / var(--pill-scale)) / var(--r-sm);
+  background: var(--accent);
+  transform-origin: 0 50%;
+  transform: translateX(var(--pill-x)) scaleX(var(--pill-scale));
+  transition:
+    transform var(--move-slow) var(--ease-out),
+    opacity var(--move) var(--ease-out);
+}
+
+.segmented.is-disabled .segmented-pill {
+  opacity: 0.5;
+}
+
+/* Подпись — в двух цветах друг на друге: приглушённая без таблетки и тёмная на
+   ней. Они сменяют друг друга прозрачностью, пока таблетка едет: у варианта,
+   который таблетка покидает, быстро — его сразу открывает; у варианта, к
+   которому она едет, — с короткой задержкой, когда таблетка уже почти под ним.
+   Иначе тёмная подпись на миг легла бы на тёмный фон. */
 .segmented-option {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
   min-width: 64px;
   padding: 6px 12px;
   border: 0;
@@ -1754,12 +2041,50 @@ body {
   color: var(--ink-dim);
   font: inherit;
   cursor: pointer;
-  transition: background var(--move) var(--ease-out), color var(--move) var(--ease-out);
+  transition: opacity var(--move) var(--ease-out);
 }
 
-.segmented-option.active {
-  background: var(--accent);
+.segmented-option::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-sm);
+  background: var(--hover);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.segmented-option:hover:not(:disabled, .active)::before {
+  opacity: 1;
+}
+
+.segmented-label {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--move-fast) var(--ease-out),
+    transform var(--move) var(--ease-spring);
+}
+
+.segmented-label.is-on {
   color: var(--accent-ink);
+  opacity: 0;
+}
+
+.segmented-option.active .segmented-label {
+  opacity: 0;
+  transition:
+    opacity var(--move) var(--ease-out) calc(var(--move-fast) * 0.5),
+    transform var(--move) var(--ease-spring);
+}
+
+.segmented-option.active .segmented-label.is-on {
+  opacity: 1;
+}
+
+.segmented-option:active:not(:disabled, .active) .segmented-label {
+  transform: scale(0.95);
+  transition-duration: var(--move-fast);
 }
 
 .segmented-option:disabled {
@@ -1791,7 +2116,12 @@ body {
   outline-offset: 2px;
 }
 
+/* Найденная игра: вся строка — подпись галочки, нажатие в любом месте строки
+   переключает её. Подсветка под курсором и лёгкое вдавливание — как у строки
+   игры. У уже добавленной игры галочка недоступна, и строка не откликается. */
 .found-row {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1800,15 +2130,34 @@ body {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--s-card-radius);
+  box-shadow: var(--glass-edge), var(--shadow-1);
   margin-bottom: 8px;
+  cursor: pointer;
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.found-row::before {
+  border-radius: var(--s-row-radius);
+}
+
+.found-row:not(:has(input:disabled)):active {
+  transform: scale(0.99);
+  transition-duration: var(--move-fast);
+}
+
+.found-row:has(input:disabled) {
+  cursor: default;
 }
 
 /* Галочки остаются: здесь выбирают несколько пунктов, а не включают настройку.
-   Цвет — цвет действия, а не стандартный синий. */
+   Цвет — цвет действия, а не стандартный синий; схема у самой галочки тёмная:
+   пустая стандартная — ярко-белый квадрат, чужой на тёмной карточке. */
 .found-row input[type="checkbox"] {
   accent-color: var(--accent);
+  color-scheme: dark;
   width: 16px;
   height: 16px;
+  cursor: inherit;
 }
 
 .found-title {
@@ -1824,6 +2173,23 @@ body {
 .found-note {
   font-size: var(--s-hint);
   color: var(--ink-faint);
+}
+
+/* Тумблер «Анимация» выключен — таблетки и бегунок встают на место сразу,
+   подсветка появляется без перехода. Начатые переходы обрываются сразу: сам
+   тумблер лежит на вкладке «Вид», и выключенный, он не оставляет за собой
+   недоигранного движения. Нажатие остаётся — это ответ на клик, мгновенный он
+   тоже понятен (как у дока). Блок стоит последним в группе стилей настроек,
+   чтобы побеждать правила выше.
+   Вход экрана, колонки вкладок и раздела здесь не выключается намеренно: он
+   одноразовый, и обнулённой --move хватает — при нуле он кончается сразу,
+   начатый тоже. А `animation: none` при обратном включении тумблера запустил
+   бы вход заново, и экран настроек, на котором тумблер и нажали, проявился
+   бы ещё раз. */
+:root[data-motion="off"] :is(.settings-tab-pill, .settings-back, .settings-tab, .game-row, .found-row, .button, .switch, .switch-thumb, .segmented-pill, .segmented-option, .segmented-label),
+:root[data-motion="off"] :is(.settings-back, .settings-tab, .settings-card > .settings-row, .game-row-head, .found-row, .button, .switch, .segmented-option)::before,
+:root[data-motion="off"] .switch-thumb::after {
+  transition: none;
 }
 
 /* Единственное место, где обнуляется переменная --move — а с ней все

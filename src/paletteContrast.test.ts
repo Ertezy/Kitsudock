@@ -216,7 +216,13 @@ describe("читаемость палитры", () => {
     // Горящая карточка с кодом красится из акцента вместо обычной карточки.
     const accent = get("--accent");
     const burning = over([accent[0], accent[1], accent[2], burningShare(rawCss)], glass);
-    return { get, labelOpacity: labelOpacity(rawCss), surfaces: { bg, glass, card, burning, accent } };
+    // Подсветка под курсором светлит то, на чём лежит. Строка карточки настроек:
+    // карточка на фоне и подсветка поверх. Вариант выбора языка: его поле —
+    // карточка на такой карточке, и подсветка поверх.
+    const settingsCard = over(get("--card"), bg);
+    const hoveredRow = over(get("--hover"), settingsCard);
+    const hoveredOption = over(get("--hover"), over(get("--card"), settingsCard));
+    return { get, labelOpacity: labelOpacity(rawCss), surfaces: { bg, glass, card, burning, accent, hoveredRow, hoveredOption } };
   };
 
   type Surface = keyof ReturnType<typeof palette>["surfaces"];
@@ -238,6 +244,9 @@ describe("читаемость палитры", () => {
     ["цвет действия как текст на горящей карточке кода", "--accent", "burning"],
     ["цвет опасного на стекле", "--danger", "glass"],
     ["текст действия на акценте", "--accent-ink", "accent"],
+    ["приглушённый текст на строке настроек под курсором", "--ink-dim", "hoveredRow"],
+    ["самый тихий текст на строке настроек под курсором", "--ink-faint", "hoveredRow"],
+    ["приглушённый текст на варианте выбора под курсором", "--ink-dim", "hoveredOption"],
   ];
   for (const [name, token, surface] of pairs) {
     it(name + " не ниже 4.5:1", () => {

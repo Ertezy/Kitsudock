@@ -1,0 +1,44 @@
+// Скользящая «таблетка» под выбранным вариантом: у выбора языка и у вкладок
+// настроек. Отдельно от компонентов, чтобы расчёт проверялся тестами без окна.
+//
+// Таблетка одна на весь ряд и переезжает к новому варианту, а не появляется под
+// ним заново. Спека полировки (§2) разрешает анимировать только `transform` и
+// `opacity`, поэтому и сдвиг, и ширина — в `transform`: ширина у элемента
+// постоянная (`PILL_BASE`), а нужную он набирает растяжением. Варианты бывают
+// разной ширины («English» шире «日本語»), и растяжение доезжает вместе со
+// сдвигом. Скругление стили заранее сжимают на ту же величину, как у подложки
+// дока, — растянутое, оно снова круглое.
+
+/** Вариант в ряду: где начинается вдоль ряда и какой длины, в точках. */
+export interface Slot {
+  start: number;
+  size: number;
+}
+
+/** Постоянная длина таблетки до растяжения, в точках. */
+export const PILL_BASE = 100;
+
+/** Где стоит таблетка: сдвиг от начала ряда, длина варианта и растяжение до неё. */
+export interface PillPlacement {
+  offset: number;
+  size: number;
+  scale: number;
+}
+
+/**
+ * Место таблетки под вариантом `index`. `base` — длина таблетки до растяжения.
+ * Нет такого варианта или он ещё не разложен (скрытая вкладка, нулевой размер) —
+ * `null`: таблетки нулевой ширины не бывает, её просто нет, пока мерить нечего.
+ */
+export function pillPlacement(slots: readonly Slot[], index: number, base: number = PILL_BASE): PillPlacement | null {
+  const slot = slots[index];
+  if (!slot || !(base > 0)) return null;
+  if (!Number.isFinite(slot.start) || !(slot.size > 0)) return null;
+  return { offset: slot.start, size: slot.size, scale: slot.size / base };
+}
+
+/** Те же ли это замеры: одинаковые не перезаписывают состояние и не вызывают лишнюю отрисовку. */
+export function sameSlots(a: readonly Slot[] | null, b: readonly Slot[] | null): boolean {
+  if (a === null || b === null) return a === b;
+  return a.length === b.length && a.every((s, i) => s.start === b[i].start && s.size === b[i].size);
+}
