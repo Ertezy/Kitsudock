@@ -25,6 +25,20 @@ describe("словари", () => {
     expect(shape(ru)).toEqual(shape(en));
   });
 
+  it("тексты прямые: без «Упс», восклицаний и «что-то пошло не так» (спека полировки, §5)", () => {
+    const texts = (value: unknown): string[] => {
+      if (typeof value === "string") return [value];
+      if (typeof value === "function") return [String(value(1, 2))];
+      if (value !== null && typeof value === "object") return Object.values(value).flatMap(texts);
+      return [];
+    };
+    for (const dict of [en, ru]) {
+      const all = texts(dict);
+      expect(all.length).toBeGreaterThan(100);
+      for (const text of all) expect(text, text).not.toMatch(/!|Упс|Oops|Что-то пошло не так|Something went wrong/i);
+    }
+  });
+
   it("dictionary и currentT отдают словарь нужного языка", () => {
     expect(dictionary("en")).toBe(en);
     expect(dictionary("ru")).toBe(ru);
