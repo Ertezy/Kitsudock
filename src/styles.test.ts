@@ -95,6 +95,13 @@ const CURVE = /cubic-bezier\(|steps\(|linear\(|(?<![\w-])(ease|ease-in|ease-out|
 const ART_DRIFT = /^art-drift\s/;
 
 /**
+ * Значение без имён переменных, но с их запасными значениями: `var(--move, 0.2s)`
+ * превращается в `0.2s)`. Запасное значение — такое же число мимо шкалы, как
+ * записанное прямо, и прятаться за `var()` ему нельзя.
+ */
+const withoutVarNames = (value: string) => value.replace(/var\(\s*--[\w-]+\s*,?/g, "");
+
+/**
  * Длительности только через переменные движения: иначе тумблер «Анимация» их не
  * выключит. В :root время числом может быть только у --move: остальные скорости
  * считаются от неё, а не задаются рядом.
@@ -111,7 +118,7 @@ function durationProblems(decls: Decl[]): string[] {
     if (!TIMING_PROPS.includes(d.prop) || d.value === "none") continue;
     const vars = [...d.value.matchAll(/var\(\s*(--[\w-]+)/g)].map((m) => m[1]);
     const foreign = vars.filter((v) => !/^--(move|ease)(-[\w-]+)?$/.test(v));
-    const literal = TIME.test(d.value.replace(/var\([^)]*\)/g, ""));
+    const literal = TIME.test(withoutVarNames(d.value));
     const missing = !/timing-function/.test(d.prop) && segments(d.value).some((s) => !/var\(\s*--move/.test(s));
     if (foreign.length || literal || missing) bad.push(`${d.selector} { ${d.prop}: ${d.value} }`);
   }
@@ -124,7 +131,7 @@ function curveProblems(decls: Decl[]): string[] {
   for (const d of decls) {
     if (isRoot(d.selector) || !TIMING_PROPS.includes(d.prop)) continue;
     for (const s of segments(d.value)) {
-      const curves = [...s.replace(/var\([^)]*\)/g, "").matchAll(new RegExp(CURVE, "g"))].map((m) => m[0]);
+      const curves = [...withoutVarNames(s).matchAll(new RegExp(CURVE, "g"))].map((m) => m[0]);
       const drift = d.prop === "animation" && ART_DRIFT.test(s) && curves.length === 1 && curves[0] === "ease-in-out";
       if (curves.length && !drift) bad.push(`${d.selector} { ${d.prop}: ${s} }`);
     }
@@ -168,6 +175,14 @@ const COLOUR_LITERAL = new RegExp(
 const unescaped = (value: string) => value.replace(/%[\da-f]{2}/gi, (m) => String.fromCharCode(Number.parseInt(m.slice(1), 16)));
 
 /**
+ * Ссылки на элемент по имени — `url(#fade)`, `href="#cafe"` — не цвет, хотя имя
+ * из букв a–f и читается как `#fade`. Убираются до проверки; цвет числом в
+ * `fill='#fade'` остаётся цветом.
+ */
+const withoutRefs = (value: string) =>
+  value.replace(/url\(\s*(['"]?)#[\w-]+\1\s*\)|(?<![\w-])(?:xlink:)?href\s*=\s*(['"])#[\w-]+\2/gi, "");
+
+/**
  * Цвет вне :root — только из токенов. Проверяются все свойства, не только
  * `color` и `background`: тень, рамка, градиент, полоса прокрутки и `fill` тоже
  * несут цвет, как и цвет внутри `data:`-картинки, записанный в адресе (`%23…`).
@@ -177,7 +192,7 @@ const unescaped = (value: string) => value.replace(/%[\da-f]{2}/gi, (m) => Strin
  */
 function colourProblems(decls: Decl[]): string[] {
   return decls
-    .filter((d) => !isRoot(d.selector) && COLOUR_LITERAL.test(unescaped(d.value)))
+    .filter((d) => !isRoot(d.selector) && COLOUR_LITERAL.test(withoutRefs(unescaped(d.value))))
     .map((d) => `${d.selector} { ${d.prop}: ${d.value} }`);
 }
 
@@ -263,6 +278,18 @@ describe("сторож ловит нарушения", () => {
     expect(durationProblems(css(":root { --move: 200ms; } .x { transition: opacity var(--move-fast) var(--ease-out); }"))).toEqual([]);
   });
 
+  it("число в запасном значении var() — тоже число мимо шкалы", () => {
+    expect(durationProblems(css(".x { transition: opacity var(--move, 0.2s) var(--ease-out); }"))).toHaveLength(1);
+    expect(durationProblems(css(".x { animation-delay: var(--move-fast, 120ms); }"))).toHaveLength(1);
+    expect(curveProblems(css(".x { transition: opacity var(--move) var(--ease-out, ease-in); }"))).toHaveLength(1);
+    expect(colourProblems(css(".x { color: var(--ink, #fff); }"))).toHaveLength(1);
+    expect(colourProblems(css(".x { border-color: var(--line, rgba(0, 0, 0, 0.2)); }"))).toHaveLength(1);
+    expect(colourProblems(css(".x { background: var(--card, white); }"))).toHaveLength(1);
+    // Запасное значение из шкалы — можно.
+    expect(durationProblems(css(".x { transition: opacity var(--move-fast, var(--move)) var(--ease-out); }"))).toEqual([]);
+    expect(colourProblems(css(".x { color: var(--s-ink, var(--ink)); }"))).toEqual([]);
+  });
+
   it("отрицательное время внутри сокращения не проходит, а цифра в имени кадров — не время", () => {
     expect(durationProblems(css(".x { animation: art-drift var(--move-ambient) ease-in-out infinite alternate -3s; }"))).toHaveLength(1);
     expect(durationProblems(css(".x { transition: opacity var(--move) var(--ease-out) -0.1s; }"))).toHaveLength(1);
@@ -341,6 +368,16 @@ describe("сторож ловит нарушения", () => {
       "%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E";
     expect(colourProblems(css(svg(grain)))).toEqual([]);
     expect(colourProblems(css(".x { width: calc(100% - 20px); }"))).toEqual([]);
+  });
+
+  it("ссылка на элемент по имени из букв a–f — не цвет, а цвет с тем же именем — цвет", () => {
+    const svg = (inner: string) => `.x { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'%3E${inner}%3C/svg%3E"); }`;
+    expect(colourProblems(css(svg("%3ClinearGradient id='fade'/%3E%3Crect fill='url(%23fade)'/%3E")))).toEqual([]);
+    expect(colourProblems(css(svg("%3Crect filter=%27url(%22%23bead%22)%27/%3E")))).toEqual([]);
+    expect(colourProblems(css(svg("%3Cuse href='%23cafe'/%3E%3Cuse xlink:href=%22%23decaf%22/%3E")))).toEqual([]);
+    expect(colourProblems(css(".x { filter: url(#fade); }"))).toEqual([]);
+    expect(colourProblems(css(svg("%3Crect fill='%23fade'/%3E")))).toHaveLength(1);
+    expect(colourProblems(css(svg("%3Crect fill='url(%23fade)' stroke='%23cafe'/%3E")))).toHaveLength(1);
   });
 
   it("точка с запятой и скобки внутри значения не ломают разбор", () => {

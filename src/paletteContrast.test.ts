@@ -50,9 +50,35 @@ function contrast(foreground: Colour, background: Colour): number {
   return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
 }
 
+/**
+ * Текст, разрезанный по `;` верхнего уровня: точка с запятой в кавычках или
+ * скобках — часть значения, как в `url("data:image/svg+xml;utf8,…")`.
+ */
+function splitDeclarations(body: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  let quote = "";
+  let depth = 0;
+  for (const ch of body) {
+    if (quote) {
+      if (ch === quote) quote = "";
+    } else if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === "(") depth++;
+    else if (ch === ")") depth--;
+    else if (ch === ";" && depth === 0) {
+      out.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
 /** Объявления блока в токены. Обычные свойства (`color-scheme`) пропускаются, обрывок без двоеточия или пустое значение — ошибка. */
 function readDeclarations(body: string, into: Map<string, string>): void {
-  for (const piece of body.split(";")) {
+  for (const piece of splitDeclarations(body)) {
     const text = piece.trim();
     if (!text) continue;
     const m = /^([\w-]+)\s*:\s*([\s\S]*\S)$/.exec(text);
@@ -65,7 +91,9 @@ function readDeclarations(body: string, into: Map<string, string>): void {
  * Токены из всех блоков `:root { … }` верхнего уровня, в порядке файла: поздний
  * блок перекрывает ранний, как в каскаде. Блоки с атрибутом (`:root[data-motion]`),
  * вложенные в `@media` и любые другие селекторы не берутся: их значения действуют
- * не всегда. Скобки внутри кавычек блок не закрывают.
+ * не всегда. Скобки внутри кавычек блок не закрывают. Правила без блока
+ * (`@charset …;`, `@import …;`) кончаются точкой с запятой и к заголовку
+ * следующего блока не прилипают.
  */
 function rootTokens(css: string): Map<string, string> {
   const src = css.replace(COMMENTS, "");
@@ -92,6 +120,9 @@ function rootTokens(css: string): Map<string, string> {
       }
     } else if (ch === '"' || ch === "'") {
       quote = quote === ch ? "" : quote || ch;
+    } else if (!quote && depth === 0 && ch === ";") {
+      head = "";
+      continue;
     }
     if (depth === 0) head += ch;
     else body += ch;
@@ -164,6 +195,20 @@ describe("чтение стилей", () => {
 
   it("комментарии, обычные свойства и скобки в кавычках не мешают", () => {
     const css = '/* :root { --x: #000000; } */ .y::after { content: "}"; } :root { color-scheme: dark; --a: #111111 /* тон */ }';
+    expect([...rootTokens(css)]).toEqual([["--a", "#111111"]]);
+  });
+
+  it("точка с запятой в кавычках и скобках — часть значения, а не конец объявления", () => {
+    const css = ':root { --grain: url("data:image/svg+xml;utf8,<svg/>"); --a: #111111; --b: url(data:x;y); }';
+    expect([...rootTokens(css)]).toEqual([
+      ["--grain", 'url("data:image/svg+xml;utf8,<svg/>")'],
+      ["--a", "#111111"],
+      ["--b", "url(data:x;y)"],
+    ]);
+  });
+
+  it("@charset и @import перед :root не мешают найти блок", () => {
+    const css = '@charset "utf-8";\n@import url("x.css");\n:root { --a: #111111; }';
     expect([...rootTokens(css)]).toEqual([["--a", "#111111"]]);
   });
 
@@ -241,6 +286,7 @@ describe("читаемость палитры", () => {
     ["мягкий цвет содержимого на карточке поверх стекла", "--content-soft", "card"],
     ["подпись раздела на стекле", "--label", "glass"],
     ["цвет действия как текст на стекле", "--accent", "glass"],
+    ["цвет действия как текст на карточке поверх стекла", "--accent", "card"],
     ["цвет действия как текст на горящей карточке кода", "--accent", "burning"],
     ["цвет опасного на стекле", "--danger", "glass"],
     ["текст действия на акценте", "--accent-ink", "accent"],
