@@ -57,7 +57,9 @@ describe("текст ошибки", () => {
   it("русский — подробность на месте переменной части", () => {
     const ruText = (code: string, detail?: string) => errorText(ru, { code, detail });
     expect(ruText("gameNotFound", "Genshin Impact")).toBe("Игра не найдена: Genshin Impact");
-    expect(ruText("gameNotFound")).toBe("Этой игры уже нет в списке.");
+    // Без подробности — и «Найти заново» без находки, и отказ правки: игра
+    // при этом может быть в доке, поэтому текст не говорит, что её нет в списке.
+    expect(ruText("gameNotFound")).toBe("Игра не найдена");
     expect(ruText("fileMissing", "C:\\g.exe")).toBe("Файл не найден: C:\\g.exe");
     expect(ruText("exePathMissing")).toBe("Путь к игре не указан. Укажите файл игры вручную.");
     expect(ruText("argsUnclosedQuote", '-name "x')).toBe('Не удалось разобрать аргументы запуска «-name "x»: закройте кавычку.');
@@ -85,7 +87,7 @@ describe("текст ошибки", () => {
     expect(errorText(en, { code: "videoTooLarge", detail: "300" })).toBe(
       "The video is larger than 300 MB — pick a smaller file.",
     );
-    expect(errorText(en, { code: "gameNotFound" })).toBe("This game is no longer in the list.");
+    expect(errorText(en, { code: "gameNotFound" })).toBe("Game not found");
     expect(errorText(en, { code: "configSaveFailed", detail: "x" })).toBe("Couldn't save the settings: x");
   });
 });

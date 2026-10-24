@@ -15,6 +15,7 @@ export default function FirstRunView({ onDone }: Props) {
   // `null` — поиск ещё идёт: пустой список до ответа значил бы «ничего не
   // нашлось», и это сообщение мелькнуло бы перед находками.
   const [found, setFound] = useState<FoundGame[] | null>(null);
+  const [scanFailed, setScanFailed] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -42,14 +43,15 @@ export default function FirstRunView({ onDone }: Props) {
 
   useEffect(() => {
     void (async () => {
-      // Поиск не удался — говорим об этом и показываем то же, что при пустом
-      // поиске: на этом экране нет кнопки «назад», и он не должен застрять на
-      // строке «ищу…».
+      // Поиск не удался — говорим об этом: «проверить не удалось», а не
+      // «ничего не нашлось», — и оставляем выход дальше: на этом экране нет
+      // кнопки «назад», и он не должен застрять на строке «ищу…».
       let list: FoundGame[] = [];
       try {
         list = await api.scanInstalled();
       } catch (e) {
         setError(errorText(currentT(), e));
+        setScanFailed(true);
       }
       setFound(list);
       // По умолчанию отмечены только игры, про которые у нас есть контент,
@@ -65,6 +67,8 @@ export default function FirstRunView({ onDone }: Props) {
   const scanned = found ?? [];
   const known = scanned.filter((g) => g.contentId !== null);
   const rest = scanned.filter((g) => g.contentId === null);
+  // Пустой список после ответа — «ничего не нашлось», после провала — «проверить
+  // не удалось»: сцена та же, слова и выход разные.
   const nothing = found !== null && found.length === 0;
 
   const toggle = (title: string) =>
@@ -138,8 +142,8 @@ export default function FirstRunView({ onDone }: Props) {
       {nothing && (
         <EmptyState
           className="settings-empty"
-          art="search"
-          title={t.settings.firstRun.nothingTitle}
+          art={scanFailed ? "none" : "search"}
+          title={scanFailed ? t.settings.firstRun.scanFailedTitle : t.settings.firstRun.nothingTitle}
           hint={t.settings.firstRun.nothingHint}
         />
       )}

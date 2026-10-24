@@ -72,16 +72,43 @@ export function panelIsEmpty(
 
 /**
  * Почему панель пуста — от этого зависит, что ей сказать (спека полировки, §5):
- * - `unlinked` — игра не связана с данными: кодов для неё не будет, пока её не
- *   привяжут в настройках;
+ * - `noGames` — игр нет вовсе, выбирать нечего;
+ * - `unlinked` — игра не связана с данными, но данные под её названием есть
+ *   (`linkable`): их можно выбрать в настройках игры;
+ * - `uncollected` — игра не связана, и данных для неё не собирают: привязывать
+ *   её не к чему, и подсказка об этом не говорит;
  * - `stale` — данные старше недели, коды и баннеры спрятаны, а видео нет;
  * - `quiet` — данные свежие, просто сейчас ничего не идёт.
  */
-export type EmptyReason = "unlinked" | "stale" | "quiet";
+export type EmptyReason = "noGames" | "unlinked" | "uncollected" | "stale" | "quiet";
 
-export function emptyReason(contentId: string | null, tooOld: boolean): EmptyReason {
-  if (contentId === null) return "unlinked";
-  return tooOld ? "stale" : "quiet";
+export function emptyReason(state: { hasGame: boolean; contentId: string | null; linkable: boolean; tooOld: boolean }): EmptyReason {
+  if (!state.hasGame) return "noGames";
+  if (state.contentId === null) return state.linkable ? "unlinked" : "uncollected";
+  return state.tooOld ? "stale" : "quiet";
+}
+
+/**
+ * Название, как его сравнивает Rust (`catalog::normalize`): только буквы и
+ * цифры, без регистра. «Arknights: Endfield» и «arknights endfield» — одно.
+ */
+function normalizeTitle(title: string): string {
+  return [...title].filter((ch) => /[\p{L}\p{N}]/u.test(ch)).join("").toLowerCase();
+}
+
+/**
+ * Есть ли в данных игра с тем же названием и хоть что-то собранное по ней —
+ * коды, баннеры или видео. Только тогда несвязанной игре имеет смысл
+ * предлагать привязку: иначе подсказка звала бы привязать её к чужим данным.
+ * Найденные среди установленных такие игры Rust связывает сам
+ * (`catalog::enrich_from_stores`); несвязанной с совпадающим названием игра
+ * остаётся, например, добавленная вручную или со снятой в настройках связью.
+ */
+export function linkable(hub: HubData | null, title: string | null): boolean {
+  if (!hub || title === null) return false;
+  const name = normalizeTitle(title);
+  const collected = new Set([...hub.codes, ...hub.banners, ...hub.videos].map((x) => x.gameId));
+  return hub.games.some((g) => collected.has(g.id) && normalizeTitle(g.title) === name);
 }
 
 /**

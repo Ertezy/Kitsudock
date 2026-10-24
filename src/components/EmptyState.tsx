@@ -3,8 +3,9 @@ interface Props {
   title: string;
   /** Что с этим сделать. */
   hint?: string;
-  /** Рисунок: карточка, которой пока нет, или лупа — для поиска без находок. */
-  art?: "card" | "search";
+  /** Рисунок: карточка, которой пока нет, лупа — для поиска без находок, или
+   *  без рисунка — для отказа, где сцена «пусто» сказала бы неправду. */
+  art?: "card" | "search" | "none";
   /** Свой класс места: панель, настройки. */
   className?: string;
 }
@@ -17,7 +18,7 @@ interface Props {
 export default function EmptyState({ title, hint, art = "card", className }: Props) {
   return (
     <div className={className ? `empty ${className}` : "empty"}>
-      <span className={art === "search" ? "empty-art is-search" : "empty-art"} aria-hidden="true" />
+      {art !== "none" && <span className={art === "search" ? "empty-art is-search" : "empty-art"} aria-hidden="true" />}
       <p className="empty-title">{title}</p>
       {hint && <p className="empty-hint">{hint}</p>}
     </div>

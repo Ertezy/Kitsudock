@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { activeCodes, bannerKeys, codesFor, dataStatus, emptyReason, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
+import { activeCodes, bannerKeys, codesFor, dataStatus, emptyReason, linkable, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
 import type { Banner, Code, HubData, Video } from "../types";
@@ -73,15 +73,52 @@ describe("panelIsEmpty", () => {
 });
 
 describe("emptyReason", () => {
-  it("игра не связана с данными — так и говорится, что бы ни было с данными", () => {
-    expect(emptyReason(null, false)).toBe("unlinked");
-    expect(emptyReason(null, true)).toBe("unlinked");
+  const base = { hasGame: true, contentId: "genshin", linkable: false, tooOld: false };
+
+  it("игр нет вовсе — так и говорится, что бы ни было с данными", () => {
+    expect(emptyReason({ ...base, hasGame: false, contentId: null })).toBe("noGames");
+    expect(emptyReason({ ...base, hasGame: false, contentId: null, linkable: true, tooOld: true })).toBe("noGames");
+  });
+  it("игра не связана с данными, но данные под её названием есть — подсказка привязать", () => {
+    expect(emptyReason({ ...base, contentId: null, linkable: true })).toBe("unlinked");
+    expect(emptyReason({ ...base, contentId: null, linkable: true, tooOld: true })).toBe("unlinked");
+  });
+  it("игра не связана, и данных для неё не собирают — привязывать не к чему", () => {
+    expect(emptyReason({ ...base, contentId: null })).toBe("uncollected");
+    expect(emptyReason({ ...base, contentId: null, tooOld: true })).toBe("uncollected");
   });
   it("данные старше недели — коды и баннеры спрятаны, причина в этом", () => {
-    expect(emptyReason("genshin", true)).toBe("stale");
+    expect(emptyReason({ ...base, tooOld: true })).toBe("stale");
   });
   it("данные свежие, просто сейчас ничего нет", () => {
-    expect(emptyReason("genshin", false)).toBe("quiet");
+    expect(emptyReason(base)).toBe("quiet");
+  });
+});
+
+describe("linkable", () => {
+  const hubWith = (games: { id: string; title: string }[], codeGames: string[] = [], videoGames: string[] = []): HubData => ({
+    ...hub("remote"),
+    games: games.map((g) => ({ ...g, redeemUrl: null })),
+    codes: codeGames.map((gameId) => ({ ...code(null), gameId })),
+    videos: videoGames.map((gameId) => ({ ...video, gameId })),
+  });
+
+  it("название совпадает с игрой из данных, у которой что-то есть, — как сопоставляет Rust: без регистра, пробелов и знаков", () => {
+    const h = hubWith([{ id: "endfield", title: "Arknights: Endfield" }], ["endfield"]);
+    expect(linkable(h, "arknights endfield")).toBe(true);
+    expect(linkable(h, "Arknights: Endfield")).toBe(true);
+  });
+  it("запись в данных есть, но по ней ничего не собрано — привязывать не к чему", () => {
+    expect(linkable(hubWith([{ id: "endfield", title: "Arknights: Endfield" }]), "Arknights: Endfield")).toBe(false);
+  });
+  it("видео тоже считаются собранными данными", () => {
+    expect(linkable(hubWith([{ id: "endfield", title: "Arknights: Endfield" }], [], ["endfield"]), "Arknights: Endfield")).toBe(true);
+  });
+  it("незнакомое название, нет данных или нет игры — нет", () => {
+    const h = hubWith([{ id: "hsr", title: "Honkai: Star Rail" }], ["hsr"]);
+    expect(linkable(h, "Lantern Keeper Demo")).toBe(false);
+    expect(linkable(null, "Honkai: Star Rail")).toBe(false);
+    expect(linkable(h, null)).toBe(false);
   });
 });
 

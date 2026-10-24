@@ -88,7 +88,11 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
           return (
             <div
               key={`${c.gameId}:${c.code}`}
-              className={["code-card", soon && "burning", failed && "copy-failed"].filter(Boolean).join(" ")}
+              // Повторная неудача с тем же кодом должна вздрогнуть снова: у
+              // соседних копирований разные классы, и анимация начинается заново.
+              className={["code-card", soon && "burning", failed && "copy-failed", failed && (copied?.id ?? 0) % 2 === 0 && "is-again"]
+                .filter(Boolean)
+                .join(" ")}
               onClick={() => void copy(c.code)}
               role="button"
               tabIndex={0}

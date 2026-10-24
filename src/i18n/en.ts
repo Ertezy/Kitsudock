@@ -20,12 +20,15 @@ export const en = {
   panel: {
     noDataYet: "No fresh data yet. Refresh to check again.",
     // Пустая панель (`EmptyState`): заголовок — что случилось, подсказка — что
-    // делать; причин три (`lib/panel.ts`, `emptyReason`).
+    // делать; причины — `lib/panel.ts`, `emptyReason`.
     panelEmpty: "No codes, banners or videos yet",
     emptyQuietHint: "New ones will show up here as soon as they're out.",
     emptyStaleHint: "The data is over a week old, so codes and banners are hidden. They'll be back after the next update.",
     unlinkedTitle: "No data for this game",
     unlinkedHint: "You can link the game to data in its settings: \"Codes, banners and videos of\".",
+    uncollectedHint: "Codes, banners and videos aren't collected for it.",
+    noGamesTitle: "No games yet",
+    noGamesHint: "Add them in Settings: the gear at the bottom of this panel.",
     sources: { remote: "online", override: "local override", cache: "from cache", bundled: "bundled" },
     unknownSource: "unknown",
     dataStatus: (source: string, freshness: string) => `Source: ${source}, ${freshness}.`,
@@ -70,7 +73,7 @@ export const en = {
     launching: "Launching…",
     gameFileMissing: "Game file not found",
     dockFileMissing: (title: string) => `${title} — game file not found`,
-    noGameSelected: "No game selected — pick one in the dock below.",
+    noGameSelected: "No game selected — add a game in Settings.",
     // Подробность — сама фраза ошибки, с заглавной буквы: отдельным предложением.
     loadFailed: (detail: string) => `The game list didn't load. ${detail}`,
     relocate: "Find again",
@@ -93,7 +96,7 @@ export const en = {
   errors: {
     unknown: "Unknown error",
     internal: (d?: string) => (d ? `Internal error: ${d}` : "Internal error"),
-    gameNotFound: (d?: string) => (d ? `Game not found: ${d}` : "This game is no longer in the list."),
+    gameNotFound: (d?: string) => (d ? `Game not found: ${d}` : "Game not found"),
     fileMissing: (d?: string) => (d ? `File not found: ${d}` : "File not found"),
     exePathMissing: (_d?: string) => "The game's path isn't set. Specify the game file manually.",
     argsUnclosedQuote: (d?: string) => `Can't read the launch arguments${d ? ` "${d}"` : ""}: close the open quote.`,
@@ -141,6 +144,7 @@ export const en = {
       nothingTitle: "No installed games found",
       nothingHint: "You can add a game manually in Settings, on the Games tab.",
       continue: "Continue",
+      scanFailedTitle: "Couldn't check the installed games",
     },
     games: {
       hint: "The order in the list is the order in the dock at the bottom of the main screen. Drag a row to change it.",

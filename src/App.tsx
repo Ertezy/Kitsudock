@@ -261,6 +261,7 @@ export default function App() {
       <SidePanel
         hub={hub}
         selectedContentId={selected?.contentId ?? null}
+        selectedTitle={selected?.title ?? null}
         onOpenSettings={() => setScreen("settings")}
         appVersion={appVersion}
       />

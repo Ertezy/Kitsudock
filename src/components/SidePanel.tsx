@@ -4,7 +4,7 @@ import Banners from "./panel/Banners";
 import Videos from "./panel/Videos";
 import Skeleton from "./panel/Skeleton";
 import EmptyState from "./EmptyState";
-import { codesFor, emptyReason, panelIsEmpty, sourceLabel, videosFor } from "../lib/panel";
+import { codesFor, emptyReason, linkable, panelIsEmpty, sourceLabel, videosFor } from "../lib/panel";
 import { entryEnded, hubChanged, isEntryAnimation, panelMounted, skeletonShown } from "../lib/panelEntry";
 import { hubFreshness } from "../lib/time";
 import { api } from "../lib/api";
@@ -17,6 +17,9 @@ interface Props {
   hub: HubData | null;
   /** Игра, выбранная в доке. Коды, баннеры и видео — только по ней. */
   selectedContentId: string | null;
+  /** Название выбранной игры; null — игр нет вовсе. Нужно пустой панели:
+   *  сказать, что игр нет, или что для этой игры данных нет. */
+  selectedTitle: string | null;
   /** Открыть экран настроек — вызывается по клику на шестерёнку. */
   onOpenSettings: () => void;
   /** Версия работающего приложения; null — ещё не узнали. */
@@ -28,7 +31,7 @@ const DAY = 86400;
 /** Как часто пересчитывается «сейчас». */
 const TICK_MS = 30_000;
 
-export default function SidePanel({ hub, selectedContentId, onOpenSettings, appVersion }: Props) {
+export default function SidePanel({ hub, selectedContentId, selectedTitle, onOpenSettings, appVersion }: Props) {
   const lang = useLang();
   const t = useT();
   const videoLang = useVideoLanguage();
@@ -101,10 +104,20 @@ export default function SidePanel({ hub, selectedContentId, onOpenSettings, appV
   // тут же сменится настоящими данными и будет выглядеть как ложная тревога.
   const empty = hub !== null && panelIsEmpty(codes, banners, videos, nowSec);
   // Пустая панель говорит, почему пуста и что с этим сделать.
-  const reason = emptyReason(selectedContentId, tooOld);
-  const emptyTitle = reason === "unlinked" ? t.panel.unlinkedTitle : t.panel.panelEmpty;
-  const emptyHint =
-    reason === "unlinked" ? t.panel.unlinkedHint : reason === "stale" ? t.panel.emptyStaleHint : t.panel.emptyQuietHint;
+  const reason = emptyReason({
+    hasGame: selectedTitle !== null,
+    contentId: selectedContentId,
+    linkable: linkable(hub, selectedTitle),
+    tooOld,
+  });
+  const EMPTY = {
+    noGames: [t.panel.noGamesTitle, t.panel.noGamesHint],
+    unlinked: [t.panel.unlinkedTitle, t.panel.unlinkedHint],
+    uncollected: [t.panel.unlinkedTitle, t.panel.uncollectedHint],
+    stale: [t.panel.panelEmpty, t.panel.emptyStaleHint],
+    quiet: [t.panel.panelEmpty, t.panel.emptyQuietHint],
+  } as const;
+  const [emptyTitle, emptyHint] = EMPTY[reason];
 
   // Источник данных виден в интерфейсе — требование общей спеки §9.4.
   // Без него невозможно отличить «сеть отвалилась, показываю прошлогодний

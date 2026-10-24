@@ -87,8 +87,9 @@ export default function GamesSection() {
     <div>
       <h2 className="settings-section-title">{t.settings.tabs.games}</h2>
       {/* Подсказка про порядок нужна, только когда есть что упорядочивать;
-          пустой список вместо неё показывает, что сделать. */}
-      {!empty && <p className="settings-hint">{t.settings.games.hint}</p>}
+          пустой список вместо неё показывает, что сделать. До ответа нет ни
+          той, ни другого: подсказка не мелькает перед пустым местом. */}
+      {loaded && !empty && <p className="settings-hint">{t.settings.games.hint}</p>}
 
       {error && <div className="settings-error">{error}</div>}
 
