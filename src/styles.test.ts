@@ -198,49 +198,109 @@ function colourProblems(decls: Decl[]): string[] {
 
 /**
  * Рамка фокуса одна на всё приложение: толщина, цвет и отступ — из токенов
- * `--focus-ring` и `--focus-offset`. Своя рамка по месту — снова разнобой, от
- * которого ушли (оранжевая у дока, светлая у PLAY, приглушённая в настройках).
+ * `--focus-ring` и `--focus-offset` (в тесной группе — `--focus-offset-tight`).
+ * Своя рамка по месту — снова разнобой, от которого ушли (оранжевая у дока,
+ * светлая у PLAY, приглушённая в настройках).
  */
 function focusProblems(decls: Decl[]): string[] {
   return decls
     .filter((d) => !isRoot(d.selector))
     .filter((d) => {
       if (d.prop === "outline") return d.value !== "none" && d.value !== "0" && d.value !== "var(--focus-ring)";
-      if (d.prop === "outline-offset") return d.value !== "var(--focus-offset)";
+      if (d.prop === "outline-offset") return d.value !== "var(--focus-offset)" && d.value !== "var(--focus-offset-tight)";
       return d.prop.startsWith("outline-");
     })
     .map((d) => `${d.selector} { ${d.prop}: ${d.value} }`);
 }
 
 /** Псевдокласс сразу за частью селектора — с возможными `:not(…)` и другими между ними. */
+const escapeRe = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const followedBy = (part: string, pseudo: string) => {
-  const escaped = part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const between = String.raw`(?::[\w-]+(?:\((?:[^()]|\([^()]*\))*\))?)*`;
-  return new RegExp(`(?:^|[\\s,>+~(])${escaped}${between}:${pseudo}(?![\\w-])`);
+  return new RegExp(`(?:^|[\\s,>+~(])${escapeRe(part)}${between}:${pseudo}(?![\\w-])`);
 };
+/** Простой селектор как отдельное звено: `.dot` в `.row:hover .dot`, но не в `.dots`. */
+const hasCompound = (selector: string, compound: string) => new RegExp(`(?:^|[\\s>+~])${escapeRe(compound)}(?![\\w-])`).test(selector);
+
+/** Список селекторов по запятым верхнего уровня: запятые внутри `:is(…)`, `:not(…)`, `[…]` и кавычек не делят. */
+function splitList(selector: string): string[] {
+  const out: string[] = [];
+  let depth = 0;
+  let quote = "";
+  let cur = "";
+  for (const ch of selector) {
+    if (quote) {
+      if (ch === quote) quote = "";
+    } else if (ch === '"' || ch === "'") quote = ch;
+    else if (ch === "(" || ch === "[") depth++;
+    else if (ch === ")" || ch === "]") depth--;
+    else if (ch === "," && depth === 0) {
+      out.push(cur.trim().replace(/\s+/g, " "));
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur.trim().replace(/\s+/g, " "));
+  return out.filter(Boolean);
+}
+
+/**
+ * Селектор с раскрытыми `:is(…)` и `:where(…)`: `:root :is(.a, .b):hover` —
+ * это `:root .a:hover` и `:root .b:hover`. Так каждый элемент списка виден
+ * сам по себе, а не спрятан в скобках вместе с соседями.
+ */
+function expandIs(selector: string): string[] {
+  const m = /:(?:is|where)\(/.exec(selector);
+  if (!m) return [selector];
+  const open = m.index + m[0].length;
+  let depth = 1;
+  let i = open;
+  for (; i < selector.length && depth > 0; i++) {
+    if (selector[i] === "(") depth++;
+    if (selector[i] === ")") depth--;
+  }
+  const inner = selector.slice(open, i - 1);
+  return splitList(inner).flatMap((alt) => expandIs(selector.slice(0, m.index) + alt + selector.slice(i)));
+}
+
+/** Все элементы списков селекторов, с раскрытыми `:is`/`:where`. */
+const members = (selector: string) => splitList(selector).flatMap(expandIs);
+
+/** Правило для выключенного тумблера «Анимация»: оно отменяет движение, а не даёт отклик. */
+const isMotionOff = (selector: string) => /^:root\[data-motion=["']?off["']?\]/.test(selector);
 
 /**
  * У всего, что нажимается (`cursor: pointer`), есть наведение и нажатие (спека
- * полировки, §5 «Везде»). Нажатие может откликаться на родителе — тогда это
- * записано здесь же, с причиной.
+ * полировки, §5 «Везде»). Нажатие или наведение может откликаться на родителе —
+ * тогда это записано здесь же, с причиной. Правило выключенного тумблера
+ * «Анимация» откликом не считается: без своего наведения у элемента его нет.
  */
 const PRESSED_BY: Record<string, string> = {
   // Вдавливается вся свёрнутая строка игры, а не одна её шапка.
   ".game-row-head": ".game-row",
 };
+const HOVERED_BY: Record<string, string> = {};
 
-function pointerProblems(decls: Decl[]): string[] {
-  const selectors = decls.filter((d) => !isRoot(d.selector)).map((d) => d.selector);
-  const parts = new Set(
-    decls
-      .filter((d) => d.prop === "cursor" && d.value === "pointer" && !isRoot(d.selector))
-      .flatMap((d) => d.selector.split(",").map((s) => s.trim())),
-  );
+function pointerProblems(decls: Decl[], maps: { hoveredBy?: Record<string, string>; pressedBy?: Record<string, string> } = {}): string[] {
+  const hoveredBy = maps.hoveredBy ?? HOVERED_BY;
+  const pressedBy = maps.pressedBy ?? PRESSED_BY;
+  const selectors = decls
+    .filter((d) => !isRoot(d.selector))
+    .flatMap((d) => members(d.selector))
+    .filter((s) => !isMotionOff(s));
+  const parts = new Set(decls.filter((d) => d.prop === "cursor" && d.value === "pointer" && !isRoot(d.selector)).flatMap((d) => members(d.selector)));
+  const own = (part: string, pseudo: string) => selectors.some((s) => followedBy(part, pseudo).test(s));
   const bad: string[] = [];
   for (const part of parts) {
-    if (!selectors.some((s) => followedBy(part, "hover").test(s))) bad.push(`${part}: нет :hover`);
-    const pressed = PRESSED_BY[part] ?? part;
-    if (!selectors.some((s) => followedBy(pressed, "active").test(s))) bad.push(`${part}: нет :active`);
+    // Наведение от родителя меняет сам элемент: в селекторе после `родитель:hover`
+    // стоит он же (`.row:hover .child`).
+    const parent = hoveredBy[part];
+    const child = part.split(" ").pop() ?? part;
+    const hoverFromParent = parent !== undefined && selectors.some((s) => followedBy(parent, "hover").test(s) && hasCompound(s, child));
+    if (!own(part, "hover") && !hoverFromParent) bad.push(`${part}: нет :hover`);
+    // Нажатие на родителе вдавливает родителя целиком — его селектора достаточно.
+    if (!own(pressedBy[part] ?? part, "active")) bad.push(`${part}: нет :active`);
   }
   return bad;
 }
@@ -248,21 +308,24 @@ function pointerProblems(decls: Decl[]): string[] {
 /**
  * Всё, что прокручивается, — с тонкой полосой в цветах палитры (или вовсе без
  * полосы, как док). Стандартная широкая серая полоса чужая на тёмном стекле.
+ * Сверяется по элементу: полоса может быть задана в другом правиле того же
+ * элемента или в общем списке, а не только рядом с `overflow`.
  */
 function scrollbarProblems(decls: Decl[]): string[] {
+  const outside = decls.filter((d) => !isRoot(d.selector));
   const scrolling = new Set(
-    decls
-      .filter((d) => /^overflow(-[xy])?$/.test(d.prop) && /\b(auto|scroll)\b/.test(d.value) && !isRoot(d.selector))
-      .map((d) => d.selector),
+    outside.filter((d) => /^overflow(-[xy])?$/.test(d.prop) && /\b(auto|scroll)\b/.test(d.value)).flatMap((d) => members(d.selector)),
   );
   const bad: string[] = [];
-  for (const selector of scrolling) {
-    const own = decls.filter((d) => d.selector === selector);
-    const width = own.find((d) => d.prop === "scrollbar-width")?.value;
-    const colour = own.find((d) => d.prop === "scrollbar-color")?.value;
+  for (const member of scrolling) {
+    const own = outside.filter((d) => members(d.selector).includes(member));
+    // Позднее правило перекрывает раннее, как в каскаде.
+    const last = (prop: string) => own.filter((d) => d.prop === prop).pop()?.value;
+    const width = last("scrollbar-width");
+    const colour = last("scrollbar-color");
     if (width === "none") continue;
-    if (width !== "thin") bad.push(`${selector}: scrollbar-width ${width ?? "не задана"}`);
-    else if (!colour || !/^var\(--[\w-]+\) (transparent|var\(--[\w-]+\))$/.test(colour)) bad.push(`${selector}: scrollbar-color ${colour ?? "не задан"}`);
+    if (width !== "thin") bad.push(`${member}: scrollbar-width ${width ?? "не задана"}`);
+    else if (!colour || !/^var\(--[\w-]+\) (transparent|var\(--[\w-]+\))$/.test(colour)) bad.push(`${member}: scrollbar-color ${colour ?? "не задан"}`);
   }
   return bad;
 }
@@ -364,6 +427,9 @@ describe("токены фокуса", () => {
     expect(root.get("--focus-ring")).toMatch(/^var\(--focus-width\) solid var\(--[\w-]+\)$/);
     expect(root.get("--focus-width")).toBe("2px");
     expect(root.get("--focus-offset")).toBe("3px");
+    // В тесной группе рамка вплотную, но не внутрь элемента: снаружи у неё
+    // остаётся то, на чём стоит группа, а не цвет самого варианта.
+    expect(root.get("--focus-offset-tight")).toBe("0px");
   });
 });
 
@@ -502,6 +568,30 @@ describe("сторож ловит нарушения", () => {
     expect(focusProblems(css(".x:focus-visible { outline: var(--focus-ring); outline-offset: 2px; }"))).toHaveLength(1);
     expect(focusProblems(css(".x:focus-visible { outline-color: var(--ink); }"))).toHaveLength(1);
     expect(focusProblems(css(".x:focus-visible { outline: var(--focus-ring); outline-offset: var(--focus-offset); } .y:focus-visible { outline: none; }"))).toEqual([]);
+    expect(focusProblems(css(".x:focus-visible { outline-offset: var(--focus-offset-tight); }"))).toEqual([]);
+    expect(focusProblems(css(".x:focus-visible { outline-offset: 0; }"))).toHaveLength(1);
+  });
+
+  it("списки в :is(…) и :where(…) раскрываются, запятая в скобках список не делит", () => {
+    expect(splitList(':is(.a, .b) .c, [data-x="1,2"] .d')).toEqual([":is(.a, .b) .c", '[data-x="1,2"] .d']);
+    expect(members(":root :is(.a, :where(.b, .c)):hover::before, .d")).toEqual([":root .a:hover::before", ":root .b:hover::before", ":root .c:hover::before", ".d"]);
+    expect(members(".x:not(.y, .z):hover")).toEqual([".x:not(.y, .z):hover"]);
+  });
+
+  it("нажимаемое в :is(…) видно по элементам, а правило выключенной анимации наведением не считается", () => {
+    expect(pointerProblems(css(":is(.a, .b) { cursor: pointer; } :is(.a, .b):hover { opacity: 1; } .a:active, .b:active { opacity: 1; }"))).toEqual([]);
+    expect(pointerProblems(css(".a, .b { cursor: pointer; } :is(.a, .b):active { opacity: 1; } .a:hover { opacity: 1; }"))).toEqual([".b: нет :hover"]);
+    expect(pointerProblems(css('.x { cursor: pointer; } .x:active { opacity: 1; } :root[data-motion="off"] .x:hover { transform: none; }'))).toEqual([".x: нет :hover"]);
+    expect(pointerProblems(css('.x { cursor: pointer; } .x:active { opacity: 1; } :root[data-motion="off"] :is(.x, .y):hover { transform: none; }'))).toEqual([".x: нет :hover"]);
+  });
+
+  it("наведение от родителя засчитывается, только если оно записано с причиной", () => {
+    const rows = ".row .child { cursor: pointer; } .row:hover .child { opacity: 1; } .row .child:active { opacity: 1; }";
+    expect(pointerProblems(css(rows), { hoveredBy: {} })).toEqual([".row .child: нет :hover"]);
+    expect(pointerProblems(css(rows), { hoveredBy: { ".row .child": ".row" } })).toEqual([]);
+    // Наведение родителя, под которым нет самого элемента, не в счёт — и похожее имя тоже.
+    expect(pointerProblems(css(".row .child { cursor: pointer; } .row:hover .other { opacity: 1; } .row .child:active { opacity: 1; }"), { hoveredBy: { ".row .child": ".row" } })).toEqual([".row .child: нет :hover"]);
+    expect(pointerProblems(css(".row .child { cursor: pointer; } .row:hover .children { opacity: 1; } .row .child:active { opacity: 1; }"), { hoveredBy: { ".row .child": ".row" } })).toEqual([".row .child: нет :hover"]);
   });
 
   it("нажимаемое без наведения или без нажатия не проходит", () => {
@@ -518,6 +608,16 @@ describe("сторож ловит нарушения", () => {
     expect(scrollbarProblems(css(".x { overflow: auto; scrollbar-width: thin; }"))).toHaveLength(1);
     expect(scrollbarProblems(css(".x { overflow: auto; scrollbar-width: thin; scrollbar-color: #888 transparent; }"))).toHaveLength(1);
     expect(scrollbarProblems(css(".x { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent; } .d { overflow-x: auto; scrollbar-width: none; } .h { overflow: hidden; }"))).toEqual([]);
+  });
+
+  it("полоса прокрутки сверяется по элементу: в своём правиле, в общем списке или в :is(…)", () => {
+    const thin = "scrollbar-width: thin; scrollbar-color: var(--scrollbar) transparent;";
+    expect(scrollbarProblems(css(`.a, .b { overflow-y: auto; } .a { ${thin} } .b { scrollbar-width: none; }`))).toEqual([]);
+    expect(scrollbarProblems(css(`.a, .b { overflow: auto; ${thin} }`))).toEqual([]);
+    expect(scrollbarProblems(css(`.a { overflow: auto; } :is(.a, .c) { ${thin} }`))).toEqual([]);
+    expect(scrollbarProblems(css(`.a, .b { overflow: auto; } .a { ${thin} }`))).toEqual([".b: scrollbar-width не задана"]);
+    // Позднее правило перекрывает раннее.
+    expect(scrollbarProblems(css(`.a { overflow: auto; ${thin} } .a { scrollbar-width: auto; }`))).toEqual([".a: scrollbar-width auto"]);
   });
 
   it("зерно с анимацией, ловящее мышь или слишком плотное — не проходит", () => {

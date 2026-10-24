@@ -131,10 +131,22 @@ function rootTokens(css: string): Map<string, string> {
   return tokens;
 }
 
+/**
+ * Список селекторов без оформления: пробелы и переносы схлопнуты, порядок не
+ * важен. `.banner,\n.play-error` и `.play-error, .banner` — одно правило.
+ */
+const selectorKey = (selector: string) =>
+  selector
+    .split(",")
+    .map((s) => s.trim().replace(/\s+/g, " "))
+    .sort()
+    .join(", ");
+
 /** Значение свойства из простого правила `селектор { … }` без вложенных блоков. */
 function ruleValue(css: string, selector: string, prop: string): string {
+  const key = selectorKey(selector);
   for (const block of css.replace(COMMENTS, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    if (block[1].trim() !== selector) continue;
+    if (selectorKey(block[1]) !== key) continue;
     const declaration = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`).exec(block[2]);
     if (declaration) return declaration[1].trim();
   }
@@ -276,6 +288,11 @@ describe("чтение стилей", () => {
     expect(ruleValue(css, ".c", "opacity")).toBe("0.65");
     expect(() => ruleValue(css, ".b", "opacity")).toThrow(/нет правила \.b/);
     expect(() => ruleValue(css, ".a", "color")).toThrow(/нет правила \.a со свойством color/);
+    // Оформление списка селекторов не важно: переносы, пробелы, порядок.
+    const listed = ".banner,\n.play-error {\n  background: color-mix(in srgb, var(--danger) 20%, var(--plate));\n}";
+    expect(ruleValue(listed, ".banner, .play-error", "background")).toBe("color-mix(in srgb, var(--danger) 20%, var(--plate))");
+    expect(ruleValue(listed, ".play-error,.banner", "background")).toBe("color-mix(in srgb, var(--danger) 20%, var(--plate))");
+    expect(() => ruleValue(listed, ".banner", "background")).toThrow(/нет правила \.banner/);
     expect(burningShare(".code-card.burning { background: color-mix(in srgb, var(--accent) 12%, transparent); }")).toBe(0.12);
     expect(() => burningShare(".code-card.burning { background: var(--card); }")).toThrow(/color-mix/);
     expect(labelOpacity(".panel-label { color: var(--label); opacity: 0.65; }")).toBe(0.65);

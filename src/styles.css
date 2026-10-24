@@ -132,9 +132,13 @@
      между элементом и рамкой закрывает тёмная подложка: светлая рамка на
      светлом арте иначе пропала бы. Рамка не ниже 3:1 ко всему, рядом с чем
      лежит (`src/paletteContrast.test.ts`). У краёв прокрутки под неё оставлен
-     запас (`--focus-room`): иначе край срезал бы рамку карточки во всю ширину. */
+     запас (`--focus-room`): иначе край срезал бы рамку карточки во всю ширину.
+     В тесной группе (варианты выбора, пара кнопок на карточке кода, точки
+     карусели) рамка вплотную к элементу (`--focus-offset-tight`): с обычным
+     отступом она ложилась бы на соседа, а вплотную помещается в зазор группы. */
   --focus-width: 2px;
   --focus-offset: 3px;
+  --focus-offset-tight: 0px;
   --focus-ring: var(--focus-width) solid var(--ink);
   --focus-halo: 0 0 0 var(--focus-offset) var(--plate);
   --focus-room: calc(var(--focus-width) + var(--focus-offset));
@@ -518,14 +522,24 @@ body::after {
   white-space: nowrap;
 }
 
-/* Карточка кода — стекло на стекле: светлая кромка сверху и лёгкая тень. */
+/* Карточка кода — стекло на стекле: светлая кромка сверху и лёгкая тень.
+   Слева код, срок и награды, справа кнопки. Вся карточка нажимается (копирует
+   код); слой подсветки лежит внутри неё (`isolation`), нажатие — пружиной
+   (ниже, у состояний карточки). */
 .code-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--r-lg);
   box-shadow: var(--glass-edge), var(--shadow-1);
   padding: 7px 8px;
   margin-bottom: 6px;
+  cursor: pointer;
+  transition: transform var(--move) var(--ease-spring);
 }
 
 .code-card code {
@@ -807,7 +821,8 @@ body::after {
    размытием под ней. Текст на ней не ниже 4.5:1 даже на белом арте
    (`src/paletteContrast.test.ts`). Слева значок ошибки (ниже, общий с ошибкой
    настроек). */
-.banner, .play-error {
+.banner,
+.play-error {
   display: flex;
   align-items: flex-start;
   gap: 10px;
@@ -1253,13 +1268,6 @@ body::after {
   scrollbar-color: var(--scrollbar) transparent;
 }
 
-.code-card {
-  display: flex;
-  gap: 9px;
-  align-items: flex-start;
-  cursor: pointer;
-}
-
 .code-card.burning {
   /* Через color-mix, а не rgba с зашитым числом: подложка берёт цвет прямо из
      --accent и не разойдётся с ним при смене палитры. */
@@ -1272,12 +1280,6 @@ body::after {
    текст на ней и так у предела контраста. Вместе с карточкой подсвечивается
    кнопка копирования — щелчок по карточке и есть копирование. Нажатие чуть
    вдавливает карточку, но не тогда, когда нажимают кнопку на ней. */
-.code-card {
-  position: relative;
-  isolation: isolate;
-  transition: transform var(--move) var(--ease-spring);
-}
-
 .code-card::before {
   content: "";
   position: absolute;
@@ -1322,7 +1324,27 @@ body::after {
   color: var(--ink);
 }
 
+/* Повторная неудача с тем же кодом, пока ошибка ещё видна: у соседних
+   копирований имена кадров разные (`is-again` в `PromoCodes`), и новое имя
+   запускает вздрагивание заново — с тем же именем браузер счёл бы, что
+   анимация уже доиграла. Кадры одинаковые. */
+.code-card.copy-failed.is-again {
+  animation-name: copy-shake-again;
+}
+
 @keyframes copy-shake {
+  25% {
+    transform: translateX(-3px);
+  }
+  55% {
+    transform: translateX(2px);
+  }
+  80% {
+    transform: translateX(-1px);
+  }
+}
+
+@keyframes copy-shake-again {
   25% {
     transform: translateX(-3px);
   }
@@ -1401,6 +1423,11 @@ body::after {
 .code-buttons button:active {
   transform: scale(0.9);
   transition-duration: var(--move-fast);
+}
+
+/* Кнопки стоят парой через 4px: рамка вплотную, иначе легла бы на соседку. */
+.code-buttons button:focus-visible {
+  outline-offset: var(--focus-offset-tight);
 }
 
 /* Копирование: значок на время становится галочкой. Оба значка лежат в одной
@@ -1516,6 +1543,8 @@ body::after {
 .carousel-dots .dot:hover:not(.active) { transform: scale(1.3); }
 .carousel-dots .dot:not(.active):active { transform: scale(0.8); transition-duration: var(--move-fast); }
 .carousel-dots .dot.active:active { transform: scale(1.15); transition-duration: var(--move-fast); }
+/* Точки стоят через 5px: рамка вплотную к точке, а не на соседних. */
+.carousel-dots .dot:focus-visible { outline-offset: var(--focus-offset-tight); }
 
 /* Карусель — лента карточек со сдвигом (спека этапа 7 §3.3). Лента едет на
    сценической скорости, как смена фона: быстро трогается и долго, мягко
@@ -2310,6 +2339,13 @@ body::after {
   border-radius: var(--s-card-radius);
 }
 
+/* Шапка первого запуска выше заголовка — в ней переключатель языка, — и рамка
+   сразу под ней касалась бы его. Зазор — как между подписью и карточкой под ней
+   (`.settings-card-caption`). */
+.first-run-head + :is(.settings-empty, .settings-error) {
+  margin-top: 8px;
+}
+
 /* Экран отказа (`ErrorBoundary`): значок ошибки, крупно, и сообщение с кнопкой
    посередине окна, а не строкой в углу. */
 .settings.is-crash .settings-body {
@@ -2625,6 +2661,12 @@ select.input {
 .segmented-option:disabled {
   opacity: 0.5;
   cursor: default;
+}
+
+/* Варианты стоят через 2px, и до рамки ряда тоже 2px: рамка фокуса вплотную к
+   варианту ровно заполняет этот зазор и не ложится на соседа. */
+.segmented-option:focus-visible {
+  outline-offset: var(--focus-offset-tight);
 }
 
 /* Подпись над карточкой — «Language · Язык». */
