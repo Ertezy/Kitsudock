@@ -262,6 +262,9 @@ export default function App() {
         hub={hub}
         selectedContentId={selected?.contentId ?? null}
         selectedTitle={selected?.title ?? null}
+        // Ошибка здесь бывает только от загрузки списка игр (`load`, `reloadGames`),
+        // и удачная загрузка её снимает.
+        gamesFailed={error !== ""}
         onOpenSettings={() => setScreen("settings")}
         appVersion={appVersion}
       />

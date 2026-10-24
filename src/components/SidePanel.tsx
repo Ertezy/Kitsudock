@@ -20,6 +20,9 @@ interface Props {
   /** Название выбранной игры; null — игр нет вовсе. Нужно пустой панели:
    *  сказать, что игр нет, или что для этой игры данных нет. */
   selectedTitle: string | null;
+  /** Список игр не загрузился (над артом при этом баннер ошибки). Пустая
+   *  панель тогда не говорит «игр нет»: игры есть, их просто не прочитали. */
+  gamesFailed: boolean;
   /** Открыть экран настроек — вызывается по клику на шестерёнку. */
   onOpenSettings: () => void;
   /** Версия работающего приложения; null — ещё не узнали. */
@@ -31,7 +34,7 @@ const DAY = 86400;
 /** Как часто пересчитывается «сейчас». */
 const TICK_MS = 30_000;
 
-export default function SidePanel({ hub, selectedContentId, selectedTitle, onOpenSettings, appVersion }: Props) {
+export default function SidePanel({ hub, selectedContentId, selectedTitle, gamesFailed, onOpenSettings, appVersion }: Props) {
   const lang = useLang();
   const t = useT();
   const videoLang = useVideoLanguage();
@@ -109,8 +112,10 @@ export default function SidePanel({ hub, selectedContentId, selectedTitle, onOpe
     contentId: selectedContentId,
     linkable: linkable(hub, selectedTitle),
     tooOld,
+    listFailed: gamesFailed,
   });
   const EMPTY = {
+    listFailed: [t.panel.listFailedTitle, t.panel.listFailedHint],
     noGames: [t.panel.noGamesTitle, t.panel.noGamesHint],
     unlinked: [t.panel.unlinkedTitle, t.panel.unlinkedHint],
     uncollected: [t.panel.unlinkedTitle, t.panel.uncollectedHint],

@@ -72,18 +72,29 @@ export function panelIsEmpty(
 
 /**
  * Почему панель пуста — от этого зависит, что ей сказать (спека полировки, §5):
+ * - `listFailed` — список игр не загрузился (`listFailed`): игр не видно, но
+ *   «игр нет» было бы неправдой;
  * - `noGames` — игр нет вовсе, выбирать нечего;
  * - `unlinked` — игра не связана с данными, но данные под её названием есть
  *   (`linkable`): их можно выбрать в настройках игры;
- * - `uncollected` — игра не связана, и данных для неё не собирают: привязывать
- *   её не к чему, и подсказка об этом не говорит;
+ * - `uncollected` — игра не связана, и по названию данных для неё не видно:
+ *   их может не быть вовсе, а может быть под другим названием (игра добавлена
+ *   вручную или переименована). Подсказка верна в обоих случаях: связать, если
+ *   данные для неё собираются;
  * - `stale` — данные старше недели, коды и баннеры спрятаны, а видео нет;
  * - `quiet` — данные свежие, просто сейчас ничего не идёт.
  */
-export type EmptyReason = "noGames" | "unlinked" | "uncollected" | "stale" | "quiet";
+export type EmptyReason = "listFailed" | "noGames" | "unlinked" | "uncollected" | "stale" | "quiet";
 
-export function emptyReason(state: { hasGame: boolean; contentId: string | null; linkable: boolean; tooOld: boolean }): EmptyReason {
-  if (!state.hasGame) return "noGames";
+export function emptyReason(state: {
+  hasGame: boolean;
+  contentId: string | null;
+  linkable: boolean;
+  tooOld: boolean;
+  /** Последняя загрузка списка игр не удалась; удачная снимает отметку. */
+  listFailed?: boolean;
+}): EmptyReason {
+  if (!state.hasGame) return state.listFailed ? "listFailed" : "noGames";
   if (state.contentId === null) return state.linkable ? "unlinked" : "uncollected";
   return state.tooOld ? "stale" : "quiet";
 }

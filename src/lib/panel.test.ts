@@ -79,11 +79,23 @@ describe("emptyReason", () => {
     expect(emptyReason({ ...base, hasGame: false, contentId: null })).toBe("noGames");
     expect(emptyReason({ ...base, hasGame: false, contentId: null, linkable: true, tooOld: true })).toBe("noGames");
   });
+  it("список игр не загрузился — игр не видно, но это не «игр нет»", () => {
+    expect(emptyReason({ ...base, hasGame: false, contentId: null, listFailed: true })).toBe("listFailed");
+    expect(emptyReason({ ...base, hasGame: false, contentId: null, linkable: true, tooOld: true, listFailed: true })).toBe("listFailed");
+  });
+  it("удачная перезагрузка снимает отметку провала, и причина снова настоящая", () => {
+    expect(emptyReason({ ...base, hasGame: false, contentId: null, listFailed: false })).toBe("noGames");
+    expect(emptyReason({ ...base, listFailed: false })).toBe("quiet");
+  });
+  it("провал перечитывания при уже показанных играх причину не меняет: игра выбрана", () => {
+    expect(emptyReason({ ...base, listFailed: true })).toBe("quiet");
+    expect(emptyReason({ ...base, contentId: null, listFailed: true })).toBe("uncollected");
+  });
   it("игра не связана с данными, но данные под её названием есть — подсказка привязать", () => {
     expect(emptyReason({ ...base, contentId: null, linkable: true })).toBe("unlinked");
     expect(emptyReason({ ...base, contentId: null, linkable: true, tooOld: true })).toBe("unlinked");
   });
-  it("игра не связана, и данных для неё не собирают — привязывать не к чему", () => {
+  it("игра не связана, и по названию данных не видно — общая подсказка, верная и для добавленной вручную", () => {
     expect(emptyReason({ ...base, contentId: null })).toBe("uncollected");
     expect(emptyReason({ ...base, contentId: null, tooOld: true })).toBe("uncollected");
   });
@@ -108,7 +120,7 @@ describe("linkable", () => {
     expect(linkable(h, "arknights endfield")).toBe(true);
     expect(linkable(h, "Arknights: Endfield")).toBe(true);
   });
-  it("запись в данных есть, но по ней ничего не собрано — привязывать не к чему", () => {
+  it("запись в данных есть, но по ней ничего не собрано — подсказки «привязать» нет", () => {
     expect(linkable(hubWith([{ id: "endfield", title: "Arknights: Endfield" }]), "Arknights: Endfield")).toBe(false);
   });
   it("видео тоже считаются собранными данными", () => {
