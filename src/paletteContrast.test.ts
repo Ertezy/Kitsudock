@@ -142,6 +142,16 @@ const selectorKey = (selector: string) =>
     .sort()
     .join(", ");
 
+/** Селекторы (в виде `selectorKey`) всех простых правил, где свойство задано ровно этим значением. */
+function rulesWith(css: string, prop: string, value: string): string[] {
+  const out: string[] = [];
+  for (const block of css.replace(COMMENTS, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    const declaration = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`).exec(block[2]);
+    if (declaration && declaration[1].trim() === value) out.push(selectorKey(block[1]));
+  }
+  return out;
+}
+
 /** Значение свойства из простого правила `селектор { … }` без вложенных блоков. */
 function ruleValue(css: string, selector: string, prop: string): string {
   const key = selectorKey(selector);
@@ -333,6 +343,10 @@ describe("читаемость палитры", () => {
     const settingsCard = over(get("--card"), bg);
     const hoveredRow = over(get("--hover"), settingsCard);
     const hoveredOption = over(get("--hover"), over(get("--card"), settingsCard));
+    // Дорожка выбора варианта (`.segmented`) — карточка: на карточке настроек и
+    // прямо на фоне (шапка первого запуска).
+    const segmentedTrack = over(get("--card"), settingsCard);
+    const segmentedTrackOnBg = over(get("--card"), bg);
     // Карточка кода, которую не удалось скопировать: на миг красится из --danger.
     const copyFailed = over(mixOf(ruleValue(rawCss, ".code-card.copy-failed", "background"), get), glass);
     // Подложки поверх арта: подпись над PLAY и ошибки на главном экране. Арт
@@ -344,7 +358,7 @@ describe("читаемость палитры", () => {
       get,
       grain: grainVeil(rawCss, get),
       labelOpacity: labelOpacity(rawCss),
-      surfaces: { bg, glass, card, burning, accent, settingsCard, hoveredRow, hoveredOption, copyFailed, plateOnArt, errorOnArt },
+      surfaces: { bg, glass, card, burning, accent, settingsCard, hoveredRow, hoveredOption, segmentedTrack, segmentedTrackOnBg, copyFailed, plateOnArt, errorOnArt },
     };
   };
 
@@ -410,10 +424,14 @@ describe("читаемость палитры", () => {
   });
 
   // Рамка фокуса — не текст, ей хватает 3:1 к тому, рядом с чем она лежит
-  // (WCAG 1.4.11). Лежит она с отступом, поэтому рядом — то, на чём стоит
-  // элемент: фон, стекло, карточки, подсвеченные строки. Поверх арта зазор под
-  // рамкой закрывает тёмная подложка (`--focus-halo`): светлая рамка на светлом
-  // арте иначе пропала бы.
+  // (WCAG 1.4.11). Обычно она лежит с отступом, поэтому рядом — то, на чём
+  // стоит элемент: фон, стекло, карточки, подсвеченные строки. Поверх арта зазор
+  // под рамкой закрывает тёмная подложка (`--focus-halo`): светлая рамка на
+  // светлом арте иначе пропала бы. В тесной группе (`--focus-offset-tight`) рамка
+  // вплотную: изнутри она касается самого элемента — у выбранного варианта это
+  // оранжевая таблетка, к ней рамка светлее всего лишь в 1.8 раза, — а снаружи
+  // лежит на дорожке группы. Видимой рядом с таблеткой рамку держит эта внешняя
+  // кромка, и проверяется именно она (ниже).
   const ring = () => {
     const tokens = rootTokens(rawCss);
     const { get, surfaces } = palette();
@@ -446,4 +464,29 @@ describe("читаемость палитры", () => {
     const { colour, haloOnArt } = ring();
     expect(contrast(colour, haloOnArt)).toBeGreaterThanOrEqual(3);
   });
+
+  // Где рамка вплотную и на чём лежит её внешняя кромка. Новая тесная группа в
+  // стилях без строки здесь — ошибка: её дорожку тоже надо проверить.
+  const TIGHT: Record<string, Surface[]> = {
+    // Дорожка выбора — карточка: на карточке настроек (вкладка «Вид») и прямо на
+    // фоне (первый запуск).
+    ".segmented-option:focus-visible": ["segmentedTrack", "segmentedTrackOnBg"],
+    // Пара кнопок на карточке кода — обычной, горящей и той, что не скопировалась.
+    ".code-buttons button:focus-visible": ["card", "burning", "copyFailed"],
+    // Точки карусели — на стекле панели.
+    ".carousel-dots .dot:focus-visible": ["glass"],
+  };
+
+  it("в тесной группе рамка вплотную только там, где известна её дорожка", () => {
+    expect(rulesWith(rawCss, "outline-offset", "var(--focus-offset-tight)").sort()).toEqual(Object.keys(TIGHT).sort());
+  });
+
+  for (const [selector, list] of Object.entries(TIGHT)) {
+    for (const surface of list) {
+      it(`рамка вплотную (${selector}): внешняя кромка на «${surface}» не ниже 3:1`, () => {
+        const { colour, surfaces } = ring();
+        expect(contrast(colour, surfaces[surface])).toBeGreaterThanOrEqual(3);
+      });
+    }
+  }
 });
