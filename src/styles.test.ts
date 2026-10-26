@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import rawCss from "./styles.css?raw";
+import indexHtml from "../index.html?raw";
+import previewHtml from "../preview.html?raw";
 
 // Файл читается средствами Vite (`?raw`), как в остальных сторожах: типов Node в
 // проекте нет, а новая зависимость не нужна. Чтобы Vitest не подменял CSS пустой
@@ -880,6 +882,16 @@ describe("палитра", () => {
   it("основа задаёт цвета токенами, и их хватает на весь интерфейс", () => {
     for (const t of ["--bg", "--glass", "--card", "--line", "--ink", "--ink-dim", "--ink-faint", "--accent", "--accent-ink", "--content", "--content-soft", "--label", "--danger", "--shadow-1", "--shadow-2", "--shadow-3", "--glass-edge"]) {
       expect(colourTokens, t).toContain(t);
+    }
+  });
+
+  it("первая отрисовка окна — цветом фона палитры: пока стили грузятся, окно не мигает чужим цветом", () => {
+    for (const [name, html] of [
+      ["index.html", indexHtml],
+      ["preview.html", previewHtml],
+    ]) {
+      const first = /html\s*\{\s*background:\s*(#[0-9a-f]{3,8})\s*;?\s*\}/i.exec(html);
+      expect(first?.[1].toLowerCase(), name).toBe(base.get("--bg"));
     }
   });
 
