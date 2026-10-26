@@ -75,9 +75,11 @@ impl Game {
 
 /// Настройки поведения окна.
 ///
-/// Оба значения по умолчанию — `true`: это ровно то, как приложение вело себя
-/// до появления переключателей, поэтому обновление ничего не меняет под
-/// человеком.
+/// Крестик по умолчанию прячет окно в трей. После запуска игры окно по
+/// умолчанию остаётся: так другую игру можно запустить сразу, не доставая окно
+/// из трея. Это умолчание действует с 0.1.1, первой публичной версии (спека
+/// полировки, §8.1). Умолчания нужны только свежей установке и конфигу без
+/// блока поведения; сохранённое человеком значение никогда не меняется.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Behaviour {
@@ -91,7 +93,7 @@ impl Default for Behaviour {
     fn default() -> Self {
         Self {
             close_to_tray: true,
-            tray_on_launch: true,
+            tray_on_launch: false,
         }
     }
 }
@@ -261,8 +263,10 @@ pub fn migrate_v1(raw: &serde_json::Value) -> Option<AppConfig> {
 /// Перенос конфига со второй версии на третью.
 ///
 /// Игры переносятся дословно — это главное требование этапа. Прибавляются
-/// только два поля уровня приложения, и оба получают значения, при которых
-/// приложение ведёт себя так же, как до обновления.
+/// только поля уровня приложения: `seeded` — включённым, ведь игры у человека
+/// уже есть, а блок поведения — нынешними умолчаниями (`Behaviour`): окно
+/// после запуска игры остаётся. Единственный человек со второй версией —
+/// владелец, и об этом он и просил (спека полировки, §8.1).
 ///
 /// Разбор по одной записи, а не всем массивом.
 ///
@@ -565,6 +569,7 @@ mod tests {
         assert_eq!(cfg.games.len(), 2);
         assert!(cfg.seeded);
         assert!(cfg.behaviour.close_to_tray);
+        assert!(!cfg.behaviour.tray_on_launch);
 
         let hsr = cfg.games.iter().find(|g| g.id == "hsr").unwrap();
         assert_eq!(hsr.content_id.as_deref(), Some("hsr"));
@@ -728,14 +733,25 @@ mod tests {
     }
 
     #[test]
-    fn migration_defaults_behaviour_to_how_the_app_already_behaved() {
-        // Обе настройки по умолчанию true — это ровно то, как приложение
-        // вело себя до появления переключателей. Обновление не должно
-        // менять поведение под человеком.
+    fn migration_gives_a_v2_config_the_current_behaviour_defaults() {
+        // В конфиге второй версии блока поведения нет, и перенос ставит
+        // нынешние умолчания: крестик прячет окно в трей, а после запуска
+        // игры окно остаётся (спека полировки, §8.1). Единственный человек со
+        // второй версией — владелец, он об этом и просил.
         let raw: serde_json::Value = serde_json::from_str(V2_SAMPLE).unwrap();
         let cfg = migrate_v2(&raw).unwrap();
         assert!(cfg.behaviour.close_to_tray);
-        assert!(cfg.behaviour.tray_on_launch);
+        assert!(!cfg.behaviour.tray_on_launch);
+    }
+
+    #[test]
+    fn a_fresh_install_keeps_the_window_after_launching_a_game() {
+        // Свежая установка: после «Играть» окно остаётся, и другую игру можно
+        // запустить сразу, не доставая окно из трея. Крестик по-прежнему
+        // прячет окно в трей.
+        let cfg = AppConfig::default();
+        assert!(cfg.behaviour.close_to_tray);
+        assert!(!cfg.behaviour.tray_on_launch);
     }
 
     #[test]
@@ -799,6 +815,7 @@ mod tests {
         let cfg: AppConfig = serde_json::from_str(json).unwrap();
         assert!(!cfg.seeded);
         assert!(cfg.behaviour.close_to_tray);
+        assert!(!cfg.behaviour.tray_on_launch);
     }
 
     #[test]
@@ -856,22 +873,25 @@ mod tests {
 
     #[test]
     fn assemble_current_keeps_a_saved_behaviour_block_instead_of_the_default() {
+        // Оба сохранённых значения — не умолчания: иначе тест не отличил бы
+        // сохранённый блок от подставленного. Сохранённое «уходить в трей»
+        // остаётся включённым и после смены умолчания (спека полировки, §8.1).
         let raw = serde_json::json!({
             "version": 3,
             "games": [],
-            "behaviour": { "closeToTray": false, "trayOnLaunch": false }
+            "behaviour": { "closeToTray": false, "trayOnLaunch": true }
         });
         let cfg = assemble_current(&raw, 3, Vec::new());
         assert!(!cfg.behaviour.close_to_tray);
-        assert!(!cfg.behaviour.tray_on_launch);
+        assert!(cfg.behaviour.tray_on_launch);
     }
 
     #[test]
-    fn assemble_current_defaults_behaviour_when_the_block_is_absent() {
+    fn assemble_current_gives_the_current_defaults_when_the_behaviour_block_is_absent() {
         let raw = serde_json::json!({ "version": 3, "games": [] });
         let cfg = assemble_current(&raw, 3, Vec::new());
         assert!(cfg.behaviour.close_to_tray);
-        assert!(cfg.behaviour.tray_on_launch);
+        assert!(!cfg.behaviour.tray_on_launch);
     }
 
     #[test]
