@@ -369,7 +369,7 @@ export function createHandlers(scenario: Scenario, settings: StandSettings = {})
       return removed;
     },
     get_about: (): About => ({
-      version: "0.1.0",
+      version: "0.1.1",
       logPath: "C:\\Users\\you\\AppData\\Roaming\\Kitsudock\\logs",
     }),
     open_log_folder: () => null,
