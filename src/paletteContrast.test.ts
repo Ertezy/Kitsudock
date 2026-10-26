@@ -5,7 +5,30 @@ import rawCss from "./styles.css?raw";
 // стекла и текста. Наличие токенов само по себе не гарантирует читаемость.
 type Colour = [number, number, number, number];
 
-const COMMENTS = /\/\*[\s\S]*?\*\//g;
+/**
+ * Текст без комментариев. Посимвольно и с кавычками: `content: "/*"` — строка,
+ * а не начало комментария. Регулярное выражение съело бы всё от неё до
+ * ближайшего конца комментария, и блоки между ними пропали бы для проверки.
+ */
+function stripComments(text: string): string {
+  let out = "";
+  let quote = "";
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (quote) {
+      out += ch;
+      if (ch === "\\" && i + 1 < text.length) out += text[++i];
+      else if (ch === quote) quote = "";
+    } else if (ch === '"' || ch === "'") {
+      quote = ch;
+      out += ch;
+    } else if (ch === "/" && text[i + 1] === "*") {
+      const end = text.indexOf("*/", i + 2);
+      i = end < 0 ? text.length : end + 1;
+    } else out += ch;
+  }
+  return out;
+}
 
 function colour(value: string): Colour {
   const text = value.trim();
@@ -96,7 +119,7 @@ function readDeclarations(body: string, into: Map<string, string>): void {
  * следующего блока не прилипают.
  */
 function rootTokens(css: string): Map<string, string> {
-  const src = css.replace(COMMENTS, "");
+  const src = stripComments(css);
   const tokens = new Map<string, string>();
   let blocks = 0;
   let depth = 0;
@@ -145,7 +168,7 @@ const selectorKey = (selector: string) =>
 /** Селекторы (в виде `selectorKey`) всех простых правил, где свойство задано ровно этим значением. */
 function rulesWith(css: string, prop: string, value: string): string[] {
   const out: string[] = [];
-  for (const block of css.replace(COMMENTS, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const block of stripComments(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     const declaration = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`).exec(block[2]);
     if (declaration && declaration[1].trim() === value) out.push(selectorKey(block[1]));
   }
@@ -155,7 +178,7 @@ function rulesWith(css: string, prop: string, value: string): string[] {
 /** Значение свойства из простого правила `селектор { … }` без вложенных блоков. */
 function ruleValue(css: string, selector: string, prop: string): string {
   const key = selectorKey(selector);
-  for (const block of css.replace(COMMENTS, "").matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const block of stripComments(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
     if (selectorKey(block[1]) !== key) continue;
     const declaration = new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`).exec(block[2]);
     if (declaration) return declaration[1].trim();
@@ -265,6 +288,16 @@ describe("чтение стилей", () => {
       ["--a", "#111111"],
       ["--b", "url(data:x;y)"],
     ]);
+  });
+
+  it("комментарий в кавычках — не комментарий: блоки и правила за ним не пропадают", () => {
+    const css = '.x::after { content: "/*"; } :root { --a: #111111; } /* тон */ :root { --b: #222222; }';
+    expect([...rootTokens(css)]).toEqual([
+      ["--a", "#111111"],
+      ["--b", "#222222"],
+    ]);
+    expect(ruleValue('.x::after { content: "/*"; } .y { opacity: 0.5; } /* c */', ".y", "opacity")).toBe("0.5");
+    expect(rulesWith('.x::after { content: "/*"; } .y { opacity: 0.5; } /* c */', "opacity", "0.5")).toEqual([".y"]);
   });
 
   it("@charset и @import перед :root не мешают найти блок", () => {
