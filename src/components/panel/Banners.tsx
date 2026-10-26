@@ -3,7 +3,7 @@ import CachedImage from "./CachedImage";
 import { bannerKeys, plainSpaces, shownBanners } from "../../lib/panel";
 import { progress, timeLeft } from "../../lib/time";
 import { useMotionOn } from "../../lib/motion";
-import { useWindowVisible } from "../../lib/windowVisible";
+import { useWindowActive } from "../../lib/windowActive";
 import { useLang, useT, type Lang } from "../../i18n";
 import type { Banner } from "../../types";
 
@@ -35,7 +35,7 @@ export default function Banners({ banners, nowSec }: Props) {
   const [restart, setRestart] = useState(0);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
-  const windowShown = useWindowVisible();
+  const windowIsActive = useWindowActive();
 
   // Сброс навешен на СОДЕРЖИМОЕ списка, а не на ссылку на массив.
   //
@@ -46,9 +46,10 @@ export default function Banners({ banners, nowSec }: Props) {
   const shownKey = keys.join("|");
   useEffect(() => setIndex(0), [shownKey]);
 
-  // Окно спрятано в трей или свёрнуто — карусель стоит (спека этапа 7 §3.3).
+  // Окно спрятано в трей или свёрнуто — карусель стоит (спека этапа 7 §3.3);
+  // не в фокусе — тоже стоит (спека полировки, §8.2).
   const count = shown.length;
-  const paused = hovered || focused || !windowShown || !motion;
+  const paused = hovered || focused || !windowIsActive || !motion;
 
   useEffect(() => {
     if (paused || count < 2) return;

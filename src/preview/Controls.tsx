@@ -113,6 +113,17 @@ export default function Controls({ params }: { params: PreviewParams }) {
         value={params.motion ? "on" : "off"}
         onPick={(motion) => go({ motion: motion === "on" })}
       />
+      {/* Неактивное окно (человек в игре): фоновое движение на паузе. Не то же,
+          что motion off — тот убирает движение совсем. */}
+      <Row<"on" | "off">
+        name="window"
+        options={[
+          { value: "on", text: "active" },
+          { value: "off", text: "inactive" },
+        ]}
+        value={params.active ? "on" : "off"}
+        onPick={(active) => go({ active: active === "on" })}
+      />
       <button type="button" style={{ ...pill(false), padding: "5px 8px" }} onClick={openSettings}>
         Settings
       </button>

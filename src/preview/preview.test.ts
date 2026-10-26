@@ -58,13 +58,30 @@ describe("адрес стенда", () => {
     for (const scenario of SCENARIOS) {
       for (const lang of ["ru", "en"] as const) {
         for (const motion of [true, false]) {
-          const params = { scenario, lang, motion, controls: true };
-          expect(readParams(toSearch(params))).toEqual(params);
+          for (const active of [true, false]) {
+            const params = { scenario, lang, motion, active, controls: true };
+            expect(readParams(toSearch(params))).toEqual(params);
+          }
         }
       }
     }
     expect(readParams("?controls=off").controls).toBe(false);
     expect(toSearch(readParams("?controls=off"))).toContain("controls=off");
+  });
+
+  it("неактивное окно — отдельный параметр, и по умолчанию окно активно", async () => {
+    const { readParams, toSearch, DEFAULT_PARAMS } = await import("./backend");
+    expect(DEFAULT_PARAMS.active).toBe(true);
+    expect(readParams("?active=off").active).toBe(false);
+    expect(readParams("?active=off").motion).toBe(true);
+    expect(toSearch(readParams("?active=off"))).toContain("active=off");
+  });
+
+  it("неактивное окно стенд изображает ответом окна: оно спрятано", async () => {
+    const { pluginHandlers } = await import("./backend");
+    expect(pluginHandlers({})["plugin:window|is_visible"]({})).toBe(true);
+    expect(pluginHandlers({ active: true })["plugin:window|is_visible"]({})).toBe(true);
+    expect(pluginHandlers({ active: false })["plugin:window|is_visible"]({})).toBe(false);
   });
 
   it("знает все пять состояний данных", async () => {

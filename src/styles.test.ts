@@ -305,6 +305,46 @@ function pointerProblems(decls: Decl[], maps: { hoveredBy?: Record<string, strin
   return bad;
 }
 
+/** Правило неактивного окна: спрятано в трей, свёрнуто или без фокуса (`lib/windowActive.ts`). */
+const INACTIVE = /^:root\[data-active=["']?off["']?\]\s+/;
+const INFINITE = /(?<![\w-])infinite(?![\w-])/;
+
+/**
+ * Бесконечное движение стоит на паузе, пока окно неактивно (спека полировки,
+ * §8.2): каждый элемент, чья анимация бесконечна, есть в правиле
+ * `:root[data-active="off"] … { animation-play-state: paused }` — сам, а не
+ * его родитель или сосед. Правило выключенного тумблера «Анимация» паузой не
+ * считается: тумблер и неактивное окно — разные условия.
+ */
+function pauseProblems(decls: Decl[]): string[] {
+  const outside = decls.filter((d) => !isRoot(d.selector));
+  const infinite = outside
+    .filter(
+      (d) =>
+        (d.prop === "animation" && segments(d.value).some((s) => INFINITE.test(s))) ||
+        (d.prop === "animation-iteration-count" && INFINITE.test(d.value)),
+    )
+    .flatMap((d) => members(d.selector))
+    .filter((s) => !isMotionOff(s) && !INACTIVE.test(s));
+  const paused = new Set(
+    outside
+      .filter((d) => d.prop === "animation-play-state" && d.value === "paused")
+      .flatMap((d) => members(d.selector))
+      .filter((s) => INACTIVE.test(s))
+      .map((s) => s.replace(INACTIVE, "")),
+  );
+  return [...new Set(infinite)].filter((s) => !paused.has(s)).map((s) => `${s}: не на паузе в неактивном окне`);
+}
+
+/** Сколько элементов с бесконечной анимацией в стилях: сторож паузы видит их. */
+const infiniteCount = (decls: Decl[]) =>
+  new Set(
+    decls
+      .filter((d) => !isRoot(d.selector) && d.prop === "animation" && INFINITE.test(d.value))
+      .flatMap((d) => members(d.selector))
+      .filter((s) => !isMotionOff(s)),
+  ).size;
+
 /**
  * Всё, что прокручивается, — с тонкой полосой в цветах палитры (или вовсе без
  * полосы, как док). Стандартная широкая серая полоса чужая на тёмном стекле.
@@ -417,6 +457,12 @@ describe("стили берут значения только из шкал", ()
 
   it("зерно — один неподвижный слой поверх окна, сквозной для мыши", () => {
     expect(grainProblems(decls)).toEqual([]);
+  });
+
+  it("всё бесконечное движение стоит на паузе, пока окно неактивно", () => {
+    // Дрейф арта, блик «запускается…», мерцание двух видов заглушек.
+    expect(infiniteCount(decls)).toBeGreaterThanOrEqual(4);
+    expect(pauseProblems(decls)).toEqual([]);
   });
 });
 
@@ -628,6 +674,32 @@ describe("сторож ловит нарушения", () => {
     expect(grainProblems(css(`.g { position: fixed; inset: 0; z-index: var(--z-grain); opacity: 0.035; mask-image: ${noise}; }`))).toHaveLength(1);
     expect(grainProblems(css(`.g { position: fixed; inset: 0; z-index: var(--z-grain); pointer-events: none; opacity: 0.1; mask-image: ${noise}; }`))).toHaveLength(1);
     expect(grainProblems(css(".a { z-index: var(--z-grain); } .b { z-index: var(--z-grain); }"))).toEqual(["слоёв зерна: 2"]);
+  });
+
+  it("бесконечная анимация без паузы в неактивном окне не проходит", () => {
+    const spin = "animation: spin var(--move) var(--ease-out) infinite;";
+    const pause = (sel: string) => `:root[data-active="off"] ${sel} { animation-play-state: paused; }`;
+    expect(pauseProblems(css(`.x { ${spin} }`))).toEqual([".x: не на паузе в неактивном окне"]);
+    expect(pauseProblems(css(`.x { ${spin} } ${pause(".x")}`))).toEqual([]);
+    // Счётчик повторов отдельным свойством — тоже бесконечная анимация.
+    expect(pauseProblems(css(".x { animation-name: spin; animation-iteration-count: infinite; }"))).toHaveLength(1);
+    // Пауза по списку и у псевдоэлемента через :is(…) засчитывается каждому.
+    expect(pauseProblems(css(`.a { ${spin} } .b::before { ${spin} } :root[data-active="off"] .a, :root[data-active="off"] :is(.b)::before { animation-play-state: paused; }`))).toEqual([]);
+  });
+
+  it("пауза засчитывается только самому элементу, только паузой и только в неактивном окне", () => {
+    const spin = "animation: spin var(--move) var(--ease-out) infinite;";
+    // Пауза соседа с похожим именем или родителя — не пауза элемента.
+    expect(pauseProblems(css(`.x { ${spin} } :root[data-active="off"] .x-y { animation-play-state: paused; }`))).toHaveLength(1);
+    expect(pauseProblems(css(`.p .x { ${spin} } :root[data-active="off"] .p { animation-play-state: paused; }`))).toHaveLength(1);
+    // Тумблер «Анимация» — другое условие, и пауза без условия — не та пауза.
+    expect(pauseProblems(css(`.x { ${spin} } :root[data-motion="off"] .x { animation-play-state: paused; }`))).toHaveLength(1);
+    expect(pauseProblems(css(`.x { ${spin} } .x { animation-play-state: paused; }`))).toHaveLength(1);
+    expect(pauseProblems(css(`.x { ${spin} } :root[data-active="off"] .x { animation-play-state: running; }`))).toHaveLength(1);
+    // Имя кадров со словом infinite внутри — не бесконечная анимация.
+    expect(pauseProblems(css(".x { animation: infinite-scroll var(--move) var(--ease-out); }"))).toEqual([]);
+    // Отмена движения при выключенном тумблере сама паузы не требует.
+    expect(pauseProblems(css(':root[data-motion="off"] .x { animation: none; }'))).toEqual([]);
   });
 
   it("точка с запятой и скобки внутри значения не ломают разбор", () => {

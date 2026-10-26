@@ -4,7 +4,7 @@ import { gradientFor } from "../lib/gradient";
 import { layerFor, layerKey, type Layer } from "../lib/background";
 import { isOwnEnter, isShown, markReady, pushLayer, settleAll, settleLayer, type ArtEntry } from "../lib/artLayers";
 import { motionOn, useMotionOn } from "../lib/motion";
-import { useWindowVisible } from "../lib/windowVisible";
+import { useWindowActive } from "../lib/windowActive";
 import type { GameView } from "../types";
 
 interface Props {
@@ -22,7 +22,7 @@ interface Scene {
 
 export default function GameArt({ game, onShown }: Props) {
   const reduced = !useMotionOn();
-  const visible = useWindowVisible();
+  const active = useWindowActive();
   const layer: Layer = game ? layerFor(game, reduced) : { kind: "fill" };
   const fill = gradientFor(game?.title ?? "");
   // У двух игр без фона заливки разные, поэтому ключ заливки — сама заливка:
@@ -70,7 +70,7 @@ export default function GameArt({ game, onShown }: Props) {
   return (
     <div className="art">
       {stack.map((entry) => (
-        <ArtLayer key={entry.id} entry={entry} visible={visible} onReady={onReady} onEntered={onEntered} />
+        <ArtLayer key={entry.id} entry={entry} active={active} onReady={onReady} onEntered={onEntered} />
       ))}
     </div>
   );
@@ -78,12 +78,12 @@ export default function GameArt({ game, onShown }: Props) {
 
 function ArtLayer({
   entry,
-  visible,
+  active,
   onReady,
   onEntered,
 }: {
   entry: ArtEntry<Scene>;
-  visible: boolean;
+  active: boolean;
   onReady: (id: number) => void;
   onEntered: (id: number) => void;
 }) {
@@ -130,7 +130,7 @@ function ArtLayer({
           onError={ready}
         />
       )}
-      {layer.kind === "video" && <ArtVideo layer={layer} visible={visible} onReady={ready} />}
+      {layer.kind === "video" && <ArtVideo layer={layer} active={active} onReady={ready} />}
     </div>
   );
 }
@@ -142,22 +142,24 @@ function ArtLayer({
  */
 function ArtVideo({
   layer,
-  visible,
+  active,
   onReady,
 }: {
   layer: Extract<Layer, { kind: "video" }>;
-  visible: boolean;
+  active: boolean;
   onReady: () => void;
 }) {
   const ref = useRef<HTMLVideoElement>(null);
 
-  // Ролик не крутится впустую, пока окно в трее или свёрнуто (спека §6.3).
+  // Ролик не крутится впустую, пока окно в трее или свёрнуто (спека §6.3), и
+  // стоит, пока окно не в фокусе — человек в игре (спека полировки, §8.2).
+  // Вернулся — ролик идёт дальше с того же кадра.
   useEffect(() => {
     const video = ref.current;
     if (!video) return;
-    if (visible) void video.play().catch(() => {});
+    if (active) void video.play().catch(() => {});
     else video.pause();
-  }, [visible]);
+  }, [active]);
 
   return (
     <video

@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { api } from "./lib/api";
 import { launchNote } from "./lib/launch";
 import { setMotion } from "./lib/motion";
+import { watchWindowActivity } from "./lib/windowActive";
 import { REFRESH_EVERY_MS, backgroundsKey, sameHub, shouldRefreshOnShow, shouldRefreshOnOnline } from "./lib/hubRefresh";
 import SidePanel from "./components/SidePanel";
 import GameArt from "./components/GameArt";
@@ -186,6 +187,11 @@ export default function App() {
   useEffect(() => {
     api.getAnimation().then(setMotion).catch(() => {});
   }, []);
+
+  // Активно ли окно — одно слежение на всё приложение (`lib/windowActive.ts`):
+  // видео фона, карусель и бесконечное движение в стилях стоят, пока окно
+  // спрятано, свёрнуто или не в фокусе (спека полировки, §8.2).
+  useEffect(() => watchWindowActivity(), []);
 
   // Экран первого запуска закрывается — список игр мог измениться.
   const finishFirstRun = useCallback(() => {

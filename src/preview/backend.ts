@@ -32,6 +32,9 @@ export interface PreviewParams {
   scenario: Scenario;
   lang: Lang;
   motion: boolean;
+  /** Активно ли окно; `active=off` — окно неактивно, фоновое движение на паузе
+   *  (спека полировки, §8.2). Не то же, что `motion=off`: тот убирает движение. */
+  active: boolean;
   /** Показывать ли плашку с переключателями; `controls=off` убирает её для снимков. */
   controls: boolean;
 }
@@ -40,6 +43,7 @@ export const DEFAULT_PARAMS: PreviewParams = {
   scenario: "normal",
   lang: "ru",
   motion: true,
+  active: true,
   controls: true,
 };
 
@@ -54,6 +58,7 @@ export function readParams(search: string): PreviewParams {
     scenario: pick("scenario", SCENARIOS, DEFAULT_PARAMS.scenario),
     lang: pick<Lang>("lang", ["ru", "en"], DEFAULT_PARAMS.lang),
     motion: pick("motion", ["on", "off"], "on") === "on",
+    active: q.get("active") !== "off",
     controls: q.get("controls") !== "off",
   };
 }
@@ -65,6 +70,7 @@ export function toSearch(p: PreviewParams): string {
     lang: p.lang,
     motion: p.motion ? "on" : "off",
   });
+  if (!p.active) q.set("active", "off");
   if (!p.controls) q.set("controls", "off");
   return `?${q.toString()}`;
 }
@@ -160,6 +166,8 @@ const after = <T>(ms: number, make: () => T): Promise<T> =>
 export interface StandSettings {
   lang?: Lang;
   motion?: boolean;
+  /** `false` — окно неактивно: стенд отвечает, что оно спрятано. */
+  active?: boolean;
 }
 
 /** Ответы стенда на команды моста. Отдельной функцией ради теста: ей не нужно окно. */
@@ -358,15 +366,20 @@ export function createHandlers(scenario: Scenario, settings: StandSettings = {})
 }
 
 /** Плагины отвечают заглушками без действия: диалог «отменён», буфер и ссылки ничего не делают. */
-const PLUGIN_HANDLERS: Record<string, Handler> = {
-  "plugin:dialog|open": () => null,
-  // Вопрос с кнопками («Убрать игру?») — ответ «Отмена», чтобы стенд ничего не стирал.
-  "plugin:dialog|message": () => "Cancel",
-  "plugin:clipboard-manager|write_text": () => null,
-  "plugin:opener|open_url": () => null,
-  // Окно на стенде всегда видно.
-  "plugin:window|is_visible": () => true,
-};
+export function pluginHandlers(settings: StandSettings): Record<string, Handler> {
+  return {
+    "plugin:dialog|open": () => null,
+    // Вопрос с кнопками («Убрать игру?») — ответ «Отмена», чтобы стенд ничего не стирал.
+    "plugin:dialog|message": () => "Cancel",
+    "plugin:clipboard-manager|write_text": () => null,
+    "plugin:opener|open_url": () => null,
+    // Окно на стенде видно. Неактивное окно (`active=off`) стенд изображает
+    // спрятанным: это один из трёх признаков неактивности (`lib/windowActive.ts`),
+    // и только его стенд держит сам — фокус и свёрнутость страница берёт у
+    // браузера, и любой щелчок по стенду вернул бы окну фокус.
+    "plugin:window|is_visible": () => settings.active !== false,
+  };
+}
 
 /**
  * Ставит перехватку моста на этой странице. Вызывать до загрузки `src/main.tsx`:
@@ -374,9 +387,10 @@ const PLUGIN_HANDLERS: Record<string, Handler> = {
  */
 export function installPreviewBackend(scenario: Scenario, settings: StandSettings = {}): void {
   const app = createHandlers(scenario, settings) as Record<string, Handler | undefined>;
+  const plugins = pluginHandlers(settings);
   mockIPC(
     (cmd, payload) => {
-      const handler = app[cmd] ?? PLUGIN_HANDLERS[cmd];
+      const handler = app[cmd] ?? plugins[cmd];
       if (!handler) {
         console.warn(`[preview] no answer for the command "${cmd}"`);
         return Promise.reject(`preview: no answer for "${cmd}"`);
