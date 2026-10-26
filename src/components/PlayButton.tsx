@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useReducer, useState } from "react";
 import { api } from "../lib/api";
 import { useT } from "../i18n";
 import { errorText } from "../i18n/errors";
 import { useMotionOn } from "../lib/motion";
 import { ART_WAIT_MS, playAreaWaiting } from "../lib/playArea";
+import { LAUNCH_HOLD_MS, launchHeld } from "../lib/launchHold";
+import { useWindowActive, windowActive } from "../lib/windowActive";
 import type { LaunchResult } from "../types";
 
 interface Props {
@@ -49,11 +51,27 @@ export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, 
     // текст ошибки совпал с прошлым разом.
   }, [externalFailure?.id]);
 
+  // После удачного запуска «Запускаю…» держится, пока фокус не заберёт игра
+  // или окно не уйдёт в трей, но не дольше потолка (`lib/launchHold.ts`):
+  // иначе надпись мелькала бы, а игру запускали бы дважды.
+  const active = useWindowActive();
+  const [held, dispatch] = useReducer(launchHeld, false);
+  useEffect(() => dispatch({ kind: "windowActive", active }), [active]);
+  useEffect(() => {
+    if (!held) return;
+    const timer = window.setTimeout(() => dispatch({ kind: "capped" }), LAUNCH_HOLD_MS);
+    return () => window.clearTimeout(timer);
+  }, [held]);
+  const launching = busy || held;
+
   const click = async () => {
     setBusy(true);
     setFailure(null);
     const result = await onLaunch();
     if (!result.ok) setFailure(result.msg);
+    // Активность — сейчас, а не из отрисовки, где нажали: за время запроса
+    // фокус могла забрать игра, а окно — уйти в трей.
+    dispatch({ kind: "answered", ok: result.ok, windowActive: windowActive() });
     setBusy(false);
   };
 
@@ -98,20 +116,20 @@ export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, 
       )}
       <div className="play-note">{note}</div>
       <button
-        className={busy ? "play launching" : "play"}
-        disabled={busy || fixing || disabled}
-        aria-busy={busy || undefined}
+        className={launching ? "play launching" : "play"}
+        disabled={launching || fixing || disabled}
+        aria-busy={launching || undefined}
         onClick={() => void click()}
       >
         {/* Блик «запускается…» — только пока идёт запуск: появляется вместе с
             состоянием и начинает проход с начала, а не с середины. */}
-        {busy && <span className="play-sheen" aria-hidden="true" />}
+        {launching && <span className="play-sheen" aria-hidden="true" />}
         {/* Обе надписи всегда в разметке, видна одна: кнопка шириной с
             длинную и не прыгает, когда «Играть» сменяется на «Запускаю…».
             Спрятанную стили убирают и от экранного диктора. */}
         <span className="play-label">
-          <span className={busy ? "is-off" : undefined}>{t.main.play}</span>
-          <span className={busy ? undefined : "is-off"}>{t.main.launching}</span>
+          <span className={launching ? "is-off" : undefined}>{t.main.play}</span>
+          <span className={launching ? undefined : "is-off"}>{t.main.launching}</span>
         </span>
       </button>
     </div>
