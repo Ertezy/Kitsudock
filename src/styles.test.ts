@@ -468,8 +468,9 @@ describe("стили берут значения только из шкал", ()
   });
 
   it("всё бесконечное движение стоит на паузе, пока окно неактивно", () => {
-    // Дрейф арта, блик «запускается…», мерцание двух видов заглушек.
-    expect(infiniteCount(decls)).toBeGreaterThanOrEqual(4);
+    // Дрейф арта, блик «запускается…», мерцание двух видов заглушек, стрелки
+    // часиков сроков.
+    expect(infiniteCount(decls)).toBeGreaterThanOrEqual(5);
     expect(pauseProblems(decls)).toEqual([]);
   });
 });
