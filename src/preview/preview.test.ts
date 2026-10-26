@@ -54,11 +54,12 @@ describe("адрес стенда", () => {
   });
 
   it("читает все параметры и отдаёт их обратно в адрес", async () => {
-    const { readParams, toSearch, SCENARIOS } = await import("./backend");
+    const { readParams, toSearch, SCENARIOS, WINDOW_STATES } = await import("./backend");
+    expect([...WINDOW_STATES]).toEqual(["auto", "on", "off"]);
     for (const scenario of SCENARIOS) {
       for (const lang of ["ru", "en"] as const) {
         for (const motion of [true, false]) {
-          for (const active of [true, false]) {
+          for (const active of WINDOW_STATES) {
             const params = { scenario, lang, motion, active, controls: true };
             expect(readParams(toSearch(params))).toEqual(params);
           }
@@ -69,19 +70,44 @@ describe("адрес стенда", () => {
     expect(toSearch(readParams("?controls=off"))).toContain("controls=off");
   });
 
-  it("неактивное окно — отдельный параметр, и по умолчанию окно активно", async () => {
+  it("окно стенда: по умолчанию следует за браузером, active=on держит его активным, active=off — неактивным", async () => {
     const { readParams, toSearch, DEFAULT_PARAMS } = await import("./backend");
-    expect(DEFAULT_PARAMS.active).toBe(true);
-    expect(readParams("?active=off").active).toBe(false);
+    expect(DEFAULT_PARAMS.active).toBe("auto");
+    expect(readParams("?active=off").active).toBe("off");
+    expect(readParams("?active=on").active).toBe("on");
+    expect(readParams("?active=maybe").active).toBe("auto");
     expect(readParams("?active=off").motion).toBe(true);
     expect(toSearch(readParams("?active=off"))).toContain("active=off");
+    expect(toSearch(readParams("?active=on"))).toContain("active=on");
+    expect(toSearch(readParams(""))).not.toContain("active");
   });
 
   it("неактивное окно стенд изображает ответом окна: оно спрятано", async () => {
     const { pluginHandlers } = await import("./backend");
     expect(pluginHandlers({})["plugin:window|is_visible"]({})).toBe(true);
-    expect(pluginHandlers({ active: true })["plugin:window|is_visible"]({})).toBe(true);
-    expect(pluginHandlers({ active: false })["plugin:window|is_visible"]({})).toBe(false);
+    expect(pluginHandlers({ active: "auto" })["plugin:window|is_visible"]({})).toBe(true);
+    expect(pluginHandlers({ active: "on" })["plugin:window|is_visible"]({})).toBe(true);
+    expect(pluginHandlers({ active: "off" })["plugin:window|is_visible"]({})).toBe(false);
+  });
+
+  it("active=on: окно держится активным, что бы ни делал браузер — для записи ролика с фокусом на другой программе", async () => {
+    const { holdWindowActive } = await import("./backend");
+    // Окно и страница без DOM: те же события и те же два чтения, что берёт
+    // `lib/windowActive.ts`. Браузер говорит: фокуса нет, страница не видна.
+    const win = new EventTarget();
+    const doc = Object.assign(new EventTarget(), { hasFocus: () => false, visibilityState: "hidden" });
+    holdWindowActive(win, doc);
+    // Слушатели приложения ставятся позже стенда.
+    const seen: string[] = [];
+    win.addEventListener("blur", () => seen.push("blur"));
+    win.addEventListener("focus", () => seen.push("focus"));
+    doc.addEventListener("visibilitychange", () => seen.push("visibilitychange"));
+    win.dispatchEvent(new Event("blur"));
+    doc.dispatchEvent(new Event("visibilitychange"));
+    win.dispatchEvent(new Event("focus"));
+    expect(seen).toEqual(["focus"]);
+    expect(doc.hasFocus()).toBe(true);
+    expect(doc.visibilityState).toBe("visible");
   });
 
   it("знает все пять состояний данных", async () => {

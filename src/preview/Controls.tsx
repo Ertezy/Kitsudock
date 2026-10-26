@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { SCENARIOS, toSearch, type PreviewParams, type Scenario } from "./backend";
+import { SCENARIOS, toSearch, type PreviewParams, type Scenario, type WindowState } from "./backend";
 import type { Lang } from "../i18n/native";
 
 // Плашка с переключателями стенда: живёт в отдельном корне поверх приложения и
@@ -113,16 +113,18 @@ export default function Controls({ params }: { params: PreviewParams }) {
         value={params.motion ? "on" : "off"}
         onPick={(motion) => go({ motion: motion === "on" })}
       />
-      {/* Неактивное окно (человек в игре): фоновое движение на паузе. Не то же,
-          что motion off — тот убирает движение совсем. */}
-      <Row<"on" | "off">
+      {/* Активно ли окно: как у браузера, всегда (запись ролика с фокусом на
+          программе записи) или никогда (человек в игре — фоновое движение на
+          паузе). Не то же, что motion off — тот убирает движение совсем. */}
+      <Row<WindowState>
         name="window"
         options={[
+          { value: "auto", text: "auto" },
           { value: "on", text: "active" },
           { value: "off", text: "inactive" },
         ]}
-        value={params.active ? "on" : "off"}
-        onPick={(active) => go({ active: active === "on" })}
+        value={params.active}
+        onPick={(active) => go({ active })}
       />
       <button type="button" style={{ ...pill(false), padding: "5px 8px" }} onClick={openSettings}>
         Settings

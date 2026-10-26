@@ -27,14 +27,26 @@ export type Scenario = "normal" | "loading" | "offline" | "stale" | "firstRun";
 
 export const SCENARIOS: readonly Scenario[] = ["normal", "loading", "offline", "stale", "firstRun"];
 
+/**
+ * Активно ли окно стенда (спека полировки, §8.2):
+ * - `auto` — как в приложении: окно неактивно, пока у вкладки нет фокуса или
+ *   она не видна;
+ * - `on` — окно всегда активно, что бы ни делал браузер: для записи ролика,
+ *   когда фокус у программы записи, а движение должно идти;
+ * - `off` — окно всегда неактивно, фоновое движение на паузе.
+ * Не то же, что `motion=off`: тот убирает движение совсем.
+ */
+export type WindowState = "auto" | "on" | "off";
+
+export const WINDOW_STATES: readonly WindowState[] = ["auto", "on", "off"];
+
 /** Всё состояние стенда — это адрес: `?scenario=normal&lang=ru&motion=on`. */
 export interface PreviewParams {
   scenario: Scenario;
   lang: Lang;
   motion: boolean;
-  /** Активно ли окно; `active=off` — окно неактивно, фоновое движение на паузе
-   *  (спека полировки, §8.2). Не то же, что `motion=off`: тот убирает движение. */
-  active: boolean;
+  /** Активно ли окно (`WindowState`); в адресе — `active=on` или `active=off`. */
+  active: WindowState;
   /** Показывать ли плашку с переключателями; `controls=off` убирает её для снимков. */
   controls: boolean;
 }
@@ -43,7 +55,7 @@ export const DEFAULT_PARAMS: PreviewParams = {
   scenario: "normal",
   lang: "ru",
   motion: true,
-  active: true,
+  active: "auto",
   controls: true,
 };
 
@@ -58,7 +70,7 @@ export function readParams(search: string): PreviewParams {
     scenario: pick("scenario", SCENARIOS, DEFAULT_PARAMS.scenario),
     lang: pick<Lang>("lang", ["ru", "en"], DEFAULT_PARAMS.lang),
     motion: pick("motion", ["on", "off"], "on") === "on",
-    active: q.get("active") !== "off",
+    active: pick("active", WINDOW_STATES, DEFAULT_PARAMS.active),
     controls: q.get("controls") !== "off",
   };
 }
@@ -70,7 +82,7 @@ export function toSearch(p: PreviewParams): string {
     lang: p.lang,
     motion: p.motion ? "on" : "off",
   });
-  if (!p.active) q.set("active", "off");
+  if (p.active !== "auto") q.set("active", p.active);
   if (!p.controls) q.set("controls", "off");
   return `?${q.toString()}`;
 }
@@ -166,8 +178,8 @@ const after = <T>(ms: number, make: () => T): Promise<T> =>
 export interface StandSettings {
   lang?: Lang;
   motion?: boolean;
-  /** `false` — окно неактивно: стенд отвечает, что оно спрятано. */
-  active?: boolean;
+  /** Активно ли окно (`WindowState`); по умолчанию `auto` — как у браузера. */
+  active?: WindowState;
 }
 
 /** Ответы стенда на команды моста. Отдельной функцией ради теста: ей не нужно окно. */
@@ -377,8 +389,28 @@ export function pluginHandlers(settings: StandSettings): Record<string, Handler>
     // спрятанным: это один из трёх признаков неактивности (`lib/windowActive.ts`),
     // и только его стенд держит сам — фокус и свёрнутость страница берёт у
     // браузера, и любой щелчок по стенду вернул бы окну фокус.
-    "plugin:window|is_visible": () => settings.active !== false,
+    "plugin:window|is_visible": () => settings.active !== "off",
   };
+}
+
+/**
+ * `active=on`: окно стенда держится активным, что бы ни делал браузер, —
+ * например, пока ролик пишется и фокус у программы записи (спека §3: стенд —
+ * и для снимков README, и для промо-ролика). Без этого движение, часики и
+ * карусель вставали бы всякий раз, когда вкладка стенда теряет фокус.
+ *
+ * Код приложения не меняется: стенд подменяет то, что `lib/windowActive.ts`
+ * читает у браузера, — как подменяет мост. Перехватчики ставятся раньше
+ * приложения и гасят события `blur` окна и `visibilitychange` страницы, а
+ * чтения фокуса и видимости всегда отвечают «есть». Видимость окна от моста
+ * стенд и так отвечает «видно».
+ */
+export function holdWindowActive(win: EventTarget, doc: EventTarget): void {
+  const swallow = (e: Event) => e.stopImmediatePropagation();
+  win.addEventListener("blur", swallow, { capture: true });
+  doc.addEventListener("visibilitychange", swallow, { capture: true });
+  Object.defineProperty(doc, "hasFocus", { configurable: true, value: () => true });
+  Object.defineProperty(doc, "visibilityState", { configurable: true, get: () => "visible" });
 }
 
 /**
@@ -406,4 +438,5 @@ export function installPreviewBackend(scenario: Scenario, settings: StandSetting
   (
     window as unknown as { __TAURI_INTERNALS__: { convertFileSrc: (path: string) => string } }
   ).__TAURI_INTERNALS__.convertFileSrc = (path) => path;
+  if (settings.active === "on") holdWindowActive(window, document);
 }
