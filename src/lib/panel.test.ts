@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { activeCodes, bannerHasClock, bannerKeys, codeHasClock, codesFor, dataStatus, emptyReason, linkable, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
+import { activeCodes, bannerHasClock, bannerKeys, codeHasClock, codesFor, dataStatus, emptyArt, emptyReason, linkable, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
 import { burnsToday } from "./time";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
@@ -158,6 +158,15 @@ describe("emptyReason", () => {
   });
 });
 
+describe("emptyArt", () => {
+  it("отказ — без рисунка: сцена «пусто» сказала бы неправду", () => {
+    expect(emptyArt("listFailed")).toBe("none");
+  });
+  it("пустые места — карточка, которой пока нет", () => {
+    for (const reason of ["noGames", "unlinked", "uncollected", "stale", "quiet"] as const) expect(emptyArt(reason), reason).toBe("card");
+  });
+});
+
 describe("linkable", () => {
   const hubWith = (games: { id: string; title: string }[], codeGames: string[] = [], videoGames: string[] = []): HubData => ({
     ...hub("remote"),
@@ -189,18 +198,20 @@ describe("dataStatus", () => {
   it("без данных говорит, что свежих данных нет и их можно проверить снова", () => {
     expect(dataStatus(null, NOW, "ru")).toBe(ru.panel.noDataYet);
   });
-  it("данные из комплекта — то же самое", () => {
-    expect(dataStatus(hub("bundled", [code(null)]), NOW, "ru")).toBe(ru.panel.noDataYet);
-  });
-  it("пустые данные из сети — то же самое", () => {
+  it("пустые данные из сети или из комплекта — то же самое", () => {
     expect(dataStatus(hub("remote"), NOW, "ru")).toBe(ru.panel.noDataYet);
+    expect(dataStatus(hub("bundled"), NOW, "ru")).toBe(ru.panel.noDataYet);
   });
   it("живые данные называют источник и свежесть", () => {
     expect(dataStatus(hub("remote", [code(null)]), NOW, "ru")).toBe("Источник — из сети, данные свежие.");
   });
+  it("данные из комплекта с содержимым — так же, как подвал панели: источник и свежесть", () => {
+    expect(dataStatus(hub("bundled", [code(null)]), NOW, "ru")).toBe("Источник — из комплекта, данные свежие.");
+  });
   it("то же по-английски", () => {
     expect(dataStatus(null, NOW, "en")).toBe(en.panel.noDataYet);
     expect(dataStatus(hub("remote", [code(null)]), NOW, "en")).toBe("Source: online, data is fresh.");
+    expect(dataStatus(hub("bundled", [code(null)]), NOW, "en")).toBe("Source: bundled, data is fresh.");
   });
 });
 

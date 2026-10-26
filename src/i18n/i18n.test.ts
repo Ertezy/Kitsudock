@@ -39,6 +39,16 @@ describe("словари", () => {
     }
   });
 
+  it("пустая панель обещает только то, что правда", () => {
+    // Когда выйдут новые коды, не знает никто: «сами, когда выйдут», без «как только».
+    expect(ru.panel.emptyQuietHint).toBe("Новые появятся здесь сами, когда выйдут.");
+    expect(en.panel.emptyQuietHint).toBe("New ones will show up here on their own once they're out.");
+    // Крестик по умолчанию прячет окно в трей, и «перезапуск» им список не
+    // перечитывает. Возврат из настроек перечитывает (`closeSettings` → `load`, App.tsx).
+    expect(ru.panel.listFailedHint).toBe("Откройте настройки и вернитесь назад — список загрузится снова.");
+    expect(en.panel.listFailedHint).toBe("Open Settings and come back to load the list again.");
+  });
+
   it("dictionary и currentT отдают словарь нужного языка", () => {
     expect(dictionary("en")).toBe(en);
     expect(dictionary("ru")).toBe(ru);

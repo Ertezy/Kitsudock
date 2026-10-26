@@ -124,6 +124,14 @@ export function emptyReason(state: {
 }
 
 /**
+ * Рисунок пустой панели (`EmptyState`). Отказ — без рисунка: список игр не
+ * загрузился, и сцена «здесь пока пусто» сказала бы неправду.
+ */
+export function emptyArt(reason: EmptyReason): "card" | "none" {
+  return reason === "listFailed" ? "none" : "card";
+}
+
+/**
  * Название, как его сравнивает Rust (`catalog::normalize`): только буквы и
  * цифры, без регистра. «Arknights: Endfield» и «arknights endfield» — одно.
  */
@@ -189,10 +197,16 @@ export function sourceLabel(source: string | undefined, t: Dictionary): string {
   return labels[source] ?? t.panel.unknownSource;
 }
 
-/** Строка состояния на вкладке «Данные» (спека этапа 5, §7.5). */
+/**
+ * Строка состояния на вкладке «Данные» (спека этапа 5, §7.5): источник и
+ * свежесть, как в подвале панели. Данные из комплекта — тоже: подвал говорит о
+ * них «данные свежие · из комплекта», и вкладка не должна спорить с ним.
+ * «Свежих данных пока нет» — только когда данных нет вовсе или в них нет ни
+ * кодов, ни баннеров, ни видео.
+ */
 export function dataStatus(hub: HubData | null, nowSec: number, lang: Lang): string {
   const t = dictionary(lang);
-  if (!hub || hub._source === "bundled") return t.panel.noDataYet;
+  if (!hub) return t.panel.noDataYet;
   if (hub.codes.length === 0 && hub.banners.length === 0 && hub.videos.length === 0) {
     return t.panel.noDataYet;
   }

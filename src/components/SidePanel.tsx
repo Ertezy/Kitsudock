@@ -4,7 +4,7 @@ import Banners from "./panel/Banners";
 import Videos from "./panel/Videos";
 import Skeleton from "./panel/Skeleton";
 import EmptyState from "./EmptyState";
-import { codesFor, emptyReason, linkable, panelIsEmpty, sourceLabel, videosFor } from "../lib/panel";
+import { codesFor, emptyArt, emptyReason, linkable, panelIsEmpty, sourceLabel, videosFor } from "../lib/panel";
 import { entryEnded, hubChanged, isEntryAnimation, panelMounted, skeletonShown } from "../lib/panelEntry";
 import { hubFreshness } from "../lib/time";
 import { api } from "../lib/api";
@@ -141,7 +141,7 @@ export default function SidePanel({ hub, selectedContentId, selectedTitle, games
         {hub && <PromoCodes codes={codes} games={hub.games} nowSec={nowSec} />}
         <Banners banners={banners} nowSec={nowSec} />
         <Videos videos={videos} nowSec={nowSec} />
-        {empty && <EmptyState className="panel-empty" title={emptyTitle} hint={emptyHint} />}
+        {empty && <EmptyState className="panel-empty" title={emptyTitle} hint={emptyHint} art={emptyArt(reason)} />}
       </div>
 
       <div className="panel-foot">

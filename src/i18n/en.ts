@@ -22,13 +22,15 @@ export const en = {
     // Пустая панель (`EmptyState`): заголовок — что случилось, подсказка — что
     // делать; причины — `lib/panel.ts`, `emptyReason`.
     panelEmpty: "No codes, banners or videos yet",
-    emptyQuietHint: "New ones will show up here as soon as they're out.",
+    emptyQuietHint: "New ones will show up here on their own once they're out.",
     emptyStaleHint: "The data is over a week old, so codes and banners are hidden. They'll be back after the next update.",
     unlinkedTitle: "No data for this game",
     unlinkedHint: "You can link the game to data in its settings: \"Codes, banners and videos of\".",
     uncollectedHint: "The game isn't linked to any data. If data is collected for it, link it in the game's settings.",
     listFailedTitle: "The game list didn't load",
-    listFailedHint: "Restart the app to load the list again.",
+    // Крестик по умолчанию прячет окно в трей и список не перечитывает, а
+    // возврат из настроек перечитывает (`closeSettings` → `load` в App.tsx).
+    listFailedHint: "Open Settings and come back to load the list again.",
     noGamesTitle: "No games yet",
     noGamesHint: "Add them in Settings: the gear at the bottom of this panel.",
     sources: { remote: "online", override: "local override", cache: "from cache", bundled: "bundled" },
