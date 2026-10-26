@@ -15,6 +15,30 @@ export function runningBanners(banners: Banner[], nowSec: number): Banner[] {
 }
 
 /**
+ * Есть ли у кода часики срока (спека полировки, §8.3): только у кода со
+ * сроком, который ещё идёт. У бессрочного и сгоревшего их нет. Нет их и пока
+ * строка срока говорит, что код не скопировался (`failed`): срока в ней тогда
+ * нет. Последние сутки часики не прячут — они становятся горячими. Истина
+ * заодно сужает тип: срок у кода — число.
+ */
+export function codeHasClock<T extends Pick<Code, "expiresAt">>(
+  code: T,
+  nowSec: number,
+  failed: boolean,
+): code is T & { expiresAt: number } {
+  return !failed && code.expiresAt !== null && code.expiresAt > nowSec;
+}
+
+/**
+ * Есть ли у баннера часики срока: только у идущего — уже начавшегося и ещё не
+ * кончившегося. У будущего («Скоро · через …») и у кончившегося их нет.
+ * Последние сутки часики не прячут — они становятся горячими.
+ */
+export function bannerHasClock(banner: Pick<Banner, "startsAt" | "endsAt">, nowSec: number): boolean {
+  return banner.startsAt <= nowSec && banner.endsAt > nowSec;
+}
+
+/**
  * Сколько баннеров одной игры идёт в карусель. Каждый слайд держит свою
  * картинку, а значит и своё скачивание: без потолка щедрый файл хаба открывал
  * бы десятки загрузок разом. Хвост списка отбрасывается после обычного порядка.

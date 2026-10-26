@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import CachedImage from "./CachedImage";
-import { bannerKeys, plainSpaces, shownBanners } from "../../lib/panel";
+import { bannerHasClock, bannerKeys, plainSpaces, shownBanners } from "../../lib/panel";
 import { bannerShareLeft, burnsToday, progress, timeLeft } from "../../lib/time";
 import DeadlineClock from "./DeadlineClock";
 import { useMotionOn } from "../../lib/motion";
@@ -164,10 +164,10 @@ function BannerCard({ banner: b, nowSec, lang, hidden }: CardProps) {
           )}
           <div className="banner-line">
             <span className="banner-title">{plainSpaces(b.title)}</span>
-            {/* Часики — у идущего баннера; у будущего и у кончившегося их нет. */}
+            {/* Где у баннера часики, решает `bannerHasClock` (`lib/panel.ts`). */}
             {!upcoming && (
               <span className="banner-left">
-                {b.endsAt > nowSec && (
+                {bannerHasClock(b, nowSec) && (
                   <DeadlineClock share={bannerShareLeft(b.startsAt, b.endsAt, nowSec)} hot={burnsToday(b.endsAt, nowSec)} />
                 )}
                 {timeLeft(b.endsAt, nowSec, lang)}

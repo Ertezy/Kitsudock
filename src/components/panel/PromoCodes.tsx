@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { copyAnnouncement, copyFeedbackOver, feedbackMs, isCopied, isCopyFailed, type Copied } from "../../lib/copyFeedback";
-import { activeCodes, plainSpaces } from "../../lib/panel";
+import { activeCodes, codeHasClock, plainSpaces } from "../../lib/panel";
 import { burnsToday, codeShareLeft, timeLeft } from "../../lib/time";
 import DeadlineClock from "./DeadlineClock";
 import { useLang, useT } from "../../i18n";
@@ -86,9 +86,8 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
           const game = gameOf(c.gameId);
           const soon = c.expiresAt !== null && burnsToday(c.expiresAt, nowSec);
           const failed = isCopyFailed(copied, c.code);
-          // Часики — у кода со сроком, который ещё идёт. Пока строка срока
-          // говорит о неудаче копирования, срока в ней нет — нет и часиков.
-          const clockShare = !failed && c.expiresAt !== null && c.expiresAt > nowSec ? codeShareLeft(c.expiresAt, nowSec) : null;
+          // Где у кода часики, решает `codeHasClock` (`lib/panel.ts`).
+          const clockShare = codeHasClock(c, nowSec, failed) ? codeShareLeft(c.expiresAt, nowSec) : null;
           return (
             <div
               key={`${c.gameId}:${c.code}`}

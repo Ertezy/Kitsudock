@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { activeCodes, bannerKeys, codesFor, dataStatus, emptyReason, linkable, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
+import { activeCodes, bannerHasClock, bannerKeys, codeHasClock, codesFor, dataStatus, emptyReason, linkable, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
+import { burnsToday } from "./time";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
 import type { Banner, Code, HubData, Video } from "../types";
@@ -57,6 +58,56 @@ describe("runningBanners", () => {
   it("оставляет только идущие сейчас", () => {
     const list = [banner(NOW - 10, NOW + 10), banner(NOW + 5, NOW + 10), banner(NOW - 10, NOW)];
     expect(runningBanners(list, NOW)).toHaveLength(1);
+  });
+});
+
+const HOUR = 3600;
+const DAY = 86400;
+
+describe("codeHasClock — где у кода нет часиков срока", () => {
+  it("у бессрочного кода часиков нет", () => {
+    expect(codeHasClock(code(null), NOW, false)).toBe(false);
+  });
+  it("у сгоревшего кода часиков нет, и у сгорающего ровно сейчас тоже", () => {
+    expect(codeHasClock(code(NOW - HOUR), NOW, false)).toBe(false);
+    expect(codeHasClock(code(NOW), NOW, false)).toBe(false);
+  });
+  it("у кода с идущим сроком часики есть", () => {
+    expect(codeHasClock(code(NOW + 2 * DAY), NOW, false)).toBe(true);
+    expect(codeHasClock(code(NOW + 30 * DAY), NOW, false)).toBe(true);
+  });
+  it("в последние сутки часики остаются — горячими", () => {
+    expect(burnsToday(NOW + 3 * HOUR, NOW)).toBe(true);
+    expect(codeHasClock(code(NOW + 3 * HOUR), NOW, false)).toBe(true);
+    expect(codeHasClock(code(NOW + 1), NOW, false)).toBe(true);
+  });
+  it("пока строка срока говорит, что код не скопировался, часиков нет", () => {
+    expect(codeHasClock(code(NOW + 2 * DAY), NOW, true)).toBe(false);
+    expect(codeHasClock(code(NOW + 3 * HOUR), NOW, true)).toBe(false);
+    expect(codeHasClock(code(null), NOW, true)).toBe(false);
+  });
+});
+
+describe("bannerHasClock — где у баннера нет часиков срока", () => {
+  it("у будущего баннера («Скоро») часиков нет", () => {
+    expect(bannerHasClock(banner(NOW + DAY, NOW + 10 * DAY), NOW)).toBe(false);
+    expect(bannerHasClock(banner(NOW + 1, NOW + 10 * DAY), NOW)).toBe(false);
+  });
+  it("у кончившегося баннера часиков нет, и у кончающегося ровно сейчас тоже", () => {
+    expect(bannerHasClock(banner(NOW - 10 * DAY, NOW - DAY), NOW)).toBe(false);
+    expect(bannerHasClock(banner(NOW - 10 * DAY, NOW), NOW)).toBe(false);
+  });
+  it("у идущего баннера часики есть, и у только что начавшегося тоже", () => {
+    expect(bannerHasClock(banner(NOW - 5 * DAY, NOW + 5 * DAY), NOW)).toBe(true);
+    expect(bannerHasClock(banner(NOW, NOW + 5 * DAY), NOW)).toBe(true);
+  });
+  it("в последние сутки часики остаются — горячими", () => {
+    expect(burnsToday(NOW + 3 * HOUR, NOW)).toBe(true);
+    expect(bannerHasClock(banner(NOW - 5 * DAY, NOW + 3 * HOUR), NOW)).toBe(true);
+  });
+  it("у баннера с нулевым или обратным сроком часиков нет", () => {
+    expect(bannerHasClock(banner(NOW, NOW), NOW)).toBe(false);
+    expect(bannerHasClock(banner(NOW + DAY, NOW - DAY), NOW)).toBe(false);
   });
 });
 
