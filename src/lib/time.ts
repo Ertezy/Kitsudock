@@ -45,6 +45,41 @@ export function progress(startSec: number, endSec: number, nowSec: number): numb
   return Math.min(1, Math.max(0, passed));
 }
 
+const WEEK = 7 * DAY;
+
+const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
+
+/**
+ * Кольцо часиков у кода (спека полировки, §8.3): доля оставшегося срока,
+ * 0..1. Неделя и больше до сгорания — полное кольцо, дальше оно убывает
+ * линейно. Своего начала у кода нет, поэтому мерка — неделя.
+ */
+export function codeShareLeft(untilSec: number, nowSec: number): number {
+  return clamp01((untilSec - nowSec) / WEEK);
+}
+
+/**
+ * Кольцо часиков у баннера: доля оставшегося от всего его срока, от начала до
+ * конца, 0..1. Нулевой или обратный срок — пустое кольцо.
+ */
+export function bannerShareLeft(startSec: number, endSec: number, nowSec: number): number {
+  const total = endSec - startSec;
+  if (total <= 0) return 0;
+  return clamp01((endSec - nowSec) / total);
+}
+
+/** Самая короткая дуга кольца — краешек, который ещё видно. */
+export const CLOCK_MIN_ARC = 0.04;
+
+/**
+ * Дуга, которую рисуют часики, 0..1: доля срока, но не короче `CLOCK_MIN_ARC`
+ * — почти истёкший срок остаётся видимым краешком, а не пропадает совсем.
+ * Истёкшему часики не рисуются вовсе.
+ */
+export function clockArc(share: number): number {
+  return Math.max(CLOCK_MIN_ARC, clamp01(share));
+}
+
 /**
  * «data is fresh» или «data from Sep 1» — единая формулировка свежести
  * данных хаба. Используется и в подвале панели, и в разделе «Данные»

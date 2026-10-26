@@ -354,11 +354,14 @@ describe("читаемость палитры", () => {
     const white: Colour = [255, 255, 255, 1];
     const plateOnArt = over(get("--plate"), white);
     const errorOnArt = over(mixOf(ruleValue(rawCss, ".banner, .play-error", "background"), get), white);
+    // Строка под картинкой баннера — срок и название — на своей подложке поверх
+    // стекла панели.
+    const bannerFoot = over(get(colourToken(ruleValue(rawCss, ".banner-foot", "background"))), glass);
     return {
       get,
       grain: grainVeil(rawCss, get),
       labelOpacity: labelOpacity(rawCss),
-      surfaces: { bg, glass, card, burning, accent, settingsCard, hoveredRow, hoveredOption, segmentedTrack, segmentedTrackOnBg, copyFailed, plateOnArt, errorOnArt },
+      surfaces: { bg, glass, card, burning, accent, settingsCard, hoveredRow, hoveredOption, segmentedTrack, segmentedTrackOnBg, copyFailed, plateOnArt, errorOnArt, bannerFoot },
     };
   };
 
@@ -488,5 +491,51 @@ describe("читаемость палитры", () => {
         expect(contrast(colour, surfaces[surface])).toBeGreaterThanOrEqual(3);
       });
     }
+  }
+
+  // Часики сроков (спека полировки, §8.3). Дуга кольца — нетекстовая графика,
+  // ей хватает 3:1 к тому, на чём она лежит (WCAG 1.4.11): к карточке кода —
+  // обычной и горящей — и к строке под картинкой баннера. И к своей дорожке:
+  // где дуга кончается, рядом с ней — дорожка на той же подложке. Цвета берутся
+  // из самих правил часиков, а не из названий токенов здесь.
+  const clock = () => {
+    const { get, surfaces } = palette();
+    const stroke = (selector: string) => colourToken(ruleValue(rawCss, selector, "stroke"));
+    const track = get(stroke(".clock-track"));
+    const on = (surface: Colour) => over(track, surface);
+    return {
+      arc: { normal: get(stroke(".clock-arc")), hot: get(stroke(".clock.is-hot .clock-arc")) },
+      places: {
+        card: surfaces.card,
+        burning: surfaces.burning,
+        bannerFoot: surfaces.bannerFoot,
+        trackOnCard: on(surfaces.card),
+        trackOnBurning: on(surfaces.burning),
+        trackOnBannerFoot: on(surfaces.bannerFoot),
+      },
+    };
+  };
+
+  it("горячее кольцо — того же цвета, что срок на горящей карточке; обычное — цвета содержимого", () => {
+    const stroke = (selector: string) => colourToken(ruleValue(rawCss, selector, "stroke"));
+    expect(stroke(".clock.is-hot .clock-arc")).toBe(colourToken(ruleValue(rawCss, ".code-timer.soon", "color")));
+    expect(stroke(".clock-arc")).toBe("--content");
+  });
+
+  const clockPairs: [string, "normal" | "hot", keyof ReturnType<typeof clock>["places"]][] = [
+    ["обычное кольцо на карточке кода", "normal", "card"],
+    ["горячее кольцо на горящей карточке кода", "hot", "burning"],
+    ["обычное кольцо на строке баннера", "normal", "bannerFoot"],
+    ["горячее кольцо на строке баннера", "hot", "bannerFoot"],
+    ["обычное кольцо на своей дорожке на карточке кода", "normal", "trackOnCard"],
+    ["горячее кольцо на своей дорожке на горящей карточке", "hot", "trackOnBurning"],
+    ["обычное кольцо на своей дорожке на строке баннера", "normal", "trackOnBannerFoot"],
+    ["горячее кольцо на своей дорожке на строке баннера", "hot", "trackOnBannerFoot"],
+  ];
+  for (const [name, arc, place] of clockPairs) {
+    it(`часики сроков: ${name} не ниже 3:1`, () => {
+      const c = clock();
+      expect(contrast(c.arc[arc], c.places[place])).toBeGreaterThanOrEqual(3);
+    });
   }
 });

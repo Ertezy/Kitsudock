@@ -54,8 +54,9 @@
   /* Метка премьеры на превью видео — красная, как принято у видеосервисов. */
   --premiere: #c23345;
 
-  /* Светлое поверх тёмного: дорожка полосы баннера, точки карусели (обычная и
-     будущего баннера), полоса прокрутки, подпись-заглушка вместо картинки. */
+  /* Светлое поверх тёмного: дорожка полосы баннера и кольца часиков сроков,
+     точки карусели (обычная и будущего баннера), полоса прокрутки,
+     подпись-заглушка вместо картинки. */
   --track: rgba(247, 241, 249, 0.14);
   --dot: rgba(247, 241, 249, 0.25);
   --dot-dim: rgba(247, 241, 249, 0.12);
@@ -102,7 +103,8 @@
    *
    * Остальные скорости — доли и кратные базовой: быстрая (отклик кнопки)
    * ≈0.12 с, базовая (наведение) 0.18 с, медленная (появление панели) ≈0.32 с,
-   * сценическая (смена фона игры) ≈0.6 с, фоновая (дрейф арта) ≈40 с.
+   * сценическая (смена фона игры) ≈0.6 с, фоновая (дрейф арта) ≈40 с, оборот
+   * стрелки часиков сроков ≈8 с, а в последние сутки срока ≈2 с.
    *
    * Чтобы сломать это, надо специально написать длительность числом мимо
    * переменных; `src/styles.test.ts` такое не пропускает. */
@@ -111,6 +113,8 @@
   --move-slow: calc(var(--move) * 1.78);
   --move-scene: calc(var(--move) * 3.33);
   --move-ambient: calc(var(--move) * 222);
+  --move-clock: calc(var(--move) * 44);
+  --move-clock-hot: calc(var(--move) * 11);
   /* Две кривые: плавное торможение для появлений и всего, что меняет цвет или
      прозрачность; лёгкая пружина с микроперелётом — для нажатий и наведения
      там, где меняется положение или размер. */
@@ -1358,7 +1362,11 @@ body::after {
 
 .code-main { flex: 1; min-width: 0; }
 
+/* Строка срока — в ряд с часиками слева от текста (ниже). */
 .code-timer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
   color: var(--ink-dim);
@@ -1366,6 +1374,52 @@ body::after {
 }
 .code-timer.soon { color: var(--accent); }
 .code-region { font-size: var(--text-xs); letter-spacing: 0.02em; color: var(--ink-faint); margin-top: 3px; }
+
+/* Часики сроков (спека полировки, §8.3; `panel/DeadlineClock.tsx`) — слева
+   от срока кода и от остатка идущего баннера. Кольцо — доля оставшегося
+   срока, по часовой от двенадцати: тусклая дорожка и поверх неё дуга. Дуга —
+   цвет содержимого, а в последние сутки — цвет срока горящей карточки
+   (`.code-timer.soon`). Стрелка цветом текста спокойно бежит по кругу, в
+   последние сутки быстрее; движется она одним поворотом, и не сама линия, а
+   её отдельный слой поверх кольца — кольцо не перерисовывается.
+   Размер — полтора кегля строки срока. Строку часики не раздвигают: лишняя
+   высота уходит в отрицательные поля по вертикали, и карточка той же высоты,
+   что без них. Контраст дуги к карточкам и к дорожке —
+   `src/paletteContrast.test.ts`. */
+.clock {
+  position: relative;
+  flex: none;
+  width: calc(var(--text-xs) * 1.5);
+  height: calc(var(--text-xs) * 1.5);
+  margin-block: calc((1lh - var(--text-xs) * 1.5) / 2);
+}
+.clock-face,
+.clock-hand {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.clock-face circle {
+  fill: none;
+  stroke-width: 2.4;
+}
+.clock-track { stroke: var(--track); }
+.clock-arc { stroke: var(--content); stroke-linecap: round; }
+.clock.is-hot .clock-arc { stroke: var(--accent); }
+.clock-hand {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  animation: clock-hand var(--move-clock) linear infinite;
+}
+.clock.is-hot .clock-hand { animation-duration: var(--move-clock-hot); }
+
+@keyframes clock-hand {
+  to {
+    transform: rotate(1turn);
+  }
+}
 
 .code-side { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .code-buttons { display: flex; gap: 4px; }
@@ -1528,7 +1582,8 @@ body::after {
   color: var(--content-soft);
   overflow-wrap: anywhere;
 }
-.banner-left { flex: none; }
+/* Остаток идущего баннера — с часиками слева (у `.clock`). */
+.banner-left { flex: none; display: flex; align-items: center; gap: 5px; }
 
 .carousel-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
 /* Текущая точка чуть крупнее соседних и дорастает до размера с пружинкой. */
@@ -1837,11 +1892,12 @@ body::after {
    длительностью было бы не остановкой, а вырожденным циклом. Начатые переходы
    обрываются сразу, как у дока. Приближение превью под курсором без анимации
    было бы скачком — его нет. Галочка копирования и крупная текущая точка
-   карусели остаются: это состояние, а не движение. */
+   карусели остаются: это состояние, а не движение. Стрелка часиков сроков
+   стоит на двенадцати, кольцо остаётся: доля срока — тоже состояние. */
 :root[data-motion="off"] .panel,
 :root[data-motion="off"] .panel .panel-scroll > *,
 :root[data-motion="off"] .panel :is(.panel-stale, .panel-update),
-:root[data-motion="off"] :is(.skeleton-block, .img-shown),
+:root[data-motion="off"] :is(.skeleton-block, .img-shown, .clock-hand),
 :root[data-motion="off"] .img-tone::before {
   animation: none;
 }
@@ -2818,11 +2874,11 @@ select.input {
    человек в игре (спека полировки, §8.2; признак ставит `lib/windowActive.ts`).
    Всё бесконечное фоновое движение замирает там, где его застало, и идёт
    дальше, когда человек вернулся: дрейф арта, блик «запускается…», мерцание
-   заглушек. Это не тумблер «Анимация» выше: тот убирает движение совсем, а
-   здесь оно только стоит; при обоих сразу правило тумблера уже сняло
-   анимацию, и пауза ей ничего не добавляет. Новое бесконечное движение без
-   строки здесь не пропустит `src/styles.test.ts`. */
-:root[data-active="off"] :is(.art-photo, .skeleton-block),
+   заглушек, стрелки часиков сроков. Это не тумблер «Анимация» выше: тот
+   убирает движение совсем, а здесь оно только стоит; при обоих сразу правило
+   тумблера уже сняло анимацию, и пауза ей ничего не добавляет. Новое
+   бесконечное движение без строки здесь не пропустит `src/styles.test.ts`. */
+:root[data-active="off"] :is(.art-photo, .skeleton-block, .clock-hand),
 :root[data-active="off"] :is(.play-sheen, .img-tone)::before {
   animation-play-state: paused;
 }

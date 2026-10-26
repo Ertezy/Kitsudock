@@ -162,7 +162,8 @@ function banners(now: number): Banner[] {
     b("genshin", "Frost Orchard", ["Kasumi"], 5, imageUrl("banner", 268, 218, 13), now + 6 * D, now + 27 * D),
     // У этой игры вики не хранит арт баннеров: рисуется запасной градиент с названием.
     b("hsr", "Rails Beyond the Frost", ["Kasumi Vale"], 5, null, now - 9 * D, now + 11 * D),
-    b("hsr", "Quiet Orchard Rerun", ["Orren", "Vey"], 4, null, now - 9 * D, now + 11 * D),
+    // Кончается в ближайшие сутки: часики срока у него горячие.
+    b("hsr", "Quiet Orchard Rerun", ["Orren", "Vey"], 4, null, now - 9 * D, now + 18 * H),
     b("zzz", "Neon Static", ["Rook"], 5, imageUrl("banner", 338, 28, 21), now - 6 * D, now + 8 * D),
     b("zzz", "Midnight Arcade", ["Pim"], 5, imageUrl("banner", 300, 330, 22), now + 8 * D, now + 29 * D),
     // Без героев и редкости: подписи поверх арта нет.

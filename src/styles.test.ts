@@ -91,8 +91,15 @@ const TIMING_PROPS = [
 /** Время числом, со знаком: `-3s` — задержка вперёд, а не часть имени; в имени вроде `fade-3s` цифра времени не считается. */
 const TIME = /(?<![\w-])[-+]?\d*\.?\d+m?s(?![\w-])/;
 const CURVE = /cubic-bezier\(|steps\(|linear\(|(?<![\w-])(ease|ease-in|ease-out|ease-in-out|linear|step-start|step-end)(?![\w-])/;
-/** Дрейф арта — не появление и не нажатие, поэтому у него своя кривая. Больше ни у кого. */
-const ART_DRIFT = /^art-drift\s/;
+/**
+ * Своя кривая — у двух фоновых движений, которые не появление и не нажатие, и
+ * только в их собственной анимации. Дрейф арта плавно разворачивается у краёв
+ * (`ease-in-out`). Стрелка часиков сроков бежит ровно (`linear`): с любой
+ * кривой из шкалы она на каждом обороте то разгонялась бы, то замирала —
+ * читалось бы как тиканье рывками, а не спокойный бег (спека полировки, §8.3).
+ * Больше ни у кого, и в шкалу `--ease-…` эти кривые не входят.
+ */
+const OWN_CURVE: Record<string, string> = { "art-drift": "ease-in-out", "clock-hand": "linear" };
 
 /**
  * Значение без имён переменных, но с их запасными значениями: `var(--move, 0.2s)`
@@ -125,15 +132,16 @@ function durationProblems(decls: Decl[]): string[] {
   return bad;
 }
 
-/** Кривые только из шкалы; `ease-in-out` — только у дрейфа арта. */
+/** Кривые только из шкалы; `ease-in-out` — только у дрейфа арта, `linear` — только у стрелки часиков. */
 function curveProblems(decls: Decl[]): string[] {
   const bad: string[] = [];
   for (const d of decls) {
     if (isRoot(d.selector) || !TIMING_PROPS.includes(d.prop)) continue;
     for (const s of segments(d.value)) {
       const curves = [...withoutVarNames(s).matchAll(new RegExp(CURVE, "g"))].map((m) => m[0]);
-      const drift = d.prop === "animation" && ART_DRIFT.test(s) && curves.length === 1 && curves[0] === "ease-in-out";
-      if (curves.length && !drift) bad.push(`${d.selector} { ${d.prop}: ${s} }`);
+      const own = OWN_CURVE[/^([\w-]+)\s/.exec(s)?.[1] ?? ""];
+      const allowed = d.prop === "animation" && own !== undefined && curves.length === 1 && curves[0] === own;
+      if (curves.length && !allowed) bad.push(`${d.selector} { ${d.prop}: ${s} }`);
     }
   }
   return bad;
@@ -408,7 +416,7 @@ describe("стили берут значения только из шкал", ()
     expect(durationProblems(decls)).toEqual([]);
   });
 
-  it("кривые — только из шкалы (у дрейфа арта своя, ease-in-out: он не появление)", () => {
+  it("кривые — только из шкалы (свои — у дрейфа арта и у стрелки часиков: они не появление)", () => {
     expect(curveProblems(decls)).toEqual([]);
   });
 
@@ -479,6 +487,42 @@ describe("токены фокуса", () => {
   });
 });
 
+describe("часики сроков", () => {
+  const root = new Map(decls.filter((d) => d.selector === ":root").map((d) => [d.prop, d.value]));
+  /** Длительность токена в секундах: `calc(var(--move) * N)` при нынешней --move. */
+  const seconds = (token: string) => {
+    const m = /^calc\(var\(--move\) \* (\d+(?:\.\d+)?)\)$/.exec(root.get(token) ?? "");
+    if (!m) throw new Error(`${token} должен быть вида calc(var(--move) * N), а он «${root.get(token)}»`);
+    return Number(m[1]) * Number.parseFloat(root.get("--move") ?? "");
+  };
+  const value = (selector: string, prop: string) =>
+    decls.filter((d) => members(d.selector).includes(selector) && d.prop === prop).map((d) => d.value);
+
+  it("оборот стрелки — около 8 с, в последние сутки — около 2 с, от переменной движения", () => {
+    expect(seconds("--move-clock")).toBeGreaterThanOrEqual(7);
+    expect(seconds("--move-clock")).toBeLessThanOrEqual(9);
+    expect(seconds("--move-clock-hot")).toBeGreaterThanOrEqual(1.5);
+    expect(seconds("--move-clock-hot")).toBeLessThanOrEqual(2.5);
+  });
+
+  it("стрелка бежит ровно и бесконечно, в последние сутки — быстрее", () => {
+    expect(value(".clock-hand", "animation")).toEqual(["clock-hand var(--move-clock) linear infinite"]);
+    expect(value(".clock.is-hot .clock-hand", "animation-duration")).toEqual(["var(--move-clock-hot)"]);
+  });
+
+  it("стрелка только поворачивается", () => {
+    const frames = /@keyframes clock-hand\s*\{([\s\S]*?\})\s*\}/.exec(rawCss.replace(/\/\*[\s\S]*?\*\//g, ""));
+    expect(frames, "нет @keyframes clock-hand").not.toBeNull();
+    const props = parse(`x { ${frames![1]} }`).map((d) => `${d.prop}: ${d.value}`);
+    expect(props).toEqual(["transform: rotate(1turn)"]);
+  });
+
+  it("тумблер «Анимация» выключен — стрелка стоит на двенадцати, кольцо остаётся", () => {
+    expect(value(':root[data-motion="off"] .clock-hand', "animation")).toEqual(["none"]);
+    expect(decls.filter((d) => isMotionOff(d.selector) && /clock-(arc|track|face)|\.clock(?![\w-])/.test(d.selector))).toEqual([]);
+  });
+});
+
 describe("палитра", () => {
   const base = new Map(decls.filter((d) => d.selector === ":root" && d.prop.startsWith("--")).map((d) => [d.prop, d.value]));
   /** Цветовые токены основы: те, в чьих значениях есть цвет числом. */
@@ -545,6 +589,17 @@ describe("сторож ловит нарушения", () => {
     expect(curveProblems(css(".x { animation: art-drift var(--move-ambient) linear infinite; }"))).toHaveLength(1);
     expect(curveProblems(css(".x { transition: transform var(--move) cubic-bezier(0.2, 1, 0.3, 1); }"))).toHaveLength(1);
     expect(curveProblems(css(".x { transition: opacity var(--move) var(--ease-out); }"))).toEqual([]);
+  });
+
+  it("linear разрешён только стрелке часиков: она бежит ровно, а не толчками", () => {
+    expect(curveProblems(css(".x { animation: clock-hand var(--move-clock) linear infinite; }"))).toEqual([]);
+    expect(curveProblems(css(".x { animation: clock-hand var(--move-clock) ease-in-out infinite; }"))).toHaveLength(1);
+    // Своя кривая — только в своей анимации, а не у соседней в том же списке.
+    expect(curveProblems(css(".x { animation: clock-hand var(--move-clock) linear infinite, spin var(--move) linear infinite; }"))).toHaveLength(1);
+    expect(curveProblems(css(".x { animation: spin var(--move) linear infinite; }"))).toHaveLength(1);
+    expect(curveProblems(css(".x { animation: clock-hands var(--move-clock) linear infinite; }"))).toHaveLength(1);
+    expect(curveProblems(css(".x { transition: transform var(--move) linear; }"))).toHaveLength(1);
+    expect(curveProblems(css(".x { animation-timing-function: linear; }"))).toHaveLength(1);
   });
 
   it("слой с вычислением по месту не проходит", () => {
