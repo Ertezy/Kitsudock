@@ -45,7 +45,7 @@ describe("словари", () => {
     expect(en.panel.emptyQuietHint).toBe("New ones will show up here on their own once they're out.");
     // Крестик по умолчанию прячет окно в трей, и «перезапуск» им список не
     // перечитывает. Возврат из настроек перечитывает (`closeSettings` → `load`, App.tsx).
-    expect(ru.panel.listFailedHint).toBe("Откройте настройки и вернитесь назад — список загрузится снова.");
+    expect(ru.panel.listFailedHint).toBe("Откройте настройки и вернитесь назад, чтобы загрузить список снова.");
     expect(en.panel.listFailedHint).toBe("Open Settings and come back to load the list again.");
   });
 
