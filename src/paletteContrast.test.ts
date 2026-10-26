@@ -236,6 +236,23 @@ function grainVeil(css: string, get: (name: string) => Colour): Colour {
   return [r, g, b, opacity];
 }
 
+/**
+ * Прозрачность, которая ложится на предупреждение «файл пропал» в строке
+ * пропавшей игры: произведение прозрачностей из правил самой строки, её шапки и
+ * самого предупреждения. Строка пропавшей игры приглушена, но если прозрачность
+ * стоит на всей строке, предупреждение гаснет вместе с ней.
+ */
+function missingWarnOpacity(css: string): number {
+  const chain = new Set([".game-row", ".game-row.missing", ".game-row-head", ".game-row.missing .game-row-head", ".game-row-warn", ".game-row.missing .game-row-warn"]);
+  let product = 1;
+  for (const block of stripComments(css).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+    if (!block[1].split(",").some((s) => chain.has(s.trim().replace(/\s+/g, " ")))) continue;
+    const declaration = /(?:^|;)\s*opacity\s*:\s*([^;]+)/.exec(block[2]);
+    if (declaration) product *= Number(declaration[1].trim());
+  }
+  return product;
+}
+
 /** Прозрачность подписи раздела: сама подпись светлая, но правило её приглушает. */
 function labelOpacity(css: string): number {
   const opacity = Number(ruleValue(css, ".panel-label", "opacity"));
@@ -342,6 +359,12 @@ describe("чтение стилей", () => {
     expect(() => labelOpacity(".panel-label { opacity: 2; }")).toThrow(/от 0 до 1/);
   });
 
+  it("прозрачность на предупреждении пропавшей игры собирается из строки, шапки и его самого", () => {
+    expect(missingWarnOpacity(".game-row.missing { opacity: 0.62; }")).toBeCloseTo(0.62, 8);
+    expect(missingWarnOpacity(".game-row.missing .game-row-head { opacity: 0.5; } .game-row-warn { opacity: 0.5; }")).toBeCloseTo(0.25, 8);
+    expect(missingWarnOpacity(".game-row.missing .game-row-grip,\n.game-row.missing .game-row-title { opacity: 0.62; }")).toBe(1);
+  });
+
   it("цвет, который тест не умеет читать, называется в ошибке", () => {
     for (const bad of ["#fff", "hsl(0 0% 100%)", "rgba(1, 2)", "rgba(1, , 3)", "rgba(300, 0, 0, 1)", "rgba(0, 0, 0, 2)", "rgb(0 0 0 / 50%)", "red", ""]) {
       expect(() => colour(bad), bad).toThrow(/не удалось разобрать цвет/);
@@ -443,6 +466,19 @@ describe("читаемость палитры", () => {
     const [r, g, b, a] = get("--label");
     expect(contrast([r, g, b, a * labelOpacity], surfaces.glass)).toBeGreaterThanOrEqual(4.5);
     expect(underGrain([r, g, b, a * labelOpacity], surfaces.glass, grain)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  // Пропавшая игра в настройках: ручка, название и источник приглушены, а
+  // предупреждение «файл пропал» — нет: его-то и надо прочитать. Строка игры —
+  // карточка прямо на фоне настроек.
+  it("предупреждение «файл пропал» на строке пропавшей игры не приглушено и не ниже 4.5:1, и под зерном тоже", () => {
+    const { get, grain, surfaces } = palette();
+    const opacity = missingWarnOpacity(rawCss);
+    const [r, g, b, a] = get(colourToken(ruleValue(rawCss, ".game-row-warn", "color")));
+    const warn: Colour = [r, g, b, a * opacity];
+    expect(opacity).toBe(1);
+    expect(contrast(warn, surfaces.settingsCard)).toBeGreaterThanOrEqual(4.5);
+    expect(underGrain(warn, surfaces.settingsCard, grain)).toBeGreaterThanOrEqual(4.5);
   });
 
   it("зерно светлое и еле заметное: 3–4 % цвета текста", () => {

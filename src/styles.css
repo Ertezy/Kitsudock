@@ -2304,7 +2304,12 @@ body::after {
   transition-duration: var(--move-fast);
 }
 
-.game-row.missing {
+/* Пропавшая игра: приглушены ручка, название и источник, но не предупреждение
+   «файл пропал» — его-то и надо прочитать. Прозрачность на всей строке гасила
+   и его, ниже 3:1 (`src/paletteContrast.test.ts`). */
+.game-row.missing .game-row-grip,
+.game-row.missing .game-row-title,
+.game-row.missing .game-row-source {
   opacity: 0.62;
 }
 
