@@ -9,6 +9,7 @@ import SidePanel from "./components/SidePanel";
 import GameArt from "./components/GameArt";
 import PlayButton from "./components/PlayButton";
 import GameDock from "./components/GameDock";
+import SocialLinks from "./components/SocialLinks";
 import Settings from "./screens/Settings";
 import FirstRunView from "./screens/settings/FirstRunView";
 import { currentT, useT } from "./i18n";
@@ -202,6 +203,8 @@ export default function App() {
   }, [load]);
 
   const selected = games.find((g) => g.id === selectedId) ?? games[0] ?? null;
+  // Запись хаба выбранной игры — ради её официальных соцсетей.
+  const selectedHub = selected?.contentId ? hub?.games.find((g) => g.id === selected.contentId) : undefined;
 
   // Фон какой игры уже начал проявляться. Подпись и кнопка PLAY поднимаются
   // вслед за фоном своей игры, а не сразу после выбора: большая картинка
@@ -291,6 +294,10 @@ export default function App() {
             externalFailure={trayFailure?.gameId === selected.id ? { id: trayFailure.id, text: trayFailure.text } : null}
           />
         )}
+        {/* key: столбик другой игры проявляется заново, как подпись над PLAY.
+            Ключ свой, не как у PlayButton: у соседей одинаковый ключ React
+            не различает и оставляет на экране лишнюю копию. */}
+        {selected && <SocialLinks key={`socials:${selected.id}`} socials={selectedHub?.socials} />}
         {error && <div className="banner">{t.main.loadFailed(error)}</div>}
         <GameDock games={games} selectedId={selected?.id ?? null} onSelect={select} />
       </main>

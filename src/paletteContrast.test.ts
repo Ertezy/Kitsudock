@@ -413,11 +413,15 @@ describe("читаемость палитры", () => {
     // Строка под картинкой баннера — срок и название — на своей подложке поверх
     // стекла панели.
     const bannerFoot = over(get(colourToken(ruleValue(rawCss, ".banner-foot", "background"))), glass);
+    // Кнопка соцсети у правого края сцены — своя подложка прямо на арте; под
+    // курсором её светлит тонкий слой.
+    const socialOnArt = over(get(colourToken(ruleValue(rawCss, ".social", "background"))), white);
+    const hoveredSocial = over(get(colourToken(ruleValue(rawCss, ".social::before", "background"))), socialOnArt);
     return {
       get,
       grain: grainVeil(rawCss, get),
       labelOpacity: labelOpacity(rawCss),
-      surfaces: { bg, glass, card, burning, accent, settingsCard, hoveredRow, hoveredOption, segmentedTrack, segmentedTrackOnBg, copyFailed, plateOnArt, errorOnArt, bannerFoot },
+      surfaces: { bg, glass, card, burning, accent, settingsCard, hoveredRow, hoveredOption, segmentedTrack, segmentedTrackOnBg, copyFailed, plateOnArt, errorOnArt, bannerFoot, socialOnArt, hoveredSocial },
     };
   };
 
@@ -452,6 +456,9 @@ describe("читаемость палитры", () => {
     ["самый тихий текст на карточке кода, которую не удалось скопировать", "--ink-faint", "copyFailed"],
     ["подпись над PLAY на подложке поверх белого арта", "--ink", "plateOnArt"],
     ["текст ошибки на её подложке поверх белого арта", "--ink", "errorOnArt"],
+    // Значок рисуется цветом текста кнопки; мелкий, поэтому держится планки текста.
+    ["значок соцсети на её кнопке поверх белого арта", colourToken(ruleValue(rawCss, ".social", "color")), "socialOnArt"],
+    ["значок соцсети под курсором поверх белого арта", colourToken(ruleValue(rawCss, ".social", "color")), "hoveredSocial"],
   ];
   for (const [name, token, surface] of pairs) {
     it(name + " не ниже 4.5:1, и под зерном тоже", () => {

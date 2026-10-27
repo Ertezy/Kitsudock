@@ -101,6 +101,22 @@ export const ru: Dictionary = {
       video: "Видео",
     },
     refuseNonHttps: (url: string) => `Ссылка не https, поэтому не откроется: ${url}`,
+    socials: {
+      group: "Официальные соцсети игры",
+      names: {
+        hoyolab: "HoYoLAB",
+        site: "Сайт игры",
+        youtube: "YouTube",
+        x: "X",
+        discord: "Discord",
+        reddit: "Reddit",
+        facebook: "Facebook",
+        instagram: "Instagram",
+        tiktok: "TikTok",
+        telegram: "Telegram",
+        vk: "VK",
+      },
+    },
   },
   // Тексты ошибок Rust: что случилось и, где можно, что сделать; переменная
   // часть — подробность. Каждая фраза — отдельное предложение с заглавной буквы:

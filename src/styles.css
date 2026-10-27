@@ -948,6 +948,105 @@ body::after {
   cursor: default;
 }
 
+/* Столбик официальных соцсетей выбранной игры — у правого края сцены, сверху
+   вниз, как у официальных лаунчеров. Он стоит в полосе шириной в кнопку у
+   самого края: кнопка PLAY и её ошибка отступают от края на 48px и в эту полосу
+   не заходят. Снизу полоса кончается над доком: его ряд вместе с запасом под
+   увеличенную иконку и подпись поднимается от низа сцены примерно на 138px и
+   ловит мышь во всю ширину. Кнопки стоят посередине полосы; десять кнопок
+   умещаются в ней и на самом маленьком окне (940×600). Сама полоса мышь не
+   ловит — только кнопки. */
+.stage {
+  --social-size: 32px;
+  --socials-edge: 10px;
+}
+
+.socials {
+  position: absolute;
+  top: 16px;
+  right: var(--socials-edge);
+  bottom: 150px;
+  z-index: var(--z-ui);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+  /* Столбик своей игры проявляется вместе с подписью над PLAY: при смене игры
+     он пересоздаётся (`key` в `App`). */
+  animation: socials-in var(--move-slow) var(--ease-out) calc(var(--move) * 0.5) backwards;
+}
+
+@keyframes socials-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
+
+/* Общий баннер ошибки не заходит на столбик. */
+.stage:has(.socials) .banner {
+  right: calc(var(--socials-edge) + var(--social-size) + 16px);
+}
+
+/* Кнопка — круглая, на тёмной плашке со стеклом, как подпись над PLAY: значок
+   мелкий, и на светлом арте полупрозрачного стекла дока ему не хватило бы.
+   Значок — цветом текста. Под курсором — тонкий светлый слой и светлая кромка,
+   как у выходов из ошибки запуска; нажатие вдавливает кнопку с пружинкой. */
+.social {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--social-size);
+  height: var(--social-size);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--plate);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--glass-edge);
+  color: var(--ink);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.social::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-pill);
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.social:hover::before {
+  opacity: 1;
+}
+
+.social:active {
+  transform: scale(0.92);
+  transition-duration: var(--move-fast);
+}
+
+/* Кнопка лежит на арте: зазор под общей рамкой фокуса закрывает тёмная
+   подложка, как у кнопки PLAY. */
+.social:focus-visible {
+  box-shadow: var(--glass-edge), var(--focus-halo);
+}
+
+.social svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* Док внизу главного экрана. Виден всегда: подсказка «наведите» ушла вместе
    со всплывающей полкой.
 

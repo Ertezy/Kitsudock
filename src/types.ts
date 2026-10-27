@@ -36,6 +36,29 @@ export interface HubGame {
   redeemUrl: string | null;
   /** Текущий фон официального лаунчера: картинка и, если есть, видео. */
   background?: { image: string; video?: string };
+  /** Официальные соцсети игры по языкам интерфейса, в порядке показа. Нет
+   *  списка для языка — нет ключа; нет ни одного — нет поля. Адреса уже
+   *  проверены в Rust (`lenient_socials`). */
+  socials?: { ru?: Social[]; en?: Social[] };
+}
+
+/** Официальная соцсеть или сайт игры. */
+export type SocialKind =
+  | "hoyolab"
+  | "site"
+  | "youtube"
+  | "x"
+  | "discord"
+  | "reddit"
+  | "facebook"
+  | "instagram"
+  | "tiktok"
+  | "telegram"
+  | "vk";
+
+export interface Social {
+  kind: SocialKind;
+  url: string;
 }
 
 export interface Code {

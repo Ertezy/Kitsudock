@@ -3,6 +3,7 @@
 // Разделы: panel, main, settings, errors.
 
 import { plural } from "./format";
+import type { SocialKind } from "../types";
 
 export const en = {
   language: {
@@ -94,6 +95,24 @@ export const en = {
       video: "Video",
     },
     refuseNonHttps: (url: string) => `This link isn't https, so it won't open: ${url}`,
+    // Столбик официальных соцсетей у правого края: подпись группы для диктора
+    // и название сети — подсказка и имя кнопки.
+    socials: {
+      group: "Official game socials",
+      names: {
+        hoyolab: "HoYoLAB",
+        site: "Official site",
+        youtube: "YouTube",
+        x: "X",
+        discord: "Discord",
+        reddit: "Reddit",
+        facebook: "Facebook",
+        instagram: "Instagram",
+        tiktok: "TikTok",
+        telegram: "Telegram",
+        vk: "VK",
+      } satisfies Record<SocialKind, string>,
+    },
   },
   // Ошибки из Rust: код → фраза, подробность подставляется
   // (src/i18n/errors.ts). Имена полей — коды из src-tauri/src/error.rs.
