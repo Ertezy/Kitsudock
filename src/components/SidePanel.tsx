@@ -92,7 +92,7 @@ export default function SidePanel({ hub, selectedContentId, selectedTitle, games
 
   // Старше недели — коды и баннеры прячутся целиком. Код, который наверняка
   // сгорел, и баннер, который наверняка кончился, хуже, чем их отсутствие:
-  // таймер на протухших данных — это враньё в лицо (спека §6).
+  // таймер на протухших данных — это враньё в лицо.
   const tooOld = hub !== null && age > 7 * DAY;
 
   const selected = (gameId: string) => gameId === selectedContentId;
@@ -124,17 +124,17 @@ export default function SidePanel({ hub, selectedContentId, selectedTitle, games
   } as const;
   const [emptyTitle, emptyHint] = EMPTY[reason];
 
-  // Источник данных виден в интерфейсе — требование общей спеки §9.4.
+  // Источник данных обязан быть виден в интерфейсе.
   // Без него невозможно отличить «сеть отвалилась, показываю прошлогодний
   // комплект» от «всё свежее», а это первое, что спросят при разборе жалобы.
   const origin = sourceLabel(hub?._source, t);
-  // Вышла версия новее этой — строка внизу панели (спека 2026-10-01 §2.2).
+  // Вышла версия новее этой — строка внизу панели.
   const update = availableUpdate(hub, appVersion);
 
   return (
     <aside className="panel" ref={panelRef} data-entry={entry.kind ?? undefined}>
       {/* Секции прокручиваются внутри себя, шестерёнка остаётся прибитой
-          к низу (спека §2.4). Пока данных нет, на месте секций стоят
+          к низу. Пока данных нет, на месте секций стоят
           заглушки, а область помечена занятой. */}
       <div className="panel-scroll" aria-busy={!loaded}>
         {skeletonShown(loaded, selectedContentId) && <Skeleton />}

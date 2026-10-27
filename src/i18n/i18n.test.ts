@@ -25,7 +25,7 @@ describe("словари", () => {
     expect(shape(ru)).toEqual(shape(en));
   });
 
-  it("тексты прямые: без «Упс», восклицаний и «что-то пошло не так» (спека полировки, §5)", () => {
+  it("тексты прямые: без «Упс», восклицаний и «что-то пошло не так»", () => {
     const texts = (value: unknown): string[] => {
       if (typeof value === "string") return [value];
       if (typeof value === "function") return [String(value(1, 2))];

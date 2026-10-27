@@ -128,7 +128,7 @@ const CURVE = /cubic-bezier\(|steps\(|linear\(|(?<![\w-])(ease|ease-in|ease-out|
  * только в их собственной анимации. Дрейф арта плавно разворачивается у краёв
  * (`ease-in-out`). Стрелка часиков сроков бежит ровно (`linear`): с любой
  * кривой из шкалы она на каждом обороте то разгонялась бы, то замирала —
- * читалось бы как тиканье рывками, а не спокойный бег (спека полировки, §8.3).
+ * читалось бы как тиканье рывками, а не спокойный бег.
  * Больше ни у кого, и в шкалу `--ease-…` эти кривые не входят.
  */
 const OWN_CURVE: Record<string, string> = { "art-drift": "ease-in-out", "clock-hand": "linear" };
@@ -333,9 +333,9 @@ const members = (selector: string) => splitList(selector).flatMap(expandIs);
 const isMotionOff = (selector: string) => /^:root\[data-motion=["']?off["']?\]/.test(selector);
 
 /**
- * У всего, что нажимается (`cursor: pointer`), есть наведение и нажатие (спека
- * полировки, §5 «Везде»). Нажатие или наведение может откликаться на родителе —
- * тогда это записано здесь же, с причиной. Правило выключенного тумблера
+ * У всего, что нажимается (`cursor: pointer`), есть наведение и нажатие.
+ * Нажатие или наведение может откликаться на родителе — тогда это записано
+ * здесь же, с причиной. Правило выключенного тумблера
  * «Анимация» откликом не считается: без своего наведения у элемента его нет.
  */
 const PRESSED_BY: Record<string, string> = {
@@ -410,8 +410,8 @@ function infiniteMembers(decls: Decl[]): string[] {
 }
 
 /**
- * Бесконечное движение стоит на паузе, пока окно неактивно (спека полировки,
- * §8.2): каждый элемент, чья анимация бесконечна, есть в правиле
+ * Бесконечное движение стоит на паузе, пока окно неактивно: каждый элемент,
+ * чья анимация бесконечна, есть в правиле
  * `:root[data-active="off"] … { animation-play-state: paused }` — сам, а не
  * его родитель или сосед. Правило выключенного тумблера «Анимация» паузой не
  * считается: тумблер и неактивное окно — разные условия.
@@ -438,8 +438,8 @@ const MOTION_SWITCH = /^:root\[data-motion=["']?off["']?\]$/;
 const MOTION_OFF = /^:root\[data-motion=["']?off["']?\]\s+/;
 
 /**
- * Тумблер «Анимация» обнуляет --move в одном месте (спека полировки, §2, §4.3),
- * и с ней — все длительности. Последний блок `:root[data-motion="off"]`, который
+ * Тумблер «Анимация» обнуляет --move в одном месте, и с ней — все
+ * длительности. Последний блок `:root[data-motion="off"]`, который
  * задаёт --move, задаёт ровно `0s`. Больше --move не задаёт никто — ни другой
  * блок `:root[…]`, ни обычное правило, — кроме одной основы в `:root`, и та без
  * `!important`: важное объявление перебило бы тумблер, хоть он и весомее.
@@ -473,8 +473,8 @@ const KILLED_BY: Record<string, { selector: string; prop: string; value: string 
 };
 
 /**
- * Тумблер «Анимация» выключен — бесконечного движения нет (спека этапа 5, §12):
- * обнулённая --move его не останавливает, а превращает в вырожденный цикл.
+ * Тумблер «Анимация» выключен — бесконечного движения нет: обнулённая --move
+ * его не останавливает, а превращает в вырожденный цикл.
  * Поэтому каждый элемент с бесконечной анимацией отменён правилом
  * `:root[data-motion="off"] … { animation: none }` — сам, последним таким
  * правилом, — или способом из KILLED_BY. Пауза — не отмена: её ставит другое
@@ -499,7 +499,7 @@ function motionOffProblems(decls: Decl[], killedBy = KILLED_BY): string[] {
 /** Переменная шкалы для размера шрифта или для скругления. */
 type Scale = "text" | "r";
 const SCALE_PROP: Record<Scale, RegExp> = { text: /^font-size$/, r: /^border(-[\w-]+)?-radius$/ };
-/** Размер иконки дока: подпись иконки, буква-заглушка и её скругление считаются от него (спека полировки, §4.1). */
+/** Размер иконки дока: подпись иконки, буква-заглушка и её скругление считаются от него. */
 const DOCK_BASE = "--dock-size";
 /** Множители без единиц, которые ставит код по месту: растяжение таблетки выбора (`Segmented.tsx`). */
 const SET_BY_CODE = new Set(["--pill-scale"]);
@@ -513,7 +513,7 @@ const SET_BY_CODE = new Set(["--pill-scale"]);
  * `calc(var(--text-xs) + 1.5px)`) — тот же размер мимо шкалы.
  * Скругление ещё бывает кругом (`50%`) и на толщину рамки меньше
  * (`calc(… - 1px)`): слой внутри кнопки ложится в её внутренний край и не
- * скруглён сильнее внешнего (спека полировки, §4.4).
+ * скруглён сильнее внешнего.
  */
 function sizeChecker(decls: Decl[]) {
   const defs = new Map<string, string[]>();
@@ -547,10 +547,10 @@ function sizeChecker(decls: Decl[]) {
 }
 
 /**
- * Размер шрифта и скругления — только из шкал (спека полировки, §4.1, §4.4),
- * включая длинные записи скруглений (`border-top-left-radius`). Переменную
- * шкалы нельзя и переопределить по месту: `--r-sm: 13px` в правиле — та же
- * шкала, сдвинутая мимо проверки.
+ * Размер шрифта и скругления — только из шкал, включая длинные записи
+ * скруглений (`border-top-left-radius`). Переменную шкалы нельзя и
+ * переопределить по месту: `--r-sm: 13px` в правиле — та же шкала, сдвинутая
+ * мимо проверки.
  */
 function sizeProblems(decls: Decl[]): string[] {
   const fits = sizeChecker(decls);
@@ -569,8 +569,8 @@ function sizeProblems(decls: Decl[]): string[] {
 const FONT_SHORTHAND = /^(\d+) (var\(--[\w-]+\))(?:\/[\d.]+)? \S/;
 
 /**
- * Веса — только 400, 500 и 600 (спека полировки, §4.1) — и в `font-weight`, и
- * в сокращении `font`; размер в сокращении — тоже из шкалы.
+ * Веса — только 400, 500 и 600 — и в `font-weight`, и в сокращении `font`;
+ * размер в сокращении — тоже из шкалы.
  */
 function fontProblems(decls: Decl[]): string[] {
   const fits = sizeChecker(decls);
@@ -585,7 +585,7 @@ function fontProblems(decls: Decl[]): string[] {
   return bad;
 }
 
-/** Анимируются только они (спека полировки, §2). */
+/** Анимируются только они. */
 const ANIMATED = new Set(["transform", "opacity"]);
 
 /**
@@ -593,7 +593,7 @@ const ANIMATED = new Set(["transform", "opacity"]);
  * с причиной. Подпись PLAY: спрятанная надпись ещё и `visibility: hidden`,
  * чтобы её не слышал экранный диктор. Переход `visibility` кадров не рисует —
  * значение меняется скачком в начале или в конце перехода прозрачности;
- * отступление от буквы §2 принято на ревью.
+ * такое отступление от правила допустимо.
  */
 const ALSO_ANIMATED: Record<string, string[]> = { ".play-label > span": ["visibility"] };
 
@@ -601,10 +601,9 @@ const ALSO_ANIMATED: Record<string, string[]> = { ".play-label > span": ["visibi
 const NOT_PROPERTY = /^(ease|ease-in|ease-out|ease-in-out|linear|step-start|step-end|normal|allow-discrete)$/i;
 
 /**
- * Переходы — только `transform` и `opacity` (спека полировки, §2): в
- * `transition-property` и в каждой части сокращения `transition`. Часть без
- * свойства — это `all`, и она не проходит, как и `all` словом и свойства
- * раскладки вроде `width`.
+ * Переходы — только `transform` и `opacity`: в `transition-property` и в
+ * каждой части сокращения `transition`. Часть без свойства — это `all`, и она
+ * не проходит, как и `all` словом и свойства раскладки вроде `width`.
  */
 function transitionProblems(decls: Decl[], also = ALSO_ANIMATED): string[] {
   const bad: string[] = [];
@@ -626,7 +625,7 @@ function transitionProblems(decls: Decl[], also = ALSO_ANIMATED): string[] {
 /** Селектор кадра внутри `@keyframes`: `from`, `to`, проценты или их список. */
 const KEYFRAME = /^(from|to|\d+(\.\d+)?%)(\s*,\s*(from|to|\d+(\.\d+)?%))*$/i;
 
-/** Кадры анимаций тоже двигают только `transform` и `opacity` (спека полировки, §2). */
+/** Кадры анимаций тоже двигают только `transform` и `opacity`. */
 function keyframeProblems(decls: Decl[]): string[] {
   return decls.filter((d) => KEYFRAME.test(d.selector) && !ANIMATED.has(d.prop)).map((d) => `${d.selector} { ${d.prop}: ${d.value} }`);
 }
@@ -689,8 +688,8 @@ function scrollbarProblems(decls: Decl[]): string[] {
 }
 
 /**
- * Зерно (спека полировки, §4.4): ровно один слой на уровне `--z-grain`,
- * неподвижный, сквозной для мыши, поверх всего окна, 3–4 % непрозрачности.
+ * Зерно: ровно один слой на уровне `--z-grain`, неподвижный, сквозной для
+ * мыши, поверх всего окна, 3–4 % непрозрачности.
  */
 function grainProblems(decls: Decl[]): string[] {
   const layers = [...new Set(decls.filter((d) => d.prop === "z-index" && d.value === "var(--z-grain)").map((d) => d.selector))];

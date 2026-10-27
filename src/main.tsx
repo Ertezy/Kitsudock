@@ -12,8 +12,8 @@ import { asVideoLang, setVideoLanguage } from "./lib/videoLanguage";
 import "./styles.css";
 
 // Язык читается до первой отрисовки: иначе при запуске на миг мелькнул бы
-// английский у того, кто выбрал русский (спека этапа 6 §4.3). Отказ моста —
-// значения по умолчанию, приложение всё равно открывается.
+// английский у того, кто выбрал русский. Отказ моста — значения по умолчанию,
+// приложение всё равно открывается.
 void Promise.all([
   api.getLanguage().then(asLang, () => "en" as const),
   api.getVideoLanguage().then(asVideoLang, () => "en" as const),

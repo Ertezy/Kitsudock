@@ -8,7 +8,7 @@ import { useWindowActive } from "../../lib/windowActive";
 import { useLang, useT, type Lang } from "../../i18n";
 import type { Banner } from "../../types";
 
-/** Как часто карусель листает сама (спека этапа 7 §3.3). */
+/** Как часто карусель листает сама. */
 export const AUTO_ADVANCE_MS = 7000;
 
 interface Props {
@@ -20,8 +20,8 @@ interface Props {
 /**
  * Баннеры выбранной игры каруселью: сначала идущие, потом будущие.
  *
- * Стрелки — поверх картинки, по бокам и полупрозрачные: так решил владелец на
- * этапе 7. Раньше они стояли в заголовке секции, чтобы не закрывать арт.
+ * Стрелки — поверх картинки, по бокам и полупрозрачные. Раньше они стояли в
+ * заголовке секции, чтобы не закрывать арт.
  */
 export default function Banners({ banners, nowSec }: Props) {
   const lang = useLang();
@@ -29,7 +29,7 @@ export default function Banners({ banners, nowSec }: Props) {
   const motion = useMotionOn();
   const shown = shownBanners(banners, nowSec);
   // Один расчёт на отрисовку — слайды, точки и shownKey берут ключи отсюда,
-  // чтобы не разойтись (правка финальной ревизии этапа 7).
+  // чтобы не разойтись.
   const keys = bannerKeys(shown);
   const [index, setIndex] = useState(0);
   // Ручное листание перезапускает отсчёт: иначе автолистание перебило бы клик.
@@ -47,8 +47,7 @@ export default function Banners({ banners, nowSec }: Props) {
   const shownKey = keys.join("|");
   useEffect(() => setIndex(0), [shownKey]);
 
-  // Окно спрятано в трей или свёрнуто — карусель стоит (спека этапа 7 §3.3);
-  // не в фокусе — тоже стоит (спека полировки, §8.2).
+  // Окно спрятано в трей или свёрнуто — карусель стоит; не в фокусе — тоже.
   const count = shown.length;
   const paused = hovered || focused || !windowIsActive || !motion;
 
@@ -78,8 +77,8 @@ export default function Banners({ banners, nowSec }: Props) {
         onMouseLeave={() => setHovered(false)}
         // Клик мышью тоже фокусирует кнопку в WebView2 и не шлёт focusout при
         // уходе курсора — карусель встала бы навсегда после клика по стрелке
-        // или точке. Спека ставит на паузу только клавиатурный фокус, поэтому
-        // считаем его через :focus-visible (правка финальной ревизии этапа 7).
+        // или точке. Пауза нужна только при клавиатурном фокусе, поэтому
+        // считаем его через :focus-visible.
         onFocus={(e) => {
           if ((e.target as Element).matches(":focus-visible")) setFocused(true);
         }}

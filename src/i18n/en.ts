@@ -1,6 +1,6 @@
-// Английский словарь — основной (спека этапа 6 §4.1). Русский обязан повторять
-// его форму: иначе проект не соберётся. Термины — по глоссарию спеки §4.5.
-// Разделы добавляют задачи перевода: panel, main, settings, errors.
+// Английский словарь — основной. Русский обязан повторять его форму: иначе
+// проект не соберётся. Термины во всех разделах одни и те же.
+// Разделы: panel, main, settings, errors.
 
 import { plural } from "./format";
 
@@ -59,7 +59,7 @@ export const en = {
     videos: "Videos",
     premiere: "premiere",
   },
-  // Главный экран, док игр и общие обёртки страницы (спека этапа 6, Task 5).
+  // Главный экран, док игр и общие обёртки страницы.
   main: {
     launch: {
       note: { steam: "Launches via Steam", epic: "Launches via Epic Games", exe: "Launches directly" },
@@ -95,8 +95,8 @@ export const en = {
     },
     refuseNonHttps: (url: string) => `This link isn't https, so it won't open: ${url}`,
   },
-  // Ошибки из Rust: код → фраза, подробность подставляется (спека §6.2,
-  // src/i18n/errors.ts). Имена полей — коды из src-tauri/src/error.rs.
+  // Ошибки из Rust: код → фраза, подробность подставляется
+  // (src/i18n/errors.ts). Имена полей — коды из src-tauri/src/error.rs.
   errors: {
     unknown: "Unknown error",
     internal: (d?: string) => (d ? `Internal error: ${d}` : "Internal error"),
@@ -126,9 +126,9 @@ export const en = {
     hint: "Reload it — that usually fixes it. Your games and settings are fine; details are in the log.",
     reload: "Reload",
   },
-  // Экран настроек и первый запуск (спека этапа 6, Task 6). Термины — по
-  // глоссарию §4.5; повторяющиеся надписи (вкладки, «Дополнительно»,
-  // «Сохранить», «Найти заново») используются из одного поля в нескольких местах.
+  // Экран настроек и первый запуск. Термины — те же, что везде; повторяющиеся
+  // надписи (вкладки, «Дополнительно», «Сохранить», «Найти заново»)
+  // используются из одного поля в нескольких местах.
   settings: {
     tabs: { games: "Games", look: "Appearance", behaviour: "Behavior", data: "Data", about: "About" },
     back: "← Back",

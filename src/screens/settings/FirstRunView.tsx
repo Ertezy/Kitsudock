@@ -55,7 +55,7 @@ export default function FirstRunView({ onDone }: Props) {
       }
       setFound(list);
       // По умолчанию отмечены только игры, про которые у нас есть контент,
-      // и только те, которых ещё нет в списке (§6.3 общей спеки).
+      // и только те, которых ещё нет в списке.
       setChecked(
         new Set(
           list.filter((g) => g.contentId !== null && !g.alreadyAdded).map((g) => g.title),

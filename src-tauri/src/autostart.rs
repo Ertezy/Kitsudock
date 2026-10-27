@@ -1,4 +1,4 @@
-//! Автозапуск с Windows (спека этапа 7 §4.1): значение `Kitsudock` в
+//! Автозапуск с Windows: значение `Kitsudock` в
 //! `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`. Переключатель читает
 //! состояние отсюда, из реестра: конфиг не меняется.
 //!
