@@ -1,0 +1,54 @@
+name: ci
+
+# Тесты на каждый push в main и на каждый запрос на слияние: красное должно
+# быть видно до слияния, а не на машине владельца перед выпуском.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests
+    # Rust-часть зовёт API Windows (реестр, запуск процессов), и её тесты
+    # собираются и проходят только там.
+    runs-on: windows-latest
+    # Зависший шаг не должен держать машину шесть часов, как по умолчанию.
+    timeout-minutes: 30
+    steps:
+      # Действия закреплены на коммит, тег остался в комментарии
+      # (обновления предлагает dependabot).
+      # Токен в .git/config после checkout не нужен: проверка только читает код.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Types
+        run: npx tsc --noEmit
+
+      - name: Frontend tests
+        run: npx vitest run
+
+      # Та же сборка страницы, что идёт в установщик: ошибка Vite видна здесь,
+      # а не в день выпуска.
+      - name: Frontend build
+        run: npm run build
+
+      # rustup на windows-latest уже стоит; ставим актуальный stable.
+      - name: Rust
+        run: rustup toolchain install stable --profile minimal && rustup default stable
+
+      # --locked: тесты идут ровно на тех версиях зависимостей, что в Cargo.lock.
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test --locked

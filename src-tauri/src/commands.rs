@@ -22,11 +22,6 @@ use crate::error::{code, AppError};
 use crate::hub;
 use crate::launch;
 
-/// Запись конфига из команды: текст ошибки сохранения уходит подробностью.
-fn save_config(app: &AppHandle, cfg: &config::AppConfig) -> Result<(), AppError> {
-    config::save(app, cfg).map_err(|e| AppError::with(code::CONFIG_SAVE_FAILED, e))
-}
-
 /// Блокирующая работа команды — сетевой запрос — на пуле для блокирующего.
 ///
 /// Тело `async`-команды идёт на рабочих потоках общего пула, и те же потоки
@@ -162,24 +157,36 @@ pub async fn get_config_dir(app: AppHandle) -> Result<String, String> {
 
 /// Запуск игры и запоминание «последней» — общий путь для кнопки Play и
 /// меню трея.
+///
+/// Запуск идёт без замка конфига: через PowerShell с правами администратора
+/// он занимает секунды, и правки настроек за это время не должны ждать или
+/// пропадать. После удачного старта конфиг перечитывается под замком и
+/// меняется только `lastPlayed`.
 pub fn launch_and_remember(app: &AppHandle, game_id: &str) -> Result<(), AppError> {
-    let mut cfg = config::load(app);
-    let game = cfg
+    let game = config::load(app)
         .games
-        .iter()
+        .into_iter()
         .find(|g| g.id == game_id)
-        .cloned()
         .ok_or_else(|| AppError::with(code::GAME_NOT_FOUND, game_id.to_string()))?;
 
     launch::launch(app, &game)?;
 
-    cfg.last_played = Some(game_id.to_string());
-    if let Err(e) = config::save(app, &cfg) {
-        log::error!("[config] не удалось сохранить lastPlayed: {e}");
-    }
+    let remembered = config::update(app, |cfg| {
+        cfg.last_played = Some(game_id.to_string());
+        Ok::<_, AppError>(cfg.behaviour.tray_on_launch)
+    });
+    // Настройку трея читаем уже после запуска: человек мог переключить её,
+    // пока игра стартовала.
+    let tray_on_launch = match remembered {
+        Ok(flag) => flag,
+        Err(e) => {
+            log::error!("[config] не удалось сохранить lastPlayed: {e}");
+            config::load(app).behaviour.tray_on_launch
+        }
+    };
 
     // Проверка трея и сообщение странице живут в одном месте.
-    if cfg.behaviour.tray_on_launch {
+    if tray_on_launch {
         crate::tray::hide_main_window(app);
     }
     Ok(())
@@ -225,6 +232,10 @@ pub async fn cache_image(app: AppHandle, url: String) -> Result<String, String> 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FoundGame {
+    /// Ключ установки (`InstalledGame::key`). По нему страница отмечает строки
+    /// и просит добавить игру: название у установок из Steam и Epic бывает
+    /// одно и то же.
+    pub key: String,
     pub title: String,
     /// Идентификатор контента, если игру знает каталог. `None` — по ней не
     /// будет ни кодов, ни баннеров, и на экране это подписывается честно.
@@ -232,7 +243,7 @@ pub struct FoundGame {
     /// Откуда найдена: `"steam" | "epic" | "hoyoplay" | "kuro" | "gryphlink"`
     /// либо `"exe"` — слово подставляет страница.
     pub source_kind: &'static str,
-    /// Игра с таким путём уже есть в конфиге — галочку ставить не нужно.
+    /// Эта установка уже есть в конфиге — галочку ставить не нужно.
     pub already_added: bool,
 }
 
@@ -247,14 +258,13 @@ pub async fn scan_installed(app: AppHandle) -> Vec<FoundGame> {
         .into_iter()
         .map(|found| {
             let content_id = crate::catalog::content_id_for(&found, &hub_games);
-            // То же сравнение, что решает, какую запись пользователя
-            // дополнить данными установки (`catalog::already_configured`
-            // переиспользует его же) — а не отдельное по exePath: у игр
-            // Steam он всегда `None` (см. `stores::steam`), и такое
-            // сравнение никогда не находило бы совпадение.
+            // То же правило «та же установка», что не даёт добавить её
+            // дважды (`library::add_found`); подробнее — у
+            // `catalog::already_configured`.
             let already_added = crate::catalog::already_configured(&found, &cfg.games, &hub_games);
             let source_kind = found_kind(&found);
             FoundGame {
+                key: found.key(),
                 title: found.title,
                 content_id,
                 source_kind,
@@ -264,30 +274,37 @@ pub async fn scan_installed(app: AppHandle) -> Vec<FoundGame> {
         .collect()
 }
 
-/// Добавить игру, найденную в магазинах, по её названию.
+/// Добавить игру, найденную в магазинах, по ключу установки из
+/// `scan_installed`. Уже добавленная установка не дублируется: команда вернёт
+/// идентификатор существующей записи (`library::add_found`).
 ///
 /// Отдельная команда, а не `add_game`: у найденной игры уже известны способ
 /// запуска и пути из манифеста, и терять их, сводя всё к `Launch::Exe`,
 /// нельзя — тогда игра из Steam перестала бы запускаться через Steam.
+///
+/// `title` нужен только для текста ошибки, если установка пропала после
+/// поиска: ключ человеку ничего не скажет.
 #[tauri::command]
-pub async fn add_game_from_scan(app: AppHandle, title: String) -> Result<String, AppError> {
+pub async fn add_game_from_scan(
+    app: AppHandle,
+    key: String,
+    title: String,
+) -> Result<String, AppError> {
     let hub_games = crate::hub::load_local(&app).games;
-    let found = crate::stores::installed()
-        .into_iter()
-        .find(|g| g.title == title)
-        .ok_or_else(|| AppError::with(code::GAME_NOT_FOUND, title.clone()))?;
+    let found = crate::stores::find_by_key(crate::stores::installed(), &key)
+        .ok_or_else(|| AppError::with(code::GAME_NOT_FOUND, title))?;
 
     let content_id = crate::catalog::content_id_for(&found, &hub_games);
-    let mut cfg = config::load(&app);
-    let id = crate::library::add_found(
-        &mut cfg,
-        found.title,
-        content_id,
-        found.launch,
-        found.install_path,
-        found.exe_path,
-    )?;
-    save_config(&app, &cfg)?;
+    let id = config::update(&app, |cfg| {
+        crate::library::add_found(
+            cfg,
+            found.title,
+            content_id,
+            found.launch,
+            found.install_path,
+            found.exe_path,
+        )
+    })?;
     crate::tray::rebuild_menu(&app);
     Ok(id)
 }
@@ -297,9 +314,10 @@ pub async fn add_game_from_scan(app: AppHandle, title: String) -> Result<String,
 /// тоже осознанное решение, и повторно спрашивать нельзя.
 #[tauri::command]
 pub async fn mark_seeded(app: AppHandle) -> Result<(), AppError> {
-    let mut cfg = config::load(&app);
-    cfg.seeded = true;
-    save_config(&app, &cfg)
+    config::update(&app, |cfg| {
+        cfg.seeded = true;
+        Ok(())
+    })
 }
 
 /// Нужно ли показать экран первого запуска вместо главного экрана.
@@ -308,7 +326,8 @@ pub async fn needs_first_run(app: AppHandle) -> bool {
     !config::load(&app).seeded
 }
 
-/// Общий помощник: прочитать конфиг, изменить, записать.
+/// Общий помощник для правок списка игр: `config::update` и пересборка меню
+/// трея.
 ///
 /// Отказ правки — `GAME_NOT_FOUND` без подробности: помощник не знает, какая
 /// игра имелась в виду (у `reorder_games` их целый список).
@@ -316,11 +335,13 @@ fn with_config<F>(app: &AppHandle, f: F) -> Result<(), AppError>
 where
     F: FnOnce(&mut config::AppConfig) -> bool,
 {
-    let mut cfg = config::load(app);
-    if !f(&mut cfg) {
-        return Err(AppError::new(code::GAME_NOT_FOUND));
-    }
-    save_config(app, &cfg)?;
+    config::update(app, |cfg| {
+        if f(cfg) {
+            Ok(())
+        } else {
+            Err(AppError::new(code::GAME_NOT_FOUND))
+        }
+    })?;
     crate::tray::rebuild_menu(app);
     Ok(())
 }
@@ -335,9 +356,7 @@ pub async fn add_game(app: AppHandle, title: String, exe: String) -> Result<Stri
     }
     // Название тоже вводит человек — проверяем перед записью в конфиг.
     crate::library::validate_title(&title)?;
-    let mut cfg = config::load(&app);
-    let id = crate::library::add(&mut cfg, title, exe);
-    save_config(&app, &cfg)?;
+    let id = config::update(&app, |cfg| Ok::<_, AppError>(crate::library::add(cfg, title, exe)))?;
     crate::tray::rebuild_menu(&app);
     Ok(id)
 }
@@ -435,12 +454,13 @@ pub async fn set_behaviour(
     close_to_tray: bool,
     tray_on_launch: bool,
 ) -> Result<(), AppError> {
-    let mut cfg = config::load(&app);
-    cfg.behaviour = config::Behaviour {
-        close_to_tray,
-        tray_on_launch,
-    };
-    save_config(&app, &cfg)
+    config::update(&app, |cfg| {
+        cfg.behaviour = config::Behaviour {
+            close_to_tray,
+            tray_on_launch,
+        };
+        Ok(())
+    })
 }
 
 #[tauri::command]
@@ -450,9 +470,10 @@ pub async fn get_store_art(app: AppHandle) -> bool {
 
 #[tauri::command]
 pub async fn set_store_art(app: AppHandle, enabled: bool) -> Result<(), AppError> {
-    let mut cfg = config::load(&app);
-    cfg.store_art = enabled;
-    save_config(&app, &cfg)
+    config::update(&app, |cfg| {
+        cfg.store_art = enabled;
+        Ok(())
+    })
 }
 
 #[tauri::command]
@@ -462,9 +483,10 @@ pub async fn get_animation(app: AppHandle) -> bool {
 
 #[tauri::command]
 pub async fn set_animation(app: AppHandle, enabled: bool) -> Result<(), AppError> {
-    let mut cfg = config::load(&app);
-    cfg.animation = enabled;
-    save_config(&app, &cfg)
+    config::update(&app, |cfg| {
+        cfg.animation = enabled;
+        Ok(())
+    })
 }
 
 #[tauri::command]
@@ -475,9 +497,10 @@ pub async fn get_language(app: AppHandle) -> Language {
 /// Меню трея переименовывается сразу — как и страница, без перезапуска.
 #[tauri::command]
 pub async fn set_language(app: AppHandle, language: Language) -> Result<(), AppError> {
-    let mut cfg = config::load(&app);
-    cfg.language = language;
-    save_config(&app, &cfg)?;
+    config::update(&app, |cfg| {
+        cfg.language = language;
+        Ok::<_, AppError>(())
+    })?;
     crate::tray::rebuild_menu(&app);
     Ok(())
 }
@@ -492,9 +515,10 @@ pub async fn set_video_language(
     app: AppHandle,
     language: VideoLanguage,
 ) -> Result<(), AppError> {
-    let mut cfg = config::load(&app);
-    cfg.video_language = language;
-    save_config(&app, &cfg)
+    config::update(&app, |cfg| {
+        cfg.video_language = language;
+        Ok(())
+    })
 }
 
 /// Включён ли автозапуск — по реестру, а не по конфигу.
@@ -539,9 +563,10 @@ pub async fn set_hub_url(app: AppHandle, url: Option<String>) -> Result<(), AppE
             return Err(AppError::new(code::HUB_URL_NOT_HTTPS));
         }
     }
-    let mut cfg = config::load(&app);
-    cfg.hub_url = url;
-    save_config(&app, &cfg)
+    config::update(&app, |cfg| {
+        cfg.hub_url = url;
+        Ok(())
+    })
 }
 
 /// Размер файлов в одной папке кеша, в байтах. Общая часть для картинок хаба
@@ -754,6 +779,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }
     }
 

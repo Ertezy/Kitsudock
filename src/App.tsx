@@ -4,7 +4,7 @@ import { api } from "./lib/api";
 import { launchNote } from "./lib/launch";
 import { setMotion } from "./lib/motion";
 import { watchWindowActivity } from "./lib/windowActive";
-import { REFRESH_EVERY_MS, backgroundsKey, sameHub, shouldRefreshOnShow, shouldRefreshOnOnline } from "./lib/hubRefresh";
+import { REFRESH_EVERY_MS, backgroundsKey, finishCheck, sameHub, startCheck, shouldRefreshOnShow, shouldRefreshOnOnline, type HubCheck } from "./lib/hubRefresh";
 import SidePanel from "./components/SidePanel";
 import GameArt from "./components/GameArt";
 import PlayButton from "./components/PlayButton";
@@ -38,8 +38,9 @@ export default function App() {
   }, []);
   const t = useT();
 
-  // Когда данные панели проверялись последний раз — для проверки при возвращении окна.
-  const lastHubCheck = useRef(0);
+  // Когда данные панели проверялись последний раз и дошла ли проверка до
+  // сервера — для проверки при возвращении окна и при появлении сети.
+  const lastHubCheck = useRef<HubCheck>({ at: 0, reachedServer: false });
 
   // Счётчик запросов к хабу: запросы могут идти внахлёст (таймер, возврат
   // окна, load() после настроек) и ответить не в том порядке, в каком ушли.
@@ -72,11 +73,12 @@ export default function App() {
   // откладывать появление главного экрана. Те же данные панель не
   // перерисовывают; отказ сети оставляет на экране то, что уже показано.
   const refreshHub = useCallback(async () => {
-    lastHubCheck.current = Date.now();
+    lastHubCheck.current = startCheck(lastHubCheck.current, Date.now());
     const requestId = ++hubRequestId.current;
     try {
       const next = await api.getHub();
       if (hubRequestId.current !== requestId) return;
+      lastHubCheck.current = finishCheck(lastHubCheck.current, next);
       // Побочный эффект здесь, а не внутри функции для `setHub`: та обязана быть
       // чистой, а React может вызвать её не один раз. Перечитываем только при
       // смене отпечатка — почти все проверки хаба фонов не меняют.
@@ -88,6 +90,7 @@ export default function App() {
       setHub((current) => (sameHub(current, next) ? current : next));
     } catch {
       // Показанные данные остаются; следующая проверка попробует снова.
+      if (hubRequestId.current === requestId) lastHubCheck.current = finishCheck(lastHubCheck.current, null);
     }
   }, [reloadGames]);
 
@@ -148,7 +151,7 @@ export default function App() {
   useEffect(() => {
     const timer = window.setInterval(() => void refreshHub(), REFRESH_EVERY_MS);
     const onShown = () => {
-      if (shouldRefreshOnShow(lastHubCheck.current, Date.now())) void refreshHub();
+      if (shouldRefreshOnShow(lastHubCheck.current.at, Date.now())) void refreshHub();
     };
     const unlisten = listen<boolean>("window-visibility", (e) => {
       if (e.payload) onShown();

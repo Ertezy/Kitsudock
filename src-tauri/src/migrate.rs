@@ -43,7 +43,7 @@ pub fn copy_old_config(old_dir: &Path, new_dir: &Path) -> io::Result<bool> {
     // оборванный перенос (сбой диска, закрытие компьютера) не оставит
     // недописанный `config.json`, который следующий запуск принял бы за
     // готовые настройки. Имя не `config.json.tmp` — его занимает
-    // `config::save`.
+    // запись конфига (`config::update`).
     let staging = new_dir.join(STAGING_FILE);
     let copied = fs::copy(&old_config, &staging).and_then(|_| fs::rename(&staging, &new_config));
     if let Err(e) = copied {

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../lib/api";
+import { addChecked, defaultChecked } from "../../lib/scanAdd";
 import { currentLang, currentT, dictionary, setLanguage, useLang, useT, type Lang } from "../../i18n";
 import { errorText } from "../../i18n/errors";
 import { LANGS, LANG_SHORT, LANGUAGE_BLOCK_TITLE } from "../../i18n/native";
@@ -54,13 +55,7 @@ export default function FirstRunView({ onDone }: Props) {
         setScanFailed(true);
       }
       setFound(list);
-      // По умолчанию отмечены только игры, про которые у нас есть контент,
-      // и только те, которых ещё нет в списке.
-      setChecked(
-        new Set(
-          list.filter((g) => g.contentId !== null && !g.alreadyAdded).map((g) => g.title),
-        ),
-      );
+      setChecked(defaultChecked(list));
     })();
   }, []);
 
@@ -71,13 +66,16 @@ export default function FirstRunView({ onDone }: Props) {
   // не удалось»: сцена та же, слова и выход разные.
   const nothing = found !== null && found.length === 0;
 
-  const toggle = (title: string) =>
+  const toggle = (key: string) =>
     setChecked((prev) => {
       const next = new Set(prev);
-      if (next.has(title)) next.delete(title);
-      else next.add(title);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
+
+  const markAdded = (key: string) =>
+    setFound((prev) => prev && prev.map((g) => (g.key === key ? { ...g, alreadyAdded: true } : g)));
 
   // Первый запуск считается состоявшимся после любого решения — и когда
   // добавили отмеченные, и когда нажали «Пропустить». Пропуск это тоже
@@ -105,12 +103,12 @@ export default function FirstRunView({ onDone }: Props) {
 
   const rows = (list: FoundGame[]) =>
     list.map((g) => (
-      <label key={g.title} className="found-row">
+      <label key={g.key} className="found-row">
         <input
           type="checkbox"
-          checked={checked.has(g.title)}
+          checked={checked.has(g.key)}
           disabled={g.alreadyAdded}
-          onChange={() => toggle(g.title)}
+          onChange={() => toggle(g.key)}
         />
         <span className="found-title">{g.title}</span>
         <span className="found-source">{t.main.launch.from[g.sourceKind]}</span>
@@ -180,11 +178,14 @@ export default function FirstRunView({ onDone }: Props) {
                   setBusy(true);
                   setError("");
                   try {
-                    for (const g of scanned) {
-                      if (!checked.has(g.title) || g.alreadyAdded) continue;
-                      // Путь берётся из того же поиска, что заполнил список.
-                      await api.addGameFromScan(g.title);
-                    }
+                    // Установка ищется по ключу из того же поиска, что
+                    // заполнил список.
+                    await addChecked(
+                      scanned,
+                      checked,
+                      (g) => api.addGameFromScan(g.key, g.title),
+                      markAdded,
+                    );
                     await markSeededAndClose();
                   } catch (e) {
                     setError(errorText(t, e));

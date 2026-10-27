@@ -5,7 +5,7 @@
 //! обёрткой: прочитать конфиг, позвать сюда, записать обратно.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::config::{AppConfig, Game, Launch};
 use crate::error::{code, AppError};
@@ -83,6 +83,7 @@ pub fn add(cfg: &mut AppConfig, title: String, exe: PathBuf) -> String {
         background: None,
         icon: None,
         video: None,
+        content_unlinked: false,
     });
     id
 }
@@ -101,6 +102,11 @@ pub fn add(cfg: &mut AppConfig, title: String, exe: PathBuf) -> String {
 /// Отдельная от `add`: у найденной игры уже известны способ запуска и пути из
 /// манифеста, и сводить их к `Launch::Exe` нельзя — тогда игра из Steam
 /// перестала бы запускаться через Steam.
+///
+/// Повторное добавление той же установки ничего не меняет и возвращает
+/// идентификатор уже записанной игры (`configured_install`): экран первого
+/// запуска после частичного провала повторяет весь список, и копии одной
+/// игры в доке появляться не должны.
 pub fn add_found(
     cfg: &mut AppConfig,
     title: String,
@@ -110,6 +116,9 @@ pub fn add_found(
     exe_path: Option<PathBuf>,
 ) -> Result<String, AppError> {
     validate_title(&title)?;
+    if let Some(existing) = configured_install(cfg, &launch, &install_path, exe_path.as_deref()) {
+        return Ok(existing.id.clone());
+    }
     let base = content_id
         .clone()
         .unwrap_or_else(|| crate::catalog::normalize(&title));
@@ -125,8 +134,22 @@ pub fn add_found(
         background: None,
         icon: None,
         video: None,
+        content_unlinked: false,
     });
     Ok(id)
+}
+
+/// Игра конфига, которая уже указывает на эту установку
+/// (`stores::same_install`).
+fn configured_install<'a>(
+    cfg: &'a AppConfig,
+    launch: &Launch,
+    install_path: &Path,
+    exe_path: Option<&Path>,
+) -> Option<&'a Game> {
+    cfg.games
+        .iter()
+        .find(|g| crate::stores::same_install(g, launch, install_path, exe_path))
 }
 
 /// Меняет названные поля одной игры. `false` — игры с таким идентификатором нет.
@@ -160,6 +183,10 @@ pub fn update(cfg: &mut AppConfig, id: &str, patch: GamePatch) -> bool {
         game.video = video;
     }
     if let Some(content) = patch.content_id {
+        // «Нет данных» запоминается отдельно от пустой привязки: иначе сверка
+        // с магазинами при следующем запуске вернула бы её
+        // (`catalog::enrich_from_stores`).
+        game.content_unlinked = content.is_none();
         game.content_id = content;
     }
     if let Some(args) = patch.args {
@@ -243,6 +270,7 @@ mod tests {
                     background: None,
                     icon: None,
                     video: None,
+                    content_unlinked: false,
                 })
                 .collect(),
         }
@@ -334,6 +362,73 @@ mod tests {
         assert_eq!(cfg.games.len(), 2);
     }
 
+    fn add_ww(cfg: &mut AppConfig, launch: Launch, install: &str) -> String {
+        add_found(
+            cfg,
+            "Wuthering Waves".into(),
+            Some("wuthering".into()),
+            launch,
+            PathBuf::from(install),
+            None,
+        )
+        .expect("должно пройти")
+    }
+
+    #[test]
+    fn adding_the_same_install_twice_returns_the_existing_game() {
+        // Повтор после частичного провала на экране первого запуска: первая
+        // игра уже записана, и вторая попытка не должна завести её копию.
+        let mut cfg = cfg_with(&[]);
+        let steam = Launch::Steam { appid: 3513350 };
+        let first = add_ww(&mut cfg, steam.clone(), r"C:\SteamLibrary\WutheringWaves");
+        let again = add_ww(&mut cfg, steam, r"C:\SteamLibrary\WutheringWaves");
+        assert_eq!(again, first);
+        assert_eq!(cfg.games.len(), 1);
+    }
+
+    #[test]
+    fn a_found_game_in_an_already_configured_folder_is_not_added_again() {
+        // Игру уже добавили руками: путь к exe в той же папке, что нашёл
+        // лаунчер. Регистр букв в путях Windows не важен.
+        let mut cfg = cfg_with(&[]);
+        let manual = add(
+            &mut cfg,
+            "WW".into(),
+            PathBuf::from(r"D:\Games\Wuthering Waves\launcher.exe"),
+        );
+        let found = add_ww(&mut cfg, Launch::Exe, r"d:\games\wuthering waves");
+        assert_eq!(found, manual);
+        assert_eq!(cfg.games.len(), 1);
+    }
+
+    #[test]
+    fn two_steam_apps_in_one_folder_are_two_games() {
+        // Игра и её демо или плейтест могут лежать в одной папке Steam: у
+        // магазина это разные приложения, и решает appid, а не папка.
+        let mut cfg = cfg_with(&[]);
+        let game = add_ww(&mut cfg, Launch::Steam { appid: 3513350 }, r"C:\Steam\common\WW");
+        let demo = add_ww(&mut cfg, Launch::Steam { appid: 3513351 }, r"C:\Steam\common\WW");
+        assert_ne!(game, demo);
+        assert_eq!(cfg.games.len(), 2);
+    }
+
+    #[test]
+    fn the_same_title_from_another_store_is_a_separate_game() {
+        let mut cfg = cfg_with(&[]);
+        let steam = add_ww(&mut cfg, Launch::Steam { appid: 3513350 }, r"C:\Steam\WW");
+        let epic = add_ww(
+            &mut cfg,
+            Launch::Epic {
+                namespace: "ns".into(),
+                catalog_item_id: "cid".into(),
+                app_name: "ww".into(),
+            },
+            r"C:\Epic\WW",
+        );
+        assert_ne!(steam, epic);
+        assert_eq!(cfg.games.len(), 2);
+    }
+
     #[test]
     fn update_changes_only_the_named_fields() {
         let mut cfg = cfg_with(&["a", "b"]);
@@ -416,6 +511,39 @@ mod tests {
             GamePatch { content_id: Some(None), ..Default::default() },
         );
         assert_eq!(cfg.games[0].content_id, None);
+    }
+
+    #[test]
+    fn choosing_no_content_remembers_the_choice() {
+        let mut cfg = cfg_with(&["a"]);
+        cfg.games[0].content_id = Some("genshin".into());
+        update(
+            &mut cfg,
+            "a",
+            GamePatch { content_id: Some(None), ..Default::default() },
+        );
+        assert!(cfg.games[0].content_unlinked);
+    }
+
+    #[test]
+    fn choosing_content_clears_the_unlink_flag() {
+        let mut cfg = cfg_with(&["a"]);
+        cfg.games[0].content_unlinked = true;
+        update(
+            &mut cfg,
+            "a",
+            GamePatch { content_id: Some(Some("genshin".into())), ..Default::default() },
+        );
+        assert_eq!(cfg.games[0].content_id.as_deref(), Some("genshin"));
+        assert!(!cfg.games[0].content_unlinked);
+    }
+
+    #[test]
+    fn a_patch_without_content_keeps_the_unlink_flag() {
+        let mut cfg = cfg_with(&["a"]);
+        cfg.games[0].content_unlinked = true;
+        update(&mut cfg, "a", GamePatch { title: Some("B".into()), ..Default::default() });
+        assert!(cfg.games[0].content_unlinked);
     }
 
     #[test]

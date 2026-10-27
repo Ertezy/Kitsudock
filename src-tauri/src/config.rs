@@ -11,9 +11,49 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::cell::Cell;
+use std::sync::{Mutex, MutexGuard, PoisonError};
 use tauri::{AppHandle, Manager};
 
 pub const CURRENT_VERSION: u32 = 3;
+
+/// Один замок на процесс для файла конфига. Команды асинхронные и идут
+/// одновременно; без замка две правки вплотную читают один и тот же файл, и
+/// записанная второй молча отменяет первую. Читает файл тоже только тот, кто
+/// держит замок: чтение старого конфига само его переписывает (перенос
+/// версий), а на Windows переименование поверх открытого файла не проходит.
+static FILE_LOCK: Mutex<()> = Mutex::new(());
+
+thread_local! {
+    /// Держит ли этот поток `FILE_LOCK`. Замок не повторный: `load` или
+    /// `update` изнутри `update` ждали бы сами себя вечно. Флаг превращает
+    /// такую ошибку в немедленную панику в тестах и отладочной сборке.
+    static HOLDS_FILE_LOCK: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Взятый `FILE_LOCK`; при освобождении снимает флаг потока.
+struct FileGuard {
+    _guard: MutexGuard<'static, ()>,
+}
+
+impl Drop for FileGuard {
+    fn drop(&mut self) {
+        HOLDS_FILE_LOCK.with(|held| held.set(false));
+    }
+}
+
+/// Упавший с паникой держатель замка не должен ронять приложение: файл
+/// пишется атомарно, так что на диске всегда целый конфиг, и замок можно
+/// брать дальше.
+fn lock_file() -> FileGuard {
+    debug_assert!(
+        !HOLDS_FILE_LOCK.with(Cell::get),
+        "замок конфига уже взят этим потоком: load или update внутри update"
+    );
+    let guard = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+    HOLDS_FILE_LOCK.with(|held| held.set(true));
+    FileGuard { _guard: guard }
+}
 
 /// Способ запуска определён в `stores`, потому что узнаём мы его из манифеста
 /// магазина. Переэкспортируем, чтобы остальной код писал `config::Launch`.
@@ -49,6 +89,12 @@ pub struct Game {
     /// Своё видео фона. Важнее своей картинки и картинки магазина.
     #[serde(default)]
     pub video: Option<PathBuf>,
+    /// Человек сам выбрал «нет данных» для этой игры. Пустой `content_id`
+    /// бывает и у игры, которую каталог просто не узнал при добавлении, и
+    /// такую сверка с магазинами при запуске привязывает заново; выбор
+    /// человека она трогать не должна. Нет поля в файле — `false`.
+    #[serde(default)]
+    pub content_unlinked: bool,
 }
 
 impl Game {
@@ -68,6 +114,7 @@ impl Game {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }
     }
 }
@@ -235,6 +282,7 @@ pub fn migrate_v1(raw: &serde_json::Value) -> Option<AppConfig> {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         });
     }
 
@@ -323,20 +371,27 @@ pub fn load(app: &AppHandle) -> AppConfig {
     let Ok(path) = config_path(app) else {
         return AppConfig::default();
     };
+    let _guard = lock_file();
+    load_from(&path)
+}
+
+/// Чтение по готовому пути — сердцевина `load` и `update`, проверяемая без
+/// `AppHandle`.
+fn load_from(path: &Path) -> AppConfig {
     if !path.exists() {
         return AppConfig::default();
     }
-    let text = match fs::read_to_string(&path) {
+    let text = match fs::read_to_string(path) {
         Ok(t) => t,
         Err(e) => {
             log::error!("[config] {} — не читается ({e}), начинаю с чистого", path.display());
-            let _ = fs::rename(&path, path.with_file_name("config.json.broken"));
+            let _ = fs::rename(path, path.with_file_name("config.json.broken"));
             return AppConfig::default();
         }
     };
     let Ok(raw) = serde_json::from_str::<serde_json::Value>(&text) else {
         log::error!("[config] {} — не JSON, начинаю с чистого", path.display());
-        let _ = fs::rename(&path, path.with_file_name("config.json.broken"));
+        let _ = fs::rename(path, path.with_file_name("config.json.broken"));
         return AppConfig::default();
     };
 
@@ -349,7 +404,7 @@ pub fn load(app: &AppHandle) -> AppConfig {
                 // sync_games_with_stores, если сверка с магазинами ничего
                 // не поменяла). Без этого файл на диске остаётся версии 1
                 // и мигрирует заново при каждом старте.
-                if let Err(e) = save(app, &cfg) {
+                if let Err(e) = save_to(path, &cfg) {
                     log::error!("[config] не удалось сохранить перенесённый конфиг: {e}");
                 }
                 cfg
@@ -369,7 +424,7 @@ pub fn load(app: &AppHandle) -> AppConfig {
             Some(cfg) => {
                 // Та же причина, что и для версии 1: миграция должна
                 // пережить перезапуск сама по себе.
-                if let Err(e) = save(app, &cfg) {
+                if let Err(e) = save_to(path, &cfg) {
                     log::error!("[config] не удалось сохранить перенесённый конфиг: {e}");
                 }
                 cfg
@@ -488,14 +543,15 @@ fn reject_if_newer_than_current(version: u32) -> Result<(), String> {
 /// Отказывается писать конфиг версии выше `CURRENT_VERSION`: у этой сборки
 /// нет схемы для полей, которых она не знает, и молча их отбросить значило
 /// бы необратимо стереть данные более новой версии приложения.
-pub fn save(app: &AppHandle, cfg: &AppConfig) -> Result<(), String> {
+///
+/// Снаружи модуля не видна: писать конфиг можно только через `update`.
+fn save_to(final_path: &Path, cfg: &AppConfig) -> Result<(), String> {
     reject_if_newer_than_current(cfg.version)?;
-    let final_path = config_path(app)?;
     let tmp_path = final_path.with_file_name("config.json.tmp");
     let json = serde_json::to_string_pretty(cfg).map_err(|e| format!("сериализация: {e}"))?;
     fs::write(&tmp_path, json)
         .map_err(|e| format!("запись {}: {e}", tmp_path.display()))?;
-    fs::rename(&tmp_path, &final_path).map_err(|e| {
+    fs::rename(&tmp_path, final_path).map_err(|e| {
         format!(
             "переименование {} -> {}: {e}",
             tmp_path.display(),
@@ -503,6 +559,55 @@ pub fn save(app: &AppHandle, cfg: &AppConfig) -> Result<(), String> {
         )
     })?;
     Ok(())
+}
+
+/// Конфиг не записался; внутри — текст ошибки для подробности.
+#[derive(Debug)]
+pub struct SaveFailed(pub String);
+
+impl From<SaveFailed> for crate::error::AppError {
+    fn from(e: SaveFailed) -> Self {
+        crate::error::AppError::with(crate::error::code::CONFIG_SAVE_FAILED, e.0)
+    }
+}
+
+impl From<SaveFailed> for String {
+    fn from(e: SaveFailed) -> Self {
+        e.0
+    }
+}
+
+/// Единственный путь записи конфига: прочитать, изменить, записать — всё под
+/// одним замком (`FILE_LOCK`), так что одновременные правки не теряются.
+///
+/// `f` возвращает `Err` — файл не трогается, ошибка уходит вызывающему как
+/// есть. Конфиг, который `f` оставила прежним, тоже не переписывается.
+///
+/// Внутри `f` нельзя звать `load`, `update` и то, что их зовёт (например,
+/// `tray::rebuild_menu`): замок не повторный, и вызов ждал бы сам себя
+/// (тесты и отладочная сборка вместо этого падают, см. `HOLDS_FILE_LOCK`).
+/// И ничего долгого — запуск игры или сеть — тоже: остальные правки стоят.
+pub fn update<T, E>(app: &AppHandle, f: impl FnOnce(&mut AppConfig) -> Result<T, E>) -> Result<T, E>
+where
+    E: From<SaveFailed>,
+{
+    let path = config_path(app).map_err(|e| E::from(SaveFailed(e)))?;
+    update_at(&path, f)
+}
+
+/// Сердцевина `update` по готовому пути — проверяется без `AppHandle`.
+fn update_at<T, E>(path: &Path, f: impl FnOnce(&mut AppConfig) -> Result<T, E>) -> Result<T, E>
+where
+    E: From<SaveFailed>,
+{
+    let _guard = lock_file();
+    let mut cfg = load_from(path);
+    let before = serde_json::to_value(&cfg).ok();
+    let out = f(&mut cfg)?;
+    if before.is_none() || before != serde_json::to_value(&cfg).ok() {
+        save_to(path, &cfg).map_err(|e| E::from(SaveFailed(e)))?;
+    }
+    Ok(out)
 }
 
 /// Существует ли файл, которым игра запускается.
@@ -1005,6 +1110,131 @@ mod tests {
         assert_eq!(json["language"], "ru");
         assert_eq!(json["videoLanguage"], "ja");
         assert_eq!(cfg.version, CURRENT_VERSION);
+    }
+
+    /// Отдельная папка на тег теста: тесты идут в одном процессе параллельно.
+    fn temp_config(tag: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("gh-config-{tag}-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        dir.join("config.json")
+    }
+
+    #[test]
+    fn concurrent_updates_lose_nothing() {
+        // Команды асинхронные и идут одновременно: запуск из трея и правка
+        // настроек вплотную друг к другу. Каждая читает файл, меняет своё поле
+        // и пишет целиком — без общего замка одна запись затирала бы другую.
+        const ROUNDS: u32 = 40;
+        let path = temp_config("concurrent");
+        let games = {
+            let path = path.clone();
+            std::thread::spawn(move || {
+                for i in 0..ROUNDS {
+                    update_at(&path, |cfg| {
+                        cfg.games.push(Game::manual(format!("g{i}"), format!("G{i}")));
+                        Ok::<_, String>(())
+                    })
+                    .unwrap();
+                }
+            })
+        };
+        let counter = {
+            let path = path.clone();
+            std::thread::spawn(move || {
+                for _ in 0..ROUNDS {
+                    update_at(&path, |cfg| {
+                        let n: u32 = cfg.hub_url.as_deref().map_or(0, |s| s.parse().unwrap());
+                        cfg.hub_url = Some((n + 1).to_string());
+                        Ok::<_, String>(())
+                    })
+                    .unwrap();
+                }
+            })
+        };
+        games.join().expect("поток игр не должен падать");
+        counter.join().expect("поток счётчика не должен падать");
+
+        let cfg = load_from(&path);
+        assert_eq!(cfg.games.len(), ROUNDS as usize, "потерялись добавленные игры");
+        assert_eq!(cfg.hub_url, Some(ROUNDS.to_string()), "потерялись приращения счётчика");
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "замок конфига уже взят этим потоком")]
+    fn reading_the_config_inside_an_update_fails_loudly() {
+        // Замок не повторный: такой вызов в сборке без проверки ждал бы сам
+        // себя вечно. Здесь он должен упасть сразу и с понятной причиной.
+        let path = temp_config("reentry");
+        let _ = update_at(&path, |_| update_at(&path, |_| Ok::<_, String>(())));
+    }
+
+    #[test]
+    fn an_update_that_fails_leaves_the_file_alone() {
+        let path = temp_config("update-err");
+        update_at(&path, |cfg| {
+            cfg.seeded = true;
+            Ok::<_, String>(())
+        })
+        .unwrap();
+        let err = update_at(&path, |cfg| {
+            cfg.seeded = false;
+            Err::<(), _>("нет такой игры".to_string())
+        });
+        assert_eq!(err, Err("нет такой игры".to_string()));
+        assert!(load_from(&path).seeded);
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn an_update_that_changes_nothing_does_not_write() {
+        let path = temp_config("update-noop");
+        update_at(&path, |cfg| {
+            cfg.seeded = true;
+            Ok::<_, String>(())
+        })
+        .unwrap();
+        let written = fs::metadata(&path).unwrap().modified().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        let id = update_at(&path, |_| Ok::<_, String>(7)).unwrap();
+        assert_eq!(id, 7);
+        assert_eq!(fs::metadata(&path).unwrap().modified().unwrap(), written);
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn a_game_saved_before_the_unlink_flag_loads_with_it_off() {
+        // Поле необязательное, и версия конфига ради него не поднимается.
+        let raw = serde_json::json!({
+            "version": 3,
+            "games": [
+                {"id":"a","title":"A","contentId":null,"launch":{"kind":"exe"},"args":""}
+            ]
+        });
+        let path = temp_config("unlink-old");
+        fs::write(&path, raw.to_string()).unwrap();
+        let cfg = load_from(&path);
+        assert_eq!(cfg.games.len(), 1);
+        assert!(!cfg.games[0].content_unlinked);
+
+        let migrated = migrate_v2(&serde_json::from_str(V2_SAMPLE).unwrap()).unwrap();
+        assert!(migrated.games.iter().all(|g| !g.content_unlinked));
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn the_unlink_flag_survives_a_save_round_trip() {
+        let mut cfg = AppConfig::default();
+        let mut g = Game::manual("a".into(), "A".into());
+        g.content_unlinked = true;
+        cfg.games.push(g);
+        let path = temp_config("unlink-round-trip");
+        save_to(&path, &cfg).unwrap();
+        assert!(fs::read_to_string(&path).unwrap().contains("\"contentUnlinked\": true"));
+        assert!(load_from(&path).games[0].content_unlinked);
+        let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 
     #[test]
