@@ -27,6 +27,18 @@ export function shouldRefreshOnOnline(last: HubCheck, nowMs: number): boolean {
   return !last.reachedServer || nowMs - last.at > ONLINE_REFRESH_AFTER_MS;
 }
 
+/** Проверка началась. До ответа остаётся прежний итог: после удачной
+ *  проверки появление сети не запускает второй запрос поверх идущего, а после
+ *  неудачной — запускает, ведь идущий мог начаться ещё без сети. */
+export function startCheck(prev: HubCheck, nowMs: number): HubCheck {
+  return { at: nowMs, reachedServer: prev.reachedServer };
+}
+
+/** Проверка закончилась: с данными (`hub`) или отказом (`null`). */
+export function finishCheck(prev: HubCheck, hub: HubData | null): HubCheck {
+  return { ...prev, reachedServer: hub !== null && reachedServer(hub) };
+}
+
 /** Дошёл ли запрос до сервера. Без сети `get_hub` не падает, а отдаёт кеш или
  *  файл из комплекта — с другим `_source`. */
 export function reachedServer(hub: HubData): boolean {

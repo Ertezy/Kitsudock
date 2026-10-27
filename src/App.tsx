@@ -4,7 +4,7 @@ import { api } from "./lib/api";
 import { launchNote } from "./lib/launch";
 import { setMotion } from "./lib/motion";
 import { watchWindowActivity } from "./lib/windowActive";
-import { REFRESH_EVERY_MS, backgroundsKey, reachedServer, sameHub, shouldRefreshOnShow, shouldRefreshOnOnline, type HubCheck } from "./lib/hubRefresh";
+import { REFRESH_EVERY_MS, backgroundsKey, finishCheck, sameHub, startCheck, shouldRefreshOnShow, shouldRefreshOnOnline, type HubCheck } from "./lib/hubRefresh";
 import SidePanel from "./components/SidePanel";
 import GameArt from "./components/GameArt";
 import PlayButton from "./components/PlayButton";
@@ -73,14 +73,12 @@ export default function App() {
   // откладывать появление главного экрана. Те же данные панель не
   // перерисовывают; отказ сети оставляет на экране то, что уже показано.
   const refreshHub = useCallback(async () => {
-    // До ответа проверка считается не дошедшей: появление сети во время
-    // запроса, начатого без неё, должно запустить новый.
-    lastHubCheck.current = { at: Date.now(), reachedServer: false };
+    lastHubCheck.current = startCheck(lastHubCheck.current, Date.now());
     const requestId = ++hubRequestId.current;
     try {
       const next = await api.getHub();
       if (hubRequestId.current !== requestId) return;
-      lastHubCheck.current = { ...lastHubCheck.current, reachedServer: reachedServer(next) };
+      lastHubCheck.current = finishCheck(lastHubCheck.current, next);
       // Побочный эффект здесь, а не внутри функции для `setHub`: та обязана быть
       // чистой, а React может вызвать её не один раз. Перечитываем только при
       // смене отпечатка — почти все проверки хаба фонов не меняют.
@@ -92,6 +90,7 @@ export default function App() {
       setHub((current) => (sameHub(current, next) ? current : next));
     } catch {
       // Показанные данные остаются; следующая проверка попробует снова.
+      if (hubRequestId.current === requestId) lastHubCheck.current = finishCheck(lastHubCheck.current, null);
     }
   }, [reloadGames]);
 

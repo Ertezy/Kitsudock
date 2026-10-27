@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { REFRESH_EVERY_MS, REFRESH_ON_SHOW_AFTER_MS, ONLINE_REFRESH_AFTER_MS, backgroundsKey, reachedServer, sameHub, shouldRefreshOnShow, shouldRefreshOnOnline } from "./hubRefresh";
+import { REFRESH_EVERY_MS, REFRESH_ON_SHOW_AFTER_MS, ONLINE_REFRESH_AFTER_MS, backgroundsKey, finishCheck, reachedServer, sameHub, startCheck, shouldRefreshOnShow, shouldRefreshOnOnline } from "./hubRefresh";
 import type { HubData, HubGame } from "../types";
 
 const hub = (updatedAt: number): HubData => ({
@@ -39,6 +39,23 @@ describe("hubRefresh", () => {
     const failed = { at: 0, reachedServer: false };
     expect(shouldRefreshOnOnline(failed, 1)).toBe(true);
     expect(shouldRefreshOnOnline(failed, 30_000)).toBe(true);
+  });
+
+  it("новая проверка до ответа не сбрасывает удачу прошлой", () => {
+    // Таймер или возврат окна начали проверку при живой сети: появление сети
+    // в это время второй запрос не запускает.
+    const ok = finishCheck(startCheck({ at: 0, reachedServer: false }, 0), hub(1));
+    const running = startCheck(ok, 3_600_000);
+    expect(running).toEqual({ at: 3_600_000, reachedServer: true });
+    expect(shouldRefreshOnOnline(running, 3_600_001)).toBe(false);
+  });
+
+  it("проверка, начатая после неудачной, при появлении сети повторяется", () => {
+    const failed = finishCheck({ at: 0, reachedServer: true }, null);
+    expect(failed.reachedServer).toBe(false);
+    expect(shouldRefreshOnOnline(startCheck(failed, 10), 20)).toBe(true);
+    const offline = finishCheck({ at: 0, reachedServer: true }, { ...hub(1), _source: "cache" });
+    expect(offline.reachedServer).toBe(false);
   });
 
   it("до сервера дошли только данные из сети, а не из кеша или комплекта", () => {
