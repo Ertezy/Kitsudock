@@ -243,7 +243,7 @@ pub struct FoundGame {
     /// Откуда найдена: `"steam" | "epic" | "hoyoplay" | "kuro" | "gryphlink"`
     /// либо `"exe"` — слово подставляет страница.
     pub source_kind: &'static str,
-    /// Игра с таким путём уже есть в конфиге — галочку ставить не нужно.
+    /// Эта установка уже есть в конфиге — галочку ставить не нужно.
     pub already_added: bool,
 }
 
@@ -258,11 +258,9 @@ pub async fn scan_installed(app: AppHandle) -> Vec<FoundGame> {
         .into_iter()
         .map(|found| {
             let content_id = crate::catalog::content_id_for(&found, &hub_games);
-            // То же сравнение, что решает, какую запись пользователя
-            // дополнить данными установки (`catalog::already_configured`
-            // переиспользует его же) — а не отдельное по exePath: у игр
-            // Steam он всегда `None` (см. `stores::steam`), и такое
-            // сравнение никогда не находило бы совпадение.
+            // То же правило «та же установка», что не даёт добавить её
+            // дважды (`library::add_found`); подробнее — у
+            // `catalog::already_configured`.
             let already_added = crate::catalog::already_configured(&found, &cfg.games, &hub_games);
             let source_kind = found_kind(&found);
             FoundGame {

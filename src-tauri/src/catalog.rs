@@ -70,20 +70,33 @@ fn find_installed<'a>(
 }
 
 /// Есть ли в конфиге пользователя запись, уже соответствующая этой найденной
-/// игре — по тому же сравнению, что и `find_installed` (сначала по
-/// идентификатору содержимого, потом по нормализованному названию).
+/// игре.
 ///
-/// `scan_installed` раньше сравнивал только `exePath`, а у игр Steam он
-/// всегда `None` (см. `stores::steam`) — совпадение никогда не находилось,
-/// и нажатие «Найти установленные игры» заводило вторую запись для уже
-/// настроенной игры Steam. Два независимых сравнения «это та же игра»
-/// расходятся быстро, поэтому здесь переиспользуется то же самое сравнение,
-/// а не пишется второе.
+/// Сравнение только по `exePath` не годится: у игр Steam он всегда `None`
+/// (см. `stores::steam`), и уже настроенная игра Steam не находилась бы.
+/// Своё отдельное сравнение «это та же игра» здесь тоже не пишется: два
+/// независимых сравнения расходятся быстро.
+///
+/// Запись, которая знает свои пути, сравнивается с находкой как установка —
+/// тем же правилом, что не даёт добавить установку дважды
+/// (`stores::same_install`). Иначе после добавления копии из Steam копия из
+/// Epic с тем же названием считалась бы добавленной, и отметить её было бы
+/// нельзя. По данным и названию сравниваются только записи без путей —
+/// перенесённые из v1.
 pub fn already_configured(found: &InstalledGame, games: &[Game], hub_games: &[HubGame]) -> bool {
     let found_alone = std::slice::from_ref(found);
-    games
-        .iter()
-        .any(|g| find_installed(g, found_alone, hub_games).is_some())
+    games.iter().any(|g| {
+        if crate::stores::has_install(g) {
+            crate::stores::same_install(
+                g,
+                &found.launch,
+                &found.install_path,
+                found.exe_path.as_deref(),
+            )
+        } else {
+            find_installed(g, found_alone, hub_games).is_some()
+        }
+    })
 }
 
 /// Дополняет игры пользователя данными из манифестов магазинов.
@@ -626,6 +639,54 @@ mod tests {
         enrich_from_stores(&mut games, &found, &hub_games());
 
         assert_eq!(games[0].content_id.as_deref(), Some("wuthering"));
+    }
+
+    fn configured_steam(title: &str, appid: u32, install: &str) -> Game {
+        Game {
+            launch: Launch::Steam { appid },
+            install_path: Some(PathBuf::from(install)),
+            ..Game::manual("g".into(), title.into())
+        }
+    }
+
+    #[test]
+    fn the_epic_copy_of_an_added_steam_game_is_not_marked_already_added() {
+        // Одна игра стоит в Steam и в Epic. Добавлена копия из Steam — копию
+        // из Epic по-прежнему можно отметить: это другая установка.
+        let games = vec![configured_steam("Same", 7, r"D:\Steam\Same")];
+        let epic_copy = InstalledGame {
+            install_path: PathBuf::from(r"C:\Epic\Same"),
+            source: Source::Epic,
+            ..installed(
+                "Same",
+                Launch::Epic { namespace: "n".into(), catalog_item_id: "c".into(), app_name: "same".into() },
+            )
+        };
+        assert!(!already_configured(&epic_copy, &games, &hub_games()));
+
+        let steam_copy = InstalledGame {
+            install_path: PathBuf::from(r"D:\Steam\Same"),
+            ..installed("Same", Launch::Steam { appid: 7 })
+        };
+        assert!(already_configured(&steam_copy, &games, &hub_games()));
+    }
+
+    #[test]
+    fn a_renamed_steam_game_is_still_marked_already_added() {
+        // Человек переименовал игру в доке — установка та же.
+        let games = vec![configured_steam("Мои волны", 3513350, r"C:\Games\X")];
+        let found = installed("Wuthering Waves", Launch::Steam { appid: 3513350 });
+        assert!(already_configured(&found, &games, &hub_games()));
+    }
+
+    #[test]
+    fn an_entry_without_paths_is_matched_by_title_or_content() {
+        // Запись, перенесённая из v1, путей не знает: сравнить установки
+        // нечем, и решает прежнее сравнение по данным и названию.
+        let mut migrated = Game::manual("wuthering".into(), "wuthering".into());
+        migrated.content_id = Some("wuthering".into());
+        let found = installed("Wuthering Waves", Launch::Steam { appid: 3513350 });
+        assert!(already_configured(&found, &[migrated], &hub_games()));
     }
 
     #[test]
