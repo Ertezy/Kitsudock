@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability (private) / Уязвимость (приватно)
+    url: https://github.com/Ertezy/Kitsudock/security/advisories/new
+    about: "Report vulnerabilities privately. If unavailable, follow SECURITY.md. / Сообщайте об уязвимостях приватно. Если форма недоступна, следуйте SECURITY.md."

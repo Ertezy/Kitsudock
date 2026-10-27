@@ -1,0 +1,84 @@
+name: Bug report / Сообщение об ошибке
+description: Report a problem with Kitsudock / Сообщить о проблеме в Kitsudock
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Issues and attachments are public. Do not include personal data, passwords or access tokens.
+        Журналы и вложения здесь публичны. Не прикладывайте личные данные, пароли или токены доступа.
+        For a security vulnerability, use [private reporting](https://github.com/Ertezy/Kitsudock/security/advisories/new)
+        and follow [SECURITY.md](https://github.com/Ertezy/Kitsudock/blob/main/SECURITY.md).
+        Об уязвимости сообщите приватно по ссылке выше; порядок описан в SECURITY.md.
+  - type: input
+    id: version
+    attributes:
+      label: Kitsudock version / Версия Kitsudock
+      description: "Settings → About / Настройки → О программе"
+      placeholder: "0.1.1"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version / Версия Windows
+      description: "Run winver to see the version and OS build / Запустите winver, чтобы увидеть версию и сборку Windows"
+      placeholder: "Windows 11 24H2, build / сборка 26100"
+    validations:
+      required: true
+  - type: input
+    id: game
+    attributes:
+      label: Game / Игра
+      description: "Which game is affected? Enter 'Not game-specific' if appropriate. / Какая игра затронута? Если проблема общая, напишите «Не связано с игрой»."
+    validations:
+      required: true
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation source / Откуда установлена игра
+      options:
+        - Steam
+        - Epic Games
+        - HoYoPlay
+        - Kuro launcher / Лаунчер Kuro
+        - GRYPHLINK
+        - Manual executable / Свой exe
+        - Other or unknown / Другое или неизвестно
+        - Not game-specific / Не связано с игрой
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce / Что делали
+      description: "List the steps that led to the problem / Перечислите действия, после которых возникла проблема"
+      placeholder: |
+        1.
+        2.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result / Что ожидали
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result / Что произошло
+      description: "Include the error message if there is one; remove personal data / Укажите текст ошибки, если он есть; удалите личные данные"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log attachment (optional) / Журнал (необязательно)
+      description: |
+        Open Settings → About → Log → Show log, or paste %LOCALAPPDATA%\io.github.ertezy.kitsudock\logs into File Explorer.
+        Откройте Настройки → О программе → Журнал → Показать журнал или вставьте %LOCALAPPDATA%\io.github.ertezy.kitsudock\logs в Проводник.
+        Attach a copy of the relevant log by dragging it here. Before attaching, remove personal data, including your Windows user name in file paths, passwords and tokens.
+        Перетащите сюда копию нужного журнала. Перед отправкой удалите личные данные: в том числе имя пользователя Windows в путях к файлам, пароли и токены.
+    validations:
+      required: false
