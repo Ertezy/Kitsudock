@@ -63,6 +63,12 @@ jobs:
       # запуска без интернета.
       - run: npm run update-hub
 
+      # Свежий файл данных проходит те же проверки, что и файл в репозитории:
+      # испорченные данные должны остановить выпуск, а не уехать в установщик.
+      - name: Bundled data
+        working-directory: src-tauri
+        run: cargo test --locked the_bundled_snapshot
+
       # Автообновления у приложения нет, поэтому файл для него не выкладывается.
       # Имя установщика постоянное, без номера версии: тогда ссылка
       # releases/latest/download/Kitsudock-setup.exe в README всегда скачивает
