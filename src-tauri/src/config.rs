@@ -11,6 +11,7 @@
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::cell::Cell;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 use tauri::{AppHandle, Manager};
 
@@ -23,11 +24,35 @@ pub const CURRENT_VERSION: u32 = 3;
 /// версий), а на Windows переименование поверх открытого файла не проходит.
 static FILE_LOCK: Mutex<()> = Mutex::new(());
 
+thread_local! {
+    /// Держит ли этот поток `FILE_LOCK`. Замок не повторный: `load` или
+    /// `update` изнутри `update` ждали бы сами себя вечно. Флаг превращает
+    /// такую ошибку в немедленную панику в тестах и отладочной сборке.
+    static HOLDS_FILE_LOCK: Cell<bool> = const { Cell::new(false) };
+}
+
+/// Взятый `FILE_LOCK`; при освобождении снимает флаг потока.
+struct FileGuard {
+    _guard: MutexGuard<'static, ()>,
+}
+
+impl Drop for FileGuard {
+    fn drop(&mut self) {
+        HOLDS_FILE_LOCK.with(|held| held.set(false));
+    }
+}
+
 /// Упавший с паникой держатель замка не должен ронять приложение: файл
 /// пишется атомарно, так что на диске всегда целый конфиг, и замок можно
 /// брать дальше.
-fn lock_file() -> MutexGuard<'static, ()> {
-    FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner)
+fn lock_file() -> FileGuard {
+    debug_assert!(
+        !HOLDS_FILE_LOCK.with(Cell::get),
+        "замок конфига уже взят этим потоком: load или update внутри update"
+    );
+    let guard = FILE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+    HOLDS_FILE_LOCK.with(|held| held.set(true));
+    FileGuard { _guard: guard }
 }
 
 /// Способ запуска определён в `stores`, потому что узнаём мы его из манифеста
@@ -559,8 +584,9 @@ impl From<SaveFailed> for String {
 /// есть. Конфиг, который `f` оставила прежним, тоже не переписывается.
 ///
 /// Внутри `f` нельзя звать `load`, `update` и то, что их зовёт (например,
-/// `tray::rebuild_menu`): замок не повторный, и вызов ждал бы сам себя. И
-/// ничего долгого — запуск игры или сеть — тоже: остальные правки стоят.
+/// `tray::rebuild_menu`): замок не повторный, и вызов ждал бы сам себя
+/// (тесты и отладочная сборка вместо этого падают, см. `HOLDS_FILE_LOCK`).
+/// И ничего долгого — запуск игры или сеть — тоже: остальные правки стоят.
 pub fn update<T, E>(app: &AppHandle, f: impl FnOnce(&mut AppConfig) -> Result<T, E>) -> Result<T, E>
 where
     E: From<SaveFailed>,
@@ -1133,6 +1159,16 @@ mod tests {
         assert_eq!(cfg.games.len(), ROUNDS as usize, "потерялись добавленные игры");
         assert_eq!(cfg.hub_url, Some(ROUNDS.to_string()), "потерялись приращения счётчика");
         let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    #[cfg(debug_assertions)]
+    #[should_panic(expected = "замок конфига уже взят этим потоком")]
+    fn reading_the_config_inside_an_update_fails_loudly() {
+        // Замок не повторный: такой вызов в сборке без проверки ждал бы сам
+        // себя вечно. Здесь он должен упасть сразу и с понятной причиной.
+        let path = temp_config("reentry");
+        let _ = update_at(&path, |_| update_at(&path, |_| Ok::<_, String>(())));
     }
 
     #[test]
