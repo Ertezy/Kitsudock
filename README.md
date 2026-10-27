@@ -104,6 +104,36 @@ unsigned (see [Install](#install)).*
   tray menu.
 - **Launch with Windows:** starts hidden in the tray and keeps the panel's data fresh.
 
+## How it works
+
+```text
+React + TypeScript window
+          | Tauri commands
+          v
+Rust / Tauri 2
+  game discovery and launch, settings, image cache, tray
+          ^
+          | hub.json
+GitHub Pages <--- Kitsudock-data (GitHub Actions)
+```
+
+The [data collector](https://github.com/Ertezy/Kitsudock-data) runs hourly in GitHub
+Actions. It gathers codes, banners, videos and links to official HoYoPlay
+backgrounds, then publishes the result as `hub.json` on GitHub Pages. Sources have
+their own refresh intervals. The app checks for fresh data on startup and every
+three hours while running, including in the tray. It also checks when the window
+returns after at least an hour since the last check, or when the connection
+returns after more than a minute since the last check.
+
+- Games launch through Steam or Epic, or by running their `.exe`. Games that need
+  administrator rights use the standard Windows elevation prompt.
+- The collector parses game websites. The app reads the prepared data file and
+  downloads the pictures and videos it references.
+- Settings → Appearance → Animation turns off interface movement, background video
+  and automatic banner scrolling through one shared setting.
+- English and Russian interface text lives in separate dictionaries:
+  [src/i18n/en.ts](src/i18n/en.ts) and [src/i18n/ru.ts](src/i18n/ru.ts).
+
 ## Where the data comes from
 
 The panel's codes, banners and videos come from a separate collector that runs on
