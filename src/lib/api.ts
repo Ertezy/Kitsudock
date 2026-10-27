@@ -63,7 +63,7 @@ export const api = {
   reorderGames: (ids: string[]) => invoke<void>("reorder_games", { ids }),
   relocateGame: (gameId: string) => invoke<void>("relocate_game", { gameId }),
   scanInstalled: () => invoke<FoundGame[]>("scan_installed"),
-  addGameFromScan: (title: string) => invoke<string>("add_game_from_scan", { title }),
+  addGameFromScan: (key: string, title: string) => invoke<string>("add_game_from_scan", { key, title }),
 
   /** Первый запуск ещё не состоялся — вместо главного экрана нужен экран с галочками. */
   needsFirstRun: () => invoke<boolean>("needs_first_run"),

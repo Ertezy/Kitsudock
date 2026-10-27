@@ -100,6 +100,9 @@ export interface Behaviour {
 }
 
 export interface FoundGame {
+  /** Ключ установки: по нему строка отмечается и добавляется. Название у
+   *  установок из Steam и Epic бывает одно и то же. */
+  key: string;
   title: string;
   contentId: string | null;
   sourceKind: FoundSourceKind;

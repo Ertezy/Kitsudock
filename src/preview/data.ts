@@ -101,12 +101,12 @@ export function gameFromScan(title: string, taken: number): GameView {
 /** Что «нашёл» поиск установленных игр. Признак `alreadyAdded` ставит бэкенд по списку игр. */
 export function makeScan(): Omit<FoundGame, "alreadyAdded">[] {
   return [
-    { title: "Genshin Impact", contentId: "genshin", sourceKind: "epic" },
-    { title: "Honkai: Star Rail", contentId: "hsr", sourceKind: "hoyoplay" },
-    { title: "Zenless Zone Zero", contentId: "zzz", sourceKind: "hoyoplay" },
-    { title: "Wuthering Waves", contentId: "wuthering", sourceKind: "kuro" },
-    { title: "Arknights: Endfield", contentId: null, sourceKind: "gryphlink" },
-    { title: "Lantern Keeper Demo", contentId: null, sourceKind: "steam" },
+    { key: "epic:genshin", title: "Genshin Impact", contentId: "genshin", sourceKind: "epic" },
+    { key: "exe:hsr", title: "Honkai: Star Rail", contentId: "hsr", sourceKind: "hoyoplay" },
+    { key: "exe:zzz", title: "Zenless Zone Zero", contentId: "zzz", sourceKind: "hoyoplay" },
+    { key: "exe:wuthering", title: "Wuthering Waves", contentId: "wuthering", sourceKind: "kuro" },
+    { key: "exe:endfield", title: "Arknights: Endfield", contentId: null, sourceKind: "gryphlink" },
+    { key: "steam:lantern", title: "Lantern Keeper Demo", contentId: null, sourceKind: "steam" },
   ];
 }
 

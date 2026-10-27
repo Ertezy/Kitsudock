@@ -81,6 +81,30 @@ pub struct InstalledGame {
     pub source: Source,
 }
 
+impl InstalledGame {
+    /// Ключ установки: чем она запускается. Steam — appid, Epic — AppName из
+    /// манифеста, остальное — путь к exe (или к папке, если exe неизвестен).
+    ///
+    /// По названию установки не различить: одна игра может стоять и в Steam,
+    /// и в Epic под одним и тем же именем. Экран сканирования отдаёт ключ
+    /// странице, и добавление ищет установку по нему же (`find_by_key`).
+    pub fn key(&self) -> String {
+        match &self.launch {
+            Launch::Steam { appid } => format!("steam:{appid}"),
+            Launch::Epic { app_name, .. } => format!("epic:{app_name}"),
+            Launch::Exe => {
+                let target = self.exe_path.as_deref().unwrap_or(&self.install_path);
+                format!("exe:{}", target.display())
+            }
+        }
+    }
+}
+
+/// Установка с данным ключом (`InstalledGame::key`).
+pub fn find_by_key(installed: Vec<InstalledGame>, key: &str) -> Option<InstalledGame> {
+    installed.into_iter().find(|g| g.key() == key)
+}
+
 /// Магазин, из которого установлена игра, и её номер там.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StoreRef {
@@ -115,6 +139,11 @@ fn is_inside(child: &Path, parent: &Path) -> bool {
                 .eq_ignore_ascii_case(&p.as_os_str().to_string_lossy())
         })
     })
+}
+
+/// Один и тот же ли это путь — по тем же правилам, что `is_inside`.
+pub(crate) fn same_path(a: &Path, b: &Path) -> bool {
+    is_inside(a, b) && is_inside(b, a)
 }
 
 /// Из какого магазина установлена игра.
@@ -391,5 +420,30 @@ mod tests {
         let game = exe_game(r"D:\Games\Any\run.exe");
         let installed = [installed_at("", Launch::Steam { appid: 1 })];
         assert_eq!(store_of(&game, &installed), None);
+    }
+
+    #[test]
+    fn the_install_key_names_how_the_game_starts() {
+        assert_eq!(installed_at(r"D:\S", Launch::Steam { appid: 3513350 }).key(), "steam:3513350");
+        assert_eq!(installed_at(r"C:\E", epic("cid")).key(), "epic:app");
+        let mut own = installed_at(r"D:\Games\WW", Launch::Exe);
+        assert_eq!(own.key(), r"exe:D:\Games\WW");
+        own.exe_path = Some(PathBuf::from(r"D:\Games\WW\launcher.exe"));
+        assert_eq!(own.key(), r"exe:D:\Games\WW\launcher.exe");
+    }
+
+    #[test]
+    fn installs_with_the_same_title_are_told_apart_by_key() {
+        // Одна игра стоит и в Steam, и в Epic: название одно, установки две.
+        let in_steam = InstalledGame { title: "Same".into(), source: Source::Steam, ..installed_at(r"D:\Steam\Same", Launch::Steam { appid: 7 }) };
+        let in_epic = InstalledGame { title: "Same".into(), ..installed_at(r"C:\Epic\Same", epic("cid")) };
+        assert_ne!(in_steam.key(), in_epic.key());
+
+        let all = vec![in_steam.clone(), in_epic.clone()];
+        let picked = find_by_key(all.clone(), &in_epic.key()).expect("установка Epic находится");
+        assert_eq!(picked.install_path, in_epic.install_path);
+        let picked = find_by_key(all.clone(), &in_steam.key()).expect("установка Steam находится");
+        assert_eq!(picked.install_path, in_steam.install_path);
+        assert!(find_by_key(all, "steam:8").is_none());
     }
 }

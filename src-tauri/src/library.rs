@@ -5,7 +5,7 @@
 //! обёрткой: прочитать конфиг, позвать сюда, записать обратно.
 
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::config::{AppConfig, Game, Launch};
 use crate::error::{code, AppError};
@@ -101,6 +101,11 @@ pub fn add(cfg: &mut AppConfig, title: String, exe: PathBuf) -> String {
 /// Отдельная от `add`: у найденной игры уже известны способ запуска и пути из
 /// манифеста, и сводить их к `Launch::Exe` нельзя — тогда игра из Steam
 /// перестала бы запускаться через Steam.
+///
+/// Повторное добавление той же установки ничего не меняет и возвращает
+/// идентификатор уже записанной игры (`configured_install`): экран первого
+/// запуска после частичного провала повторяет весь список, и копии одной
+/// игры в доке появляться не должны.
 pub fn add_found(
     cfg: &mut AppConfig,
     title: String,
@@ -110,6 +115,9 @@ pub fn add_found(
     exe_path: Option<PathBuf>,
 ) -> Result<String, AppError> {
     validate_title(&title)?;
+    if let Some(existing) = configured_install(cfg, &launch, &install_path, exe_path.as_deref()) {
+        return Ok(existing.id.clone());
+    }
     let base = content_id
         .clone()
         .unwrap_or_else(|| crate::catalog::normalize(&title));
@@ -127,6 +135,35 @@ pub fn add_found(
         video: None,
     });
     Ok(id)
+}
+
+/// Игра конфига, которая уже указывает на эту установку: тот же appid Steam,
+/// тот же AppName Epic, тот же exe или та же папка установки.
+///
+/// Название в сравнении не участвует: одна игра бывает установлена и в Steam,
+/// и в Epic, и это две разные записи.
+fn configured_install<'a>(
+    cfg: &'a AppConfig,
+    launch: &Launch,
+    install_path: &Path,
+    exe_path: Option<&Path>,
+) -> Option<&'a Game> {
+    use crate::stores::same_path;
+    cfg.games.iter().find(|g| {
+        let same_target = match (&g.launch, launch) {
+            (Launch::Steam { appid: a }, Launch::Steam { appid: b }) => a == b,
+            (Launch::Epic { app_name: a, .. }, Launch::Epic { app_name: b, .. }) => a == b,
+            _ => g
+                .exe_path
+                .as_deref()
+                .zip(exe_path)
+                .is_some_and(|(a, b)| same_path(a, b)),
+        };
+        same_target
+            || g.install_path
+                .as_deref()
+                .is_some_and(|p| same_path(p, install_path))
+    })
 }
 
 /// Меняет названные поля одной игры. `false` — игры с таким идентификатором нет.
@@ -331,6 +368,62 @@ mod tests {
         )
         .expect("должно пройти");
         assert_ne!(id, "wuthering");
+        assert_eq!(cfg.games.len(), 2);
+    }
+
+    fn add_ww(cfg: &mut AppConfig, launch: Launch, install: &str) -> String {
+        add_found(
+            cfg,
+            "Wuthering Waves".into(),
+            Some("wuthering".into()),
+            launch,
+            PathBuf::from(install),
+            None,
+        )
+        .expect("должно пройти")
+    }
+
+    #[test]
+    fn adding_the_same_install_twice_returns_the_existing_game() {
+        // Повтор после частичного провала на экране первого запуска: первая
+        // игра уже записана, и вторая попытка не должна завести её копию.
+        let mut cfg = cfg_with(&[]);
+        let steam = Launch::Steam { appid: 3513350 };
+        let first = add_ww(&mut cfg, steam.clone(), r"C:\SteamLibrary\WutheringWaves");
+        let again = add_ww(&mut cfg, steam, r"C:\SteamLibrary\WutheringWaves");
+        assert_eq!(again, first);
+        assert_eq!(cfg.games.len(), 1);
+    }
+
+    #[test]
+    fn a_found_game_in_an_already_configured_folder_is_not_added_again() {
+        // Игру уже добавили руками: путь к exe в той же папке, что нашёл
+        // лаунчер. Регистр букв в путях Windows не важен.
+        let mut cfg = cfg_with(&[]);
+        let manual = add(
+            &mut cfg,
+            "WW".into(),
+            PathBuf::from(r"D:\Games\Wuthering Waves\launcher.exe"),
+        );
+        let found = add_ww(&mut cfg, Launch::Exe, r"d:\games\wuthering waves");
+        assert_eq!(found, manual);
+        assert_eq!(cfg.games.len(), 1);
+    }
+
+    #[test]
+    fn the_same_title_from_another_store_is_a_separate_game() {
+        let mut cfg = cfg_with(&[]);
+        let steam = add_ww(&mut cfg, Launch::Steam { appid: 3513350 }, r"C:\Steam\WW");
+        let epic = add_ww(
+            &mut cfg,
+            Launch::Epic {
+                namespace: "ns".into(),
+                catalog_item_id: "cid".into(),
+                app_name: "ww".into(),
+            },
+            r"C:\Epic\WW",
+        );
+        assert_ne!(steam, epic);
         assert_eq!(cfg.games.len(), 2);
     }
 

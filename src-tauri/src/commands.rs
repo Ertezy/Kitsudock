@@ -232,6 +232,10 @@ pub async fn cache_image(app: AppHandle, url: String) -> Result<String, String> 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FoundGame {
+    /// Ключ установки (`InstalledGame::key`). По нему страница отмечает строки
+    /// и просит добавить игру: название у установок из Steam и Epic бывает
+    /// одно и то же.
+    pub key: String,
     pub title: String,
     /// Идентификатор контента, если игру знает каталог. `None` — по ней не
     /// будет ни кодов, ни баннеров, и на экране это подписывается честно.
@@ -262,6 +266,7 @@ pub async fn scan_installed(app: AppHandle) -> Vec<FoundGame> {
             let already_added = crate::catalog::already_configured(&found, &cfg.games, &hub_games);
             let source_kind = found_kind(&found);
             FoundGame {
+                key: found.key(),
                 title: found.title,
                 content_id,
                 source_kind,
@@ -271,18 +276,25 @@ pub async fn scan_installed(app: AppHandle) -> Vec<FoundGame> {
         .collect()
 }
 
-/// Добавить игру, найденную в магазинах, по её названию.
+/// Добавить игру, найденную в магазинах, по ключу установки из
+/// `scan_installed`. Уже добавленная установка не дублируется: команда вернёт
+/// идентификатор существующей записи (`library::add_found`).
 ///
 /// Отдельная команда, а не `add_game`: у найденной игры уже известны способ
 /// запуска и пути из манифеста, и терять их, сводя всё к `Launch::Exe`,
 /// нельзя — тогда игра из Steam перестала бы запускаться через Steam.
+///
+/// `title` нужен только для текста ошибки, если установка пропала после
+/// поиска: ключ человеку ничего не скажет.
 #[tauri::command]
-pub async fn add_game_from_scan(app: AppHandle, title: String) -> Result<String, AppError> {
+pub async fn add_game_from_scan(
+    app: AppHandle,
+    key: String,
+    title: String,
+) -> Result<String, AppError> {
     let hub_games = crate::hub::load_local(&app).games;
-    let found = crate::stores::installed()
-        .into_iter()
-        .find(|g| g.title == title)
-        .ok_or_else(|| AppError::with(code::GAME_NOT_FOUND, title.clone()))?;
+    let found = crate::stores::find_by_key(crate::stores::installed(), &key)
+        .ok_or_else(|| AppError::with(code::GAME_NOT_FOUND, title))?;
 
     let content_id = crate::catalog::content_id_for(&found, &hub_games);
     let id = config::update(&app, |cfg| {
