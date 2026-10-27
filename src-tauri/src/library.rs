@@ -139,33 +139,17 @@ pub fn add_found(
     Ok(id)
 }
 
-/// Игра конфига, которая уже указывает на эту установку: тот же appid Steam,
-/// тот же AppName Epic, тот же exe или та же папка установки.
-///
-/// Название в сравнении не участвует: одна игра бывает установлена и в Steam,
-/// и в Epic, и это две разные записи.
+/// Игра конфига, которая уже указывает на эту установку
+/// (`stores::same_install`).
 fn configured_install<'a>(
     cfg: &'a AppConfig,
     launch: &Launch,
     install_path: &Path,
     exe_path: Option<&Path>,
 ) -> Option<&'a Game> {
-    use crate::stores::same_path;
-    cfg.games.iter().find(|g| {
-        let same_target = match (&g.launch, launch) {
-            (Launch::Steam { appid: a }, Launch::Steam { appid: b }) => a == b,
-            (Launch::Epic { app_name: a, .. }, Launch::Epic { app_name: b, .. }) => a == b,
-            _ => g
-                .exe_path
-                .as_deref()
-                .zip(exe_path)
-                .is_some_and(|(a, b)| same_path(a, b)),
-        };
-        same_target
-            || g.install_path
-                .as_deref()
-                .is_some_and(|p| same_path(p, install_path))
-    })
+    cfg.games
+        .iter()
+        .find(|g| crate::stores::same_install(g, launch, install_path, exe_path))
 }
 
 /// Меняет названные поля одной игры. `false` — игры с таким идентификатором нет.
@@ -415,6 +399,17 @@ mod tests {
         let found = add_ww(&mut cfg, Launch::Exe, r"d:\games\wuthering waves");
         assert_eq!(found, manual);
         assert_eq!(cfg.games.len(), 1);
+    }
+
+    #[test]
+    fn two_steam_apps_in_one_folder_are_two_games() {
+        // Игра и её демо или плейтест могут лежать в одной папке Steam: у
+        // магазина это разные приложения, и решает appid, а не папка.
+        let mut cfg = cfg_with(&[]);
+        let game = add_ww(&mut cfg, Launch::Steam { appid: 3513350 }, r"C:\Steam\common\WW");
+        let demo = add_ww(&mut cfg, Launch::Steam { appid: 3513351 }, r"C:\Steam\common\WW");
+        assert_ne!(game, demo);
+        assert_eq!(cfg.games.len(), 2);
     }
 
     #[test]

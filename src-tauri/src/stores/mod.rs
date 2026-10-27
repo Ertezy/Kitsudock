@@ -146,6 +146,42 @@ pub(crate) fn same_path(a: &Path, b: &Path) -> bool {
     is_inside(a, b) && is_inside(b, a)
 }
 
+/// Указывает ли игра конфига на эту установку.
+///
+/// Две установки из одного магазина сравниваются только по номеру в нём:
+/// appid Steam или AppName Epic. Папка тут ничего не решает — игра и её демо
+/// или плейтест в Steam бывают в одной папке, но это разные приложения.
+/// Steam и Epic между собой — всегда разные установки. Файл и папка решают,
+/// только когда хотя бы одна сторона запускается напрямую (`Launch::Exe`):
+/// так игра, добавленная руками, узнаётся в находке лаунчера или магазина.
+///
+/// Название в сравнении не участвует: одна игра бывает установлена и в Steam,
+/// и в Epic, и это две разные записи.
+pub fn same_install(
+    game: &crate::config::Game,
+    launch: &Launch,
+    install_path: &Path,
+    exe_path: Option<&Path>,
+) -> bool {
+    match (&game.launch, launch) {
+        (Launch::Steam { appid: a }, Launch::Steam { appid: b }) => a == b,
+        (Launch::Epic { app_name: a, .. }, Launch::Epic { app_name: b, .. }) => a == b,
+        (Launch::Exe, _) | (_, Launch::Exe) => {
+            let same_exe = game
+                .exe_path
+                .as_deref()
+                .zip(exe_path)
+                .is_some_and(|(a, b)| same_path(a, b));
+            let same_folder = game
+                .install_path
+                .as_deref()
+                .is_some_and(|p| same_path(p, install_path));
+            same_exe || same_folder
+        }
+        _ => false,
+    }
+}
+
 /// Из какого магазина установлена игра.
 ///
 /// Способ запуска говорит это прямо. Если игра запускается напрямую, её файл
