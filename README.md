@@ -122,8 +122,8 @@ Actions. It gathers codes, banners, videos and links to official HoYoPlay
 backgrounds, then publishes the result as `hub.json` on GitHub Pages. Sources have
 their own refresh intervals. The app checks for fresh data on startup and every
 three hours while running, including in the tray. It also checks when the window
-returns after at least an hour since the last check, or when the connection
-returns after more than a minute since the last check.
+returns after at least an hour since the last check, and when the connection
+comes back.
 
 - Games launch through Steam or Epic, or by running their `.exe`. Games that need
   administrator rights use the standard Windows elevation prompt.
