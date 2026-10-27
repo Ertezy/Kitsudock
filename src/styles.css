@@ -1,44 +1,165 @@
 /* Два акцента, разведённые по работе.
  *
- * Жёлтый — цвет ДЕЙСТВИЯ: то, что нажимают или на что надо среагировать.
- * Розовый — цвет СОДЕРЖИМОГО: то, что просто читают.
+ * Цвет ДЕЙСТВИЯ (--accent, огненно-оранжевый): то, что нажимают или на что надо
+ * среагировать. Цвет СОДЕРЖИМОГО (--content, сакура): то, что просто читают.
  *
- * Разделение не украшение: жёлтый и розовый рядом дерутся за внимание и оба
- * проигрывают. Пока они не встречаются на одном элементе, оба работают. */
+ * Разделение не украшение: два акцента рядом дерутся за внимание и оба
+ * проигрывают. Пока они не встречаются на одном элементе, оба работают.
+ *
+ * Палитра «Лисий огонь»: сливово-чёрный фон и сливовые серые — в тон контура
+ * лисы на иконке; оранжевый дополняет её голубой круг, сакура — розовые уши.
+ * Внутри палитры серые, линии, тени и подложки подкрашены одним оттенком,
+ * светлое поверх тёмного — цветом основного текста, а не чистым белым. Основные
+ * цвета текста проверены на 4.5:1 там, где они лежат, — и под зерном
+ * (`src/paletteContrast.test.ts`).
+ *
+ * Любой цвет вне `:root` — только токеном: так смена палитры — правка одного
+ * блока ниже. Число цвета в правиле не пропускает `src/styles.test.ts`. */
 :root {
-  /* Основа. Почти чёрный фон, панель и карточки — синевато-серые поверх него. */
-  --bg: #070707;
-  --glass: rgba(64, 67, 78, 0.55);
-  --card: rgba(64, 67, 78, 0.4);
-  --line: rgba(194, 151, 184, 0.18);
+  /* Основа. Сливово-чёрный фон; панель и карточки — сливово-серое стекло поверх
+     него. */
+  --bg: #0f0a12;
+  --glass: rgba(71, 58, 77, 0.55);
+  --card: rgba(71, 58, 77, 0.4);
+  --line: rgba(202, 181, 212, 0.16);
+  /* Та же линия ярче: рамка карточки кода и поля под курсором, штриховая рамка
+     пустого места. */
+  --line-strong: rgba(202, 181, 212, 0.3);
 
   /* Текст почти белый, но с еле заметным сиреневым уклоном: чистый серый
-     читается как «цвет не выбирали», подкрашенный — как выбрали. */
-  --ink: #f6eff5;
-  --ink-dim: rgba(246, 239, 245, 0.62);
-  --ink-faint: rgba(246, 239, 245, 0.42);
+     читается как «цвет не выбирали», подкрашенный — как выбрали. Приглушённый и
+     самый тихий — тот же цвет с прозрачностью; даже самый тихий не ниже 4.5:1 на
+     стекле и на карточке поверх него (`src/paletteContrast.test.ts`). Самый
+     тихий чуть плотнее, чем мог бы быть без зерна: зерно поверх окна немного
+     светлит тёмную подложку, и запас нужен, чтобы 4.5:1 держались и под ним. */
+  --ink: #f7f1f9;
+  --ink-dim: rgba(247, 241, 249, 0.64);
+  --ink-faint: rgba(247, 241, 249, 0.58);
 
-  /* Действие. */
-  --accent: #ffc531;
-  --accent-ink: #20180a;
+  /* Действие: мягкий огненно-оранжевый. Свечение кнопки PLAY под курсором —
+     тот же цвет, разбавленный прозрачностью: следует за палитрой сам. Блик
+     «запускается…» — цвет текста, тоже разбавленный. */
+  --accent: #fba355;
+  --accent-ink: #2c1705;
+  --accent-glow: color-mix(in srgb, var(--accent) 55%, transparent);
+  --sheen: color-mix(in srgb, var(--ink) 40%, transparent);
 
-  /* Содержимое. */
-  --content: #de89be;
-  --content-soft: #c297b8;
-  --label: #fdcff3;
+  /* Содержимое: сакура. */
+  --content: #e4a6c9;
+  --content-soft: #c8a3b7;
+  --label: #ffd2eb;
 
-  --danger: #ff8a76;
+  /* Опасное сдвинуто к розово-красному, чтобы не спорить с оранжевым. */
+  --danger: #f56b76;
+  /* Метка премьеры на превью видео — красная, как принято у видеосервисов. */
+  --premiere: #c23345;
 
-  /* Длительность всех переходов приложения — одним числом.
+  /* Светлое поверх тёмного: дорожка полосы баннера и кольца часиков сроков,
+     точки карусели (обычная и будущего баннера), полоса прокрутки,
+     подпись-заглушка вместо картинки. */
+  --track: rgba(247, 241, 249, 0.14);
+  --dot: rgba(247, 241, 249, 0.25);
+  --dot-dim: rgba(247, 241, 249, 0.12);
+  --scrollbar: rgba(247, 241, 249, 0.22);
+  --fallback-ink: rgba(247, 241, 249, 0.55);
+  /* Заглушки панели, пока грузятся данные и картинки: еле светлее стекла. */
+  --skeleton: rgba(247, 241, 249, 0.08);
+  /* Подсветка строки, вкладки или варианта под курсором — слой, который
+     проявляется прозрачностью. Тоньше заглушки: даже самый тихий текст на
+     подсвеченной строке не ниже 4.5:1 (`src/paletteContrast.test.ts`). */
+  --hover: rgba(247, 241, 249, 0.06);
+
+  /* Тёмные подложки поверх арта: мелкий текст и значки на картинке читаются на
+     любом фоне. Подпись над кнопкой PLAY; стрелки карусели в покое и под
+     курсором; длительность видео. */
+  --plate: rgba(19, 13, 21, 0.66);
+  --plate-soft: rgba(6, 1, 9, 0.45);
+  --plate-strong: rgba(6, 1, 9, 0.7);
+  --plate-badge: rgba(6, 1, 9, 0.75);
+
+  /* Шрифт: пять размеров на весь интерфейс. Любой другой размер в стилях —
+     ошибка, её ловит `src/styles.test.ts`. Размеры, которые считаются от
+     размера дока (подпись иконки, буква-заглушка), остаются выражениями от
+     его переменных. */
+  --text-xs: 11px;
+  --text-sm: 12.5px;
+  --text-md: 14px;
+  --text-lg: 17px;
+  --text-xl: 22px;
+
+  /* Скругления: мелкое внутри, кнопки и поля, карточки и панель, «таблетка».
+     Внутренний элемент никогда не скруглён сильнее внешнего. */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-pill: 999px;
+
+  /* Движение: все длительности выводятся из одной базовой.
    *
-   * Не украшение и не экономия строк: под системной настройкой «уменьшить
-   * движение» она обнуляется В ОДНОМ МЕСТЕ, и всё движение исчезает разом,
-   * включая то, которое добавят позже. Пока проверка стояла у каждой анимации
-   * отдельно, её забывали — так уже было с доком.
+   * Не украшение и не экономия строк: тумблер «Анимация» обнуляет --move В
+   * ОДНОМ МЕСТЕ (`:root[data-motion="off"]` внизу файла), и всё движение
+   * исчезает разом, включая то, которое добавят позже. Пока проверка стояла у
+   * каждой анимации отдельно, её забывали — так уже было с доком.
+   *
+   * Остальные скорости — доли и кратные базовой: быстрая (отклик кнопки)
+   * ≈0.12 с, базовая (наведение) 0.18 с, медленная (появление панели) ≈0.32 с,
+   * сценическая (смена фона игры) ≈0.6 с, фоновая (дрейф арта) ≈40 с, оборот
+   * стрелки часиков сроков ≈8 с, а в последние сутки срока ≈2 с.
    *
    * Чтобы сломать это, надо специально написать длительность числом мимо
-   * переменной. */
+   * переменных; `src/styles.test.ts` такое не пропускает. */
   --move: 0.18s;
+  --move-fast: calc(var(--move) * 0.67);
+  --move-slow: calc(var(--move) * 1.78);
+  --move-scene: calc(var(--move) * 3.33);
+  --move-ambient: calc(var(--move) * 222);
+  --move-clock: calc(var(--move) * 44);
+  --move-clock-hot: calc(var(--move) * 11);
+  /* Две кривые: плавное торможение для появлений и всего, что меняет цвет или
+     прозрачность; лёгкая пружина с микроперелётом — для нажатий и наведения
+     там, где меняется положение или размер. */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Глубина: три уровня подъёма. Тени подкрашены в тон фона, не чёрные. Кромка —
+     тонкий светлый блик по верхнему краю стекла. */
+  --shadow-1: 0 1px 2px rgba(6, 1, 9, 0.35);
+  --shadow-2: 0 6px 18px rgba(6, 1, 9, 0.45);
+  --shadow-3: 0 18px 48px rgba(6, 1, 9, 0.55);
+  --glass-edge: inset 0 1px 0 rgba(247, 241, 249, 0.07);
+  /* Тень под подписью, лежащей прямо на картинке (имя персонажа на баннере). */
+  --shadow-text: 0 2px 8px rgba(6, 1, 9, 0.6);
+
+  /* Рамка фокуса с клавиатуры — одна на всё приложение. Светлая, цветом текста,
+     а не цветом действия: оранжевая рамка вокруг оранжевой кнопки PLAY читалась
+     бы как кнопка потолще. На арте зазор между элементом и рамкой закрывает
+     тёмная подложка: светлая рамка на светлом арте иначе пропала бы. Рамка не
+     ниже 3:1 ко всему, рядом с чем лежит (`src/paletteContrast.test.ts`). У
+     краёв прокрутки под неё оставлен запас (`--focus-room`): иначе край срезал
+     бы рамку карточки во всю ширину.
+     В тесной группе (варианты выбора, пара кнопок на карточке кода, точки
+     карусели) рамка вплотную к элементу (`--focus-offset-tight`): с обычным
+     отступом она ложилась бы на соседа, а вплотную помещается в зазор группы. */
+  --focus-width: 2px;
+  --focus-offset: 3px;
+  --focus-offset-tight: 0px;
+  --focus-ring: var(--focus-width) solid var(--ink);
+  --focus-halo: 0 0 0 var(--focus-offset) var(--plate);
+  --focus-room: calc(var(--focus-width) + var(--focus-offset));
+
+  /* Слои. Арт — внизу, интерфейс поверх него; остальное — на вырост. Кнопка
+     PLAY лежит на слой выше дока: по дизайну она на переднем плане.
+     «Под содержимым» — подсветка наведения внутри своего элемента: тот
+     изолирован (`isolation: isolate`), и слой ложится над его фоном, но под его
+     текстом, не уходя под соседей. */
+  --z-below: -1;
+  --z-art: 0;
+  --z-ui: 10;
+  --z-ui-raised: calc(var(--z-ui) + 1);
+  --z-panel: 20;
+  --z-overlay: 30;
+  --z-grain: 40;
+  --z-toast: 50;
 }
 
 * {
@@ -60,8 +181,36 @@ body {
   background: var(--bg);
 }
 
+/* Зерно: один неподвижный слой поверх всего окна — и арта, и интерфейса. Шум
+   рисует SVG-фильтр прямо в адресе картинки, и он здесь только маска: где зерно
+   проступает, решает шум, а цвет слоя — токен, светлый, цветом текста. 3.5 %
+   непрозрачности: на арте и на тёмном стекле зерно чувствуется, но узором не
+   читается. Слой не движется и не мерцает: картинка рисуется один раз и дальше
+   только накладывается, в простое он ничего не стоит. Мышь проходит сквозь
+   него. Контраст текста под ним проверяется (`src/paletteContrast.test.ts`). */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-grain);
+  pointer-events: none;
+  background: var(--ink);
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='grain'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 2.2 -0.6'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23grain)'/%3E%3C/svg%3E");
+  mask-size: 180px 180px;
+  opacity: 0.035;
+}
+
+/* Рамка фокуса с клавиатуры — одна на всё (токены в :root). Только
+   `:focus-visible`: после щелчка мышью рамки нет. Где рамке место не вокруг
+   самого элемента (иконка дока, кадр превью видео, строка найденной игры),
+   правило рядом с ним переносит её туда. */
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+}
+
 /* Экраны перетекают, а не подменяются щелчком. Само правило появления
-   дописывается к .screen и .settings на шаге 5. */
+   стоит у .screen и .settings. */
 @keyframes screen-in {
   from {
     opacity: 0;
@@ -74,10 +223,10 @@ body {
 .screen {
   display: flex;
   height: 100%;
-  animation: screen-in var(--move) ease-out;
+  animation: screen-in var(--move) var(--ease-out);
 }
 
-/* Ровно так, как в спеке: не проценты и не фикс. На окне 1150 это 300px,
+/* Не проценты и не фикс, а проценты в пределах. На окне 1150 это 300px,
    на развёрнутом 1920 — 400px. Панель не раздувается и не съёживается. */
 .panel {
   width: clamp(300px, 24%, 400px);
@@ -85,22 +234,55 @@ body {
   background: var(--glass);
   backdrop-filter: blur(12px);
   border-right: 1px solid var(--line);
+  /* Вторая тень — полоса того же стекла слева, за краем окна. Пружина входа
+     на миг заносит панель чуть правее места, и без полосы у левого края окна
+     проступила бы тонкая тёмная щель. За стеклом там только ровный фон окна,
+     поэтому полоса без размытия неотличима от самой панели. */
+  box-shadow: var(--glass-edge), -16px 0 0 var(--glass);
   display: flex;
   flex-direction: column;
   padding: 14px 13px 12px;
   overflow: hidden;
+  /* Панель выезжает слева с лёгкой пружиной и проявляется — при запуске и при
+     возвращении из настроек: это появление самого экрана. Разделы внутри
+     следом поднимаются лесенкой (ниже). */
+  animation: panel-in var(--move-slow) var(--ease-spring) backwards;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
 }
 
 /* Прокручиваемая часть панели. `min-height: 0` обязателен: без него
    flex-элемент не сжимается ниже своего содержимого, прокрутка не включается,
    и контент выдавливает шестерёнку за нижний край. */
 .panel-scroll {
+  /* Высота мягкого края внизу (ниже). */
+  --panel-fade: 12px;
+
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+  scrollbar-color: var(--scrollbar) transparent;
+  /* Карточки кодов и превью видео — во всю ширину, и край прокрутки срезал бы
+     их рамку фокуса. Поэтому по бокам запас под рамку: поля внутри и столько же
+     отрицательного отступа снаружи — содержимое стоит, где стояло. Фокус с
+     клавиатуры прокручивает так, чтобы рамка целиком была видна, и над мягким
+     краем, а не под ним. */
+  margin-inline: calc(-1 * var(--focus-room));
+  padding-inline: var(--focus-room);
+  scroll-padding-block: var(--focus-room) calc(var(--focus-room) + var(--panel-fade));
+  /* Мягкий край внизу: то, что уходит под край прокрутки, растворяется, а не
+     срезается посередине строки (на стенде «stale» срезанная дата под
+     последним видимым превью читалась как ошибка вёрстки). Конец списка в край
+     не попадает: у последнего раздела снизу свой отступ больше края. Для маски
+     важна только непрозрачность цвета, --bg непрозрачен. */
+  mask-image: linear-gradient(to top, transparent, var(--bg) var(--panel-fade));
 }
 
 .panel-section {
@@ -117,8 +299,8 @@ body {
 .panel-label {
   display: flex;
   justify-content: space-between;
-  font-size: 10px;
-  letter-spacing: 0.14em;
+  font-size: var(--text-xs);
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   /* Подписи секций — содержимое, а не действие: самый светлый розовый. */
   color: var(--label);
@@ -126,22 +308,251 @@ body {
   margin-bottom: 8px;
 }
 
-.code-card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 8px;
+/* Вход разделов (`lib/panelEntry.ts`): по очереди поднимаются и проявляются.
+   Отметку `data-entry` панель держит, только пока вход идёт, — при её
+   появлении и когда данные пришли впервые. Раздел, появившийся при смене игры
+   или от обновления данных, встаёт сразу, как и содержимое соседних.
+   Появление панели: разделы (или заглушки) ждут, пока она почти выедет. Пришли
+   данные: встают сразу, на место пропавших заглушек, без пустой паузы. Разделов
+   в ряду не больше трёх. */
+.panel[data-entry] .panel-scroll > * {
+  animation: panel-rise var(--move-slow) var(--ease-out) backwards;
+}
+.panel[data-entry="mount"] .panel-scroll > :nth-child(1) {
+  animation-delay: var(--move-fast);
+}
+.panel[data-entry="mount"] .panel-scroll > :nth-child(2) {
+  animation-delay: calc(var(--move-fast) * 1.5);
+}
+.panel[data-entry="mount"] .panel-scroll > :nth-child(n + 3) {
+  animation-delay: calc(var(--move-fast) * 2);
+}
+.panel[data-entry="data"] .panel-scroll > :nth-child(2) {
+  animation-delay: calc(var(--move-fast) * 0.5);
+}
+.panel[data-entry="data"] .panel-scroll > :nth-child(n + 3) {
+  animation-delay: var(--move-fast);
+}
+/* Строки внизу панели, которые тоже ждали данных, просто проявляются. */
+.panel[data-entry="data"] :is(.panel-stale, .panel-update) {
+  animation: panel-fade var(--move-slow) var(--ease-out) backwards;
+}
+
+/* Только `backwards`, как у подъёма кнопки PLAY: доигравший вход ничего не
+   держит. */
+@keyframes panel-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@keyframes panel-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Заглушки разделов, пока данных нет (`panel/Skeleton.tsx`): очертания будущих
+   карточек тех же размеров. Мерцают одной прозрачностью, спокойно и медленно,
+   волной сверху вниз — у каждого следующего раздела чуть позже. Прокрутки у
+   заглушек нет: нижняя просто срезается краем, как и настоящая лента видео. */
+.panel-scroll[aria-busy="true"] {
+  overflow: hidden;
+}
+
+.skeleton-block {
+  background: var(--skeleton);
+  border-radius: var(--r-pill);
+  animation: skeleton-pulse calc(var(--move-scene) * 3) var(--ease-out) infinite;
+}
+.skeleton-section:nth-child(2) .skeleton-block {
+  animation-delay: calc(var(--move-fast) * 1.5);
+}
+.skeleton-section:nth-child(3) .skeleton-block {
+  animation-delay: calc(var(--move-fast) * 3);
+}
+
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Свой поток блоков: верхний отступ полоски-подписи остаётся внутри раздела,
+   а не выпадает над ним, и раздел заглушек той же высоты, что настоящий. */
+.skeleton-section {
+  display: flow-root;
+}
+
+/* Подпись раздела: полоска на месте строки подписи. */
+.skeleton-label {
+  width: 72px;
+  height: 7px;
+  margin: 3px 0 11px;
+}
+
+/* Строки кодов в коробке с тем же потолком, что у настоящей (`.codes-box`):
+   последняя срезается её краем. Прокрутки у заглушек нет. */
+.skeleton-codes {
+  overflow: hidden;
+}
+
+/* Строка кода: та же карточка, что у настоящего кода с наградами (68 px);
+   полоски — код, срок и награды, справа две кнопки. */
+.skeleton-code {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
   padding: 7px 8px;
   margin-bottom: 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--glass-edge), var(--shadow-1);
+}
+.skeleton-code-main {
+  flex: 1;
+  min-width: 0;
+}
+.skeleton-code .skeleton-line {
+  height: 7px;
+}
+.skeleton-code .is-code {
+  width: 46%;
+  height: 10px;
+  margin: 5px 0 10px;
+}
+.skeleton-code .is-short {
+  width: 30%;
+  margin-bottom: 10px;
+}
+.skeleton-code .is-long {
+  width: 64%;
+  margin-bottom: 3px;
+}
+.skeleton-code:nth-child(2) .is-code { width: 38%; }
+.skeleton-code:nth-child(2) .is-long { width: 50%; }
+.skeleton-code:nth-child(3) .is-code { width: 54%; }
+.skeleton-code:nth-child(3) .is-long { width: 42%; }
+.skeleton-code:nth-child(4) .is-code { width: 42%; }
+.skeleton-code:nth-child(4) .is-long { width: 58%; }
+.skeleton-code-side {
+  display: flex;
+  gap: 4px;
+}
+.skeleton-button {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--r-sm);
+}
+
+/* Карточка баннера: арт и подвал с полосой срока; под ней точки карусели. */
+.skeleton-banner {
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+.skeleton-art {
+  aspect-ratio: 16 / 9;
+  border-radius: 0;
+}
+.skeleton-banner-foot {
+  padding: 8px 10px 9px;
+  background: var(--card);
+}
+.skeleton-bar {
+  height: 4px;
+}
+.skeleton-banner-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 9px;
+}
+.skeleton-banner-line .skeleton-line {
+  height: 7px;
+  margin-bottom: 3px;
+}
+.skeleton-banner-line .is-title { width: 44%; }
+.skeleton-banner-line .is-tail { width: 14%; }
+.skeleton-dots {
+  display: flex;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 8px;
+}
+.skeleton-dot {
+  width: 5px;
+  height: 5px;
+}
+
+/* Превью видео: кадр, заголовок и дата. Нижний отступ внутри — запас строки
+   даты под полоской: внешним он слился бы с отступом между превью. */
+.skeleton-video {
+  margin-bottom: 9px;
+  padding-bottom: 3px;
+}
+.skeleton-thumb {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-lg);
+}
+.skeleton-video .skeleton-line {
+  height: 7px;
+}
+.skeleton-video .is-long {
+  width: 82%;
+  height: 8px;
+  margin-top: 11px;
+}
+.skeleton-video .is-short {
+  width: 30%;
+  margin-top: 10px;
+}
+
+/* Только для экранного диктора: на экране строки нет, а читается она как
+   обычный текст. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Карточка кода — стекло на стекле: светлая кромка сверху и лёгкая тень.
+   Слева код, срок и награды, справа кнопки. Вся карточка нажимается (копирует
+   код); слой подсветки лежит внутри неё (`isolation`), нажатие — пружиной
+   (ниже, у состояний карточки). */
+.code-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--glass-edge), var(--shadow-1);
+  padding: 7px 8px;
+  margin-bottom: 6px;
+  cursor: pointer;
+  transition: transform var(--move) var(--ease-spring);
 }
 
 .code-card code {
   font-family: ui-monospace, monospace;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--text-md);
+  font-weight: 600;
 }
 
 .code-meta {
-  font-size: 10px;
+  font-size: var(--text-xs);
   color: var(--ink-dim);
   margin-top: 3px;
   overflow-wrap: anywhere;
@@ -153,7 +564,7 @@ body {
   border-top: 1px solid var(--line);
   padding-top: 11px;
   margin-top: 12px;
-  font-size: 12px;
+  font-size: var(--text-sm);
   color: var(--ink-dim);
 }
 
@@ -163,18 +574,14 @@ body {
   overflow: hidden;
 }
 
+/* Общий баннер ошибки над артом. Вид — общий с ошибкой запуска (ниже, у
+   `.play-error`): подложка из --danger и тёмной плашки следует за палитрой
+   сама. */
 .banner {
   position: absolute;
   top: 16px;
   left: 16px;
   right: 16px;
-  /* Значение совпадает с --danger (#ff8a76): CSS не умеет собрать rgba из
-     шестнадцатеричной переменной. Так же сделано для .settings-error. */
-  background: rgba(255, 138, 118, 0.2);
-  border: 1px solid var(--danger);
-  border-radius: 8px;
-  padding: 10px 12px;
-  font-size: 13px;
 }
 
 .art {
@@ -182,53 +589,49 @@ body {
   inset: 0;
 }
 
-.art-photo {
+/* Слой фона (`GameArt`, стопка из `lib/artLayers.ts`). Пока его картинка не
+   загрузилась, он невидим, а прежний фон лежит под ним как был. Загрузился —
+   проявляется на сценической скорости и при этом чуть «доезжает» масштабом
+   (1.03 → 1): фон не просто сменяется, а встаёт на место. Прежний слой всё это
+   время неподвижен и непрозрачен и уходит, только когда новый закрыл его
+   целиком, — заливка окна между фонами не проглядывает.
+
+   Доезд — на обёртке, а дрейф — на картинке внутри: у обоих `transform`, и на
+   одном элементе одна анимация перебила бы другую. Так дрейф идёт и во время
+   доезда, и после него, без рывка. */
+.art-layer {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  /* Перетекание при смене игры и медленный дрейф — вместе.
-     Дрейф намеренно очень медленный: экран не должен выглядеть мёртвым, но и
-     отвлекать от него нечему. */
-  animation: art-in var(--move) ease-out, art-drift 40s ease-in-out infinite alternate;
+  opacity: 0;
 }
 
-/* Нижний слой перетекания (`GameArt`): уже показанная картинка. Без
-   собственного art-in — он должен быть непрозрачен с первого кадра, иначе у
-   него самого была бы своя вспышка в фон окна в момент, когда он становится
-   нижним слоем. */
-.art-photo-under {
-  animation: art-drift 40s ease-in-out infinite alternate;
+.art-layer.is-in {
   opacity: 1;
+  animation: art-enter var(--move-scene) var(--ease-out) backwards;
 }
 
-/* Своё видео фона (спека этапа 5, §6). Без медленного дрейфа: ролик и так
-   движется, дрейф поверх него укачивал бы. Перетекание при смене игры — то же,
-   что у картинки. */
-.art-video {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  animation: art-in var(--move) ease-out;
-}
-
-/* Нижний слой перетекания для видео: неподвижен и непрозрачен с первого кадра,
-   по той же причине, что `.art-photo-under`. */
-.art-layer-under {
-  animation: none;
-  opacity: 1;
-}
-
-@keyframes art-in {
+@keyframes art-enter {
   from {
     opacity: 0;
+    transform: scale(1.03);
   }
-  to {
-    opacity: 1;
-  }
+}
+
+.art-photo,
+.art-video,
+.art-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Медленный дрейф картинки. Намеренно очень медленный: экран не должен
+   выглядеть мёртвым, но и отвлекать от него нечему. У своего видео фона и у
+   заливки дрейфа нет: ролик и так движется, дрейф поверх него укачивал бы. */
+.art-photo {
+  animation: art-drift var(--move-ambient) ease-in-out infinite alternate;
 }
 
 @keyframes art-drift {
@@ -241,20 +644,34 @@ body {
 }
 
 /* Подпись над кнопкой PLAY: откуда запустится игра. Крупного названия игры на
-   экране нет (спека этапа 5, §11): оно почти всегда нарисовано на самом арте и
-   сливалось с ним. Одна тень не спасала на светлом арте, поэтому строка лежит
-   на полупрозрачной подложке. Подложка темнее, чем у дока (`--glass`): у дока
-   крупные иконки, а мелкий текст на светлом арте серой подложки не хватает. */
+   экране нет: оно почти всегда нарисовано на самом арте и сливалось с ним. Одна
+   тень не спасала на светлом арте, поэтому строка лежит на полупрозрачной
+   подложке. Подложка темнее, чем у дока (`--glass`): у дока крупные иконки, а
+   мелкий текст на светлом арте серой подложки не хватает. */
 .play-note {
   margin-right: 8px;
   padding: 6px 14px;
-  border-radius: 999px;
-  background: rgba(14, 15, 20, 0.66);
+  border-radius: var(--r-pill);
+  background: var(--plate);
   backdrop-filter: blur(12px);
-  font-size: 14px;
+  box-shadow: var(--glass-edge);
+  font-size: var(--text-md);
   font-weight: 600;
   color: var(--ink);
   letter-spacing: 0.02em;
+  /* Лесенка при смене игры: фон начинает перетекать, следом поднимается
+     подпись, за ней кнопка. `PlayButton` пересоздаётся при каждой смене игры
+     (`key` в `App`), поэтому появление проигрывается само. */
+  animation: play-rise var(--move-slow) var(--ease-out) calc(var(--move) * 0.5) backwards;
+}
+
+/* Только `backwards`, без `forwards`: доигравшая анимация не держит свой
+   `transform`, и нажатие кнопки ниже (`scale`) не перебивается ею. */
+@keyframes play-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
 }
 
 /* Док снизу доходит верхней панелью до кнопки PLAY по дизайну; кнопка должна быть на переднем плане. */
@@ -266,51 +683,260 @@ body {
   flex-direction: column;
   align-items: flex-end;
   gap: 10px;
-  z-index: 2;
+  z-index: var(--z-ui-raised);
 }
 
+/* Фон новой игры ещё не начал проявляться (большая картинка грузится): подпись
+   и кнопка ждут невидимыми, и их появление не начинается. Когда фон пошёл —
+   или вышло короткое ожидание (`lib/playArea.ts`), — класс снимается, и
+   лесенка отсчитывает свои задержки от этого мига. Скрыты именно
+   `visibility`, а не прозрачностью: невидимую кнопку нельзя ни нажать, ни
+   выбрать с клавиатуры. Ошибка запуска и выходы из неё не ждут никогда: это
+   ответ на действие человека. */
+.play-area.is-waiting > .play-note,
+.play-area.is-waiting > .play {
+  visibility: hidden;
+  animation: none;
+}
+
+/* Кнопка PLAY. Наведение — мягкое свечение цветом действия; нажатие —
+   ощутимое вдавливание с пружиной на отпускании; «запускается…» — спокойный
+   блик, проходящий по кнопке. */
 .play {
+  position: relative;
   background: var(--accent);
   color: var(--accent-ink);
-  font: 700 21px/1 "Golos Text Variable", "Segoe UI", sans-serif;
+  font: 600 var(--text-xl)/1 "Golos Text Variable", "Segoe UI", sans-serif;
+  letter-spacing: -0.01em;
   padding: 17px 52px;
   border: 0;
-  border-radius: 40px;
+  border-radius: var(--r-pill);
   cursor: pointer;
-  box-shadow: 0 7px 26px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--shadow-2);
+  animation: play-rise var(--move-slow) var(--ease-out) var(--move) backwards;
+  transition: transform var(--move-fast) var(--ease-spring);
 }
 
-.play:disabled {
-  opacity: 0.65;
+/* Свечение — отдельный слой, у которого меняется только прозрачность: сама
+   тень при этом не пересчитывается, и наведение не стоит перерисовки. Своего
+   фона у слоя нет, а тень снаружи кнопки, поэтому надпись он не закрывает. */
+.play::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-pill);
+  box-shadow: 0 6px 30px 2px var(--accent-glow);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.play:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.play:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* Кнопка лежит на арте: зазор под общей рамкой фокуса закрывает тёмная
+   подложка, иначе на светлом арте рамка пропала бы. */
+.play:focus-visible {
+  box-shadow: var(--shadow-2), var(--focus-halo);
+}
+
+/* Надпись над бликом: позиционированные слои рисуются в порядке разметки.
+   Обе надписи — «Играть» и «Запускаю…» — лежат в одной клетке друг на друге,
+   видна одна: кнопка всегда шириной с длинную и не прыгает, когда надпись
+   меняется. Сменяются они прозрачностью; спрятанная ещё и `visibility: hidden`
+   — её не слышит экранный диктор, имя кнопки — видимая надпись. */
+.play-label {
+  position: relative;
+  display: grid;
+  justify-items: center;
+}
+
+.play-label > span {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--move-fast) var(--ease-out),
+    visibility var(--move-fast) var(--ease-out);
+}
+
+.play-label > .is-off {
+  opacity: 0;
+  visibility: hidden;
+}
+
+/* Недоступная кнопка — не цвет действия: нажать её нельзя, и оранжевый тут
+   обещал бы то, чего нет. Тёмная подложка, как у подписи над кнопкой, и
+   приглушённый, но читаемый текст. Прозрачность всей кнопки, как раньше,
+   гасила и надпись — на светлом арте она терялась. */
+.play:disabled:not(.launching) {
+  background: var(--plate);
+  color: var(--ink-dim);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--glass-edge);
   cursor: default;
+}
+
+/* «Запускается…»: кнопка недоступна, но не погашена — это работа, а не
+   запрет. */
+.play.launching {
+  cursor: progress;
+}
+
+/* Блик. Обрезается своей «таблеткой», а не кнопкой: у кнопки обрезка срезала
+   бы и свечение вокруг неё. Полоса света проходит слева направо за первые 70%
+   цикла, замедляясь, и пропадает за краем; остаток цикла — пауза, чтобы блик
+   не мельтешил. Первый проход начинается, когда пружина нажатия уже отыграла. */
+.play-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--r-pill);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.play-sheen::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(100deg, transparent, var(--sheen), transparent);
+  transform: translateX(-100%);
+  animation: play-sheen calc(var(--move-scene) * 3.6) var(--ease-out) var(--move) infinite;
+}
+
+@keyframes play-sheen {
+  70%,
+  to {
+    transform: translateX(225%);
+  }
+}
+
+/* Ошибки главного экрана — общий баннер над артом (`.banner`) и ошибка запуска
+   у кнопки PLAY. Обе лежат прямо на арте, а он бывает и светлым: подложка —
+   тёмная плашка, как у подписи над кнопкой, подкрашенная цветом опасного, с
+   размытием под ней. Текст на ней не ниже 4.5:1 даже на белом арте
+   (`src/paletteContrast.test.ts`). Слева значок ошибки (ниже, общий с ошибкой
+   настроек). */
+.banner,
+.play-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: color-mix(in srgb, var(--danger) 20%, var(--plate));
+  backdrop-filter: blur(12px);
+  border: 1px solid color-mix(in srgb, var(--danger) 70%, transparent);
+  border-radius: var(--r-md);
+  box-shadow: var(--glass-edge), var(--shadow-2);
+  padding: 10px 14px 10px 12px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--ink);
+  text-align: left;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
 }
 
 .play-error {
   max-width: 420px;
-  background: rgba(255, 138, 118, 0.22);
-  border: 1px solid var(--danger);
-  border-radius: 8px;
-  padding: 9px 12px;
-  font-size: 12.5px;
-  text-align: left;
 }
 
-/* Выходы из ошибки запуска — тихие, как и в правке игры в настройках.
-   Жёлтый тут не идёт: на этом экране акцент уже занят кнопкой PLAY. */
+/* Ошибка запуска и выходы из неё поднимаются так же, как подпись, но без
+   задержки: это ответ на нажатие, ждать нечего. Общий баннер — так же: он
+   появляется, когда что-то не загрузилось. */
+.banner,
+.play-error,
+.play-fix {
+  animation: play-rise var(--move-slow) var(--ease-out) backwards;
+}
+
+/* Значок ошибки — круг, подкрашенный цветом опасного, с восклицанием из двух
+   штрихов. Нарисован самими стилями: картинок и шрифтовых значков у
+   приложения нет. Размер — `--mark`, штрихи считаются от него. */
+.banner::before,
+.play-error::before,
+.settings-error::before {
+  content: "";
+}
+
+.banner::before,
+.play-error::before,
+.settings-error::before,
+.crash-mark {
+  --mark: 16px;
+  flex: none;
+  width: var(--mark);
+  height: var(--mark);
+  margin-top: 1px;
+  border-radius: 50%;
+  background:
+    linear-gradient(var(--danger), var(--danger)) 50% calc(var(--mark) * 0.22) / calc(var(--mark) * 0.125) calc(var(--mark) * 0.34) no-repeat,
+    linear-gradient(var(--danger), var(--danger)) 50% calc(var(--mark) * 0.65) / calc(var(--mark) * 0.125) calc(var(--mark) * 0.125) no-repeat,
+    color-mix(in srgb, var(--danger) 22%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--danger) 60%, transparent);
+}
+
+/* Выходы из ошибки запуска — тихие, как и в правке игры в настройках, и на
+   той же тёмной плашке, что подпись над кнопкой: на светлом арте прозрачная
+   кнопка терялась бы. Оранжевый тут не идёт: на этом экране цвет действия уже
+   занят кнопкой PLAY. Под курсором — светлый слой внутри кнопки, нажатие —
+   лёгкое вдавливание с пружинкой, как у кнопок настроек. */
 .play-fix {
   display: flex;
   gap: 8px;
 }
 
 .play-fix button {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 6px;
+  position: relative;
+  isolation: isolate;
+  background: var(--plate);
+  backdrop-filter: blur(12px);
+  border: 0;
+  border-radius: var(--r-pill);
+  box-shadow: var(--glass-edge);
   color: var(--ink);
-  padding: 6px 12px;
+  padding: 7px 14px;
   cursor: pointer;
   font: inherit;
-  font-size: 12.5px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  transition:
+    transform var(--move) var(--ease-spring),
+    opacity var(--move) var(--ease-out);
+}
+
+/* Подсветка на тёмной плашке — тонкий светлый слой и светлая кромка по краю:
+   слой плотнее светлил бы плашку, и на белом арте текст на ней опустился бы
+   ниже 4.5:1. */
+.play-fix button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-pill);
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.play-fix button:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.play-fix button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: var(--move-fast);
+}
+
+.play-fix button:focus-visible {
+  box-shadow: var(--glass-edge), var(--focus-halo);
 }
 
 .play-fix button:disabled {
@@ -345,6 +971,15 @@ body {
      записаны числами по месту. */
   --dock-size: 44px;
   --dock-zoom: 1.64;
+  /* Полный прирост иконки под самым курсором — на столько она вырастает вверх
+     и вширь. Из него стили считают и сдвиг соседей, и подъём подписи. */
+  --dock-grow: calc(var(--dock-size) * (var(--dock-zoom) - 1));
+  /* Подъём иконки при наведении. */
+  --dock-lift: 4px;
+  /* Зазор между иконками и поля ряда вокруг них: из них же считается, где
+     стоит метка выбранной игры. */
+  --dock-gap: 10px;
+  --dock-pad: 12px;
   /* Потолок ширины подписи и запас по бокам ряда под неё. Подпись высовывается
      за край иконки на половину своей ширины, поэтому запас считается из этих
      двух величин и остаётся верным, если поменять любую. */
@@ -355,7 +990,7 @@ body {
   left: 50%;
   transform: translateX(-50%);
   bottom: 14px;
-  z-index: 1;
+  z-index: var(--z-ui);
   /* Запас под подписи прибавляется к пределу ширины, а не вычитается из него.
      Иначе прозрачные поля по бокам съедали место иконок: на окне по умолчанию
      в док влезало девять игр вместо двенадцати, а на самом узком окне даже пять
@@ -373,11 +1008,19 @@ body {
   /* 8px отступа сверху и снизу вокруг иконки, плюс рамка в 1px с каждой
      стороны. */
   height: calc(var(--dock-size) + 18px);
-  border-radius: 16px;
   background: var(--glass);
   backdrop-filter: blur(12px);
   border: 1px solid var(--line);
+  box-shadow: var(--glass-edge);
   pointer-events: none;
+  /* Увеличенные иконки раздвигают ряд, и подложка растягивается вширь вместе
+     с ним — тоже растяжением, а не шириной (во сколько раз — считает
+     `GameDock`). Скругление по горизонтали заранее сжато на ту же величину:
+     растянутое, оно снова становится круглым, а не вытягивается в овал. */
+  --glass-scale: 1;
+  border-radius: calc(var(--r-lg) / var(--glass-scale)) / var(--r-lg);
+  transform: scaleX(var(--glass-scale));
+  transition: transform var(--move-fast) var(--ease-out);
 }
 
 .dock {
@@ -388,18 +1031,35 @@ body {
   position: relative;
   display: flex;
   align-items: flex-end;
-  gap: 10px;
-  /* Сверху — под подпись: зазор в 10px и сама подпись примерно в 26px.
-     Увеличенная иконка сюда не попадает: она раздвигает ряд по правилам
-     раскладки, а не вылезает за него.
-     По бокам — 12px вокруг иконок, как у подложки, плюс запас под подпись. */
-  padding: 40px calc(var(--dock-room) + 12px) 8px;
+  gap: var(--dock-gap);
+  /* Сверху — под подпись: зазор в 10px и сама подпись примерно в 26px, плюс
+     то, на сколько поднимаются над рядом увеличенная иконка и подпись над ней:
+     увеличение — растяжение, ряд от него не растёт, и всё выросшее должно
+     уместиться в запасе, иначе обрезающая ось его срежет.
+     По бокам — поля вокруг иконок, как у подложки, плюс запас под подпись. */
+  padding: calc(40px + var(--dock-grow) + var(--dock-lift)) calc(var(--dock-room) + var(--dock-pad)) 8px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
 }
 
+/* Иконка растёт **растяжением, а не шириной и высотой**: анимировать
+   разрешено только `transform` и `opacity`. Растяжение не трогает
+   раскладку, и соседи сами не раздвинулись бы — выросшая до 72px иконка
+   полезла бы в зазор в 10px, на соседнюю. Поэтому каждая иконка ещё и
+   сдвигается вбок ровно на прирост иконок перед ней (`lib/dock.ts`), и ряд
+   расходится так же, как расходился, когда рос размер.
+
+   Из обработчика движения мыши приходят два числа: близость к курсору
+   (`--near`, от нуля до единицы) и сдвиг в долях прироста (`--shift`). Во
+   сколько раз расти и сколько это в точках — решают `--dock-zoom` и
+   `--dock-grow` здесь: тогда иконка, сдвиг, подпись и метка считаются от одной
+   и той же величины. */
 .dock-item {
+  --near: 0;
+  --shift: 0;
+  --dock-scale: calc(1 + (var(--dock-zoom) - 1) * var(--near));
+
   position: relative;
   flex: none;
   border: 0;
@@ -407,42 +1067,75 @@ body {
   background: none;
   cursor: pointer;
   line-height: 0;
+  transform: translateX(calc(var(--dock-grow) * var(--shift)));
+  transition: transform var(--move-fast) var(--ease-out);
 }
 
-/* Иконка растёт **шириной и высотой, а не растяжением**, и это главное здесь.
-   Растяжение (`transform: scale`) рисует иконку крупнее, но её место в ряду
-   остаётся прежним — соседи не раздвигаются, и выросшая до 72px иконка лезет
-   в зазор в 10px, то есть на соседнюю. Размер же учитывается раскладкой: ряд
-   раздвигается сам, и наложиться иконкам негде.
-
-   Близость к курсору приходит из обработчика движения мыши числом от нуля до
-   единицы. Во сколько раз от этого расти — решает `--dock-zoom` здесь, а не
-   обработчик: тогда и подпись, и скругление, и буква-заглушка считаются от
-   одной и той же величины. */
-.dock-icon {
-  --near: 0;
-  --dock-scale: calc(1 + (var(--dock-zoom) - 1) * var(--near));
-
+/* Подъём при наведении — с пружиной, вдавливание при нажатии — к низу ряда,
+   как будто иконку прижали к доку. Отпускание возвращает её той же пружиной.
+   Нажатие с клавиатуры (пробел на иконке в фокусе) только вдавливает: подъём
+   — ответ на курсор, а курсора над иконкой нет. */
+.dock-lift {
   display: block;
-  width: calc(var(--dock-size) * var(--dock-scale));
-  height: calc(var(--dock-size) * var(--dock-scale));
-  /* Скругление растёт вместе с иконкой: постоянное выглядело бы у крупной
-     иконки заметно острее, чем у мелкой. */
-  border-radius: calc(var(--dock-size) * 0.25 * var(--dock-scale));
+  border-radius: calc(var(--dock-size) * 0.25);
+  transform-origin: 50% 100%;
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.dock-item:hover .dock-lift {
+  transform: translateY(calc(-1 * var(--dock-lift)));
+}
+
+.dock-item:active .dock-lift {
+  transform: scale(0.94);
+  transition-duration: var(--move-fast);
+}
+
+.dock-item:hover:active .dock-lift {
+  transform: translateY(calc(-1 * var(--dock-lift))) scale(0.94);
+}
+
+/* Рамка фокуса — вокруг самой иконки, а не вокруг кнопки с подписью над ней;
+   зазор под ней — тёмная подложка: стекло дока полупрозрачное, и под ним бывает
+   светлый арт. Рамка ложится ровно туда, где под иконкой стоит метка выбранной
+   игры, и пока на выбранной иконке рамка, метка гаснет: рамка сама отмечает
+   иконку, а две светлые черты внахлёст читались бы кляксой. Уйдёт фокус —
+   метка проявится снова. */
+.dock-item:focus-visible {
+  outline: none;
+}
+
+.dock-item:focus-visible .dock-lift {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
+  box-shadow: var(--focus-halo);
+}
+
+.dock-item[aria-current="true"]:focus-visible ~ .dock-mark {
+  opacity: 0;
+}
+
+.dock-icon {
+  display: block;
+  width: var(--dock-size);
+  height: var(--dock-size);
+  /* Скругление растягивается вместе с иконкой и у крупной остаётся таким же
+     мягким, как у мелкой. */
+  border-radius: calc(var(--dock-size) * 0.25);
   object-fit: cover;
-  transition:
-    width calc(var(--move) / 2) ease-out,
-    height calc(var(--move) / 2) ease-out;
+  transform: scale(var(--dock-scale));
+  transform-origin: 50% 100%;
+  transition: transform var(--move-fast) var(--ease-out);
 }
 
 .dock-letter {
   display: flex;
   align-items: center;
   justify-content: center;
-  font: 600 19px/1 "Golos Text Variable", "Segoe UI", sans-serif;
-  /* Буква растёт вместе с плашкой — при растяжении это выходило само собой,
-     при росте размера её приходится считать отдельно. */
-  font-size: calc(var(--dock-size) * 0.43 * var(--dock-scale));
+  font-family: "Golos Text Variable", "Segoe UI", sans-serif;
+  font-weight: 600;
+  line-height: 1;
+  font-size: calc(var(--dock-size) * 0.43);
   color: var(--ink);
 }
 
@@ -451,29 +1144,50 @@ body {
   filter: grayscale(1);
 }
 
-/* Точка под выбранной игрой — как отметка запущенной программы в доке. */
-.dock-dot {
+/* Метка выбранной игры — как отметка запущенной программы в доке. Она одна
+   на весь ряд и при смене игры скользит к новой иконке. Где она стоит, стили
+   считают сами по номеру игры (`--i`): иконки одного размера и стоят через
+   равные зазоры, мерить нечего. Два движения разведены по двум элементам:
+   переход к другой игре — спокойный и медленный, а сдвиг вслед за
+   раздвинувшимся рядом — такой же быстрый, как у самих иконок, иначе метка
+   отставала бы от своей иконки. */
+.dock-mark {
   position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: -6px;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: var(--ink);
+  left: calc(var(--dock-room) + var(--dock-pad) + var(--dock-size) / 2);
+  bottom: 2px;
+  pointer-events: none;
+  transform: translateX(calc(var(--i) * (var(--dock-size) + var(--dock-gap))));
+  transition:
+    transform var(--move-slow) var(--ease-out),
+    opacity var(--move) var(--ease-out);
 }
 
-/* Название всплывает над иконкой при наведении. */
+.dock-mark::before {
+  content: "";
+  position: absolute;
+  left: -6px;
+  bottom: 0;
+  width: 12px;
+  height: 3px;
+  border-radius: var(--r-pill);
+  background: var(--ink);
+  transform: translateX(calc(var(--dock-grow) * var(--shift)));
+  transition: transform var(--move-fast) var(--ease-out);
+}
+
+/* Название всплывает над иконкой при наведении и поднимается вместе с ней,
+   на сколько она выросла и приподнялась. */
 .dock-name {
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(calc(-1 * var(--dock-grow) * var(--near)));
   bottom: calc(100% + 10px);
   padding: 4px 9px;
-  border-radius: 6px;
-  background: rgba(7, 7, 7, 0.86);
+  border-radius: var(--r-sm);
+  /* Цвет фона окна, чуть прозрачнее. */
+  background: color-mix(in srgb, var(--bg) 86%, transparent);
   border: 1px solid var(--line);
-  font: 500 12px/1.2 "Golos Text Variable", "Segoe UI", sans-serif;
+  font: 500 var(--text-sm)/1.2 "Golos Text Variable", "Segoe UI", sans-serif;
   color: var(--ink);
   white-space: nowrap;
   /* Потолок ширины — не украшение: из него выведен запас по бокам ряда
@@ -484,7 +1198,9 @@ body {
   text-overflow: ellipsis;
   opacity: 0;
   pointer-events: none;
-  transition: opacity var(--move) ease;
+  transition:
+    opacity var(--move) var(--ease-out),
+    transform var(--move-fast) var(--ease-out);
 }
 
 .dock-item:hover .dock-name,
@@ -492,54 +1208,216 @@ body {
   opacity: 1;
 }
 
+.dock-item:hover .dock-name {
+  transform: translateX(-50%) translateY(calc(-1 * (var(--dock-grow) * var(--near) + var(--dock-lift))));
+}
+
 /* Тумблер «Анимация» на вкладке «Вид» вместо системной настройки «уменьшить
-   движение» (спека этапа 5, §12) — это по-прежнему первое такое место в
-   проекте, и начинать стоило с самого заметного движения в приложении.
+   движение» — это по-прежнему первое такое место в проекте, и начинать стоило с
+   самого заметного движения в приложении. Обнулённая --move новых переходов не
+   запускает, но уже идущий доиграл бы прежнюю длительность: тумблер,
+   выключенный посреди скольжения метки, ждал бы его конца. `none` обрывает
+   переход сразу. Остальное здесь — то, что без анимации было бы не движением, а
+   скачком.
    Блок стоит последним в группе стилей дока, чтобы его правила побеждали в
    каскаде правила выше — при равной весомости выигрывает то, что встречается
    в файле позже. */
-:root[data-motion="off"] .dock-icon {
+:root[data-motion="off"] :is(.dock-bg, .dock-item, .dock-lift, .dock-icon, .dock-name, .dock-mark),
+:root[data-motion="off"] .dock-mark::before {
   transition: none;
+}
+:root[data-motion="off"] .dock-item,
+:root[data-motion="off"] .dock-mark {
   /* Обработчик движения мыши и так не считает близость при выключенном
      тумблере. Это вторая застава на случай, если первую однажды обойдут:
      правило таблицы побеждает значение, проставленное по месту. */
   --near: 0 !important;
+  --shift: 0 !important;
 }
-:root[data-motion="off"] .dock-name {
-  transition: none;
+:root[data-motion="off"] .dock-bg {
+  --glass-scale: 1 !important;
+}
+/* Подъём при наведении — украшение, без анимации он был бы скачком. Нажатие
+   остаётся: это ответ на клик, и мгновенный он тоже понятен. */
+:root[data-motion="off"] .dock-item:hover .dock-lift {
+  transform: none;
+}
+:root[data-motion="off"] .dock-item:active .dock-lift {
+  transform: scale(0.94);
+}
+:root[data-motion="off"] .dock-item:hover .dock-name {
+  transform: translateX(-50%);
 }
 
 /* Коробка кодов: потолок и своя прокрутка. У одной игры кодов бывает
    десяток, а без потолка список выдавил бы баннеры и видео за нижний край
-   панели (спека §2.4). */
-.codes-box {
+   панели. */
+.skeleton-codes {
   max-height: 260px;
+}
+
+/* Запас под рамку фокуса карточек, как у прокрутки панели: поля внутри и
+   столько же отрицательного отступа снаружи. Сверху поле входит в потолок,
+   поэтому потолок на него выше: видимая часть списка та же, что у заглушек. */
+.codes-box {
+  max-height: calc(260px + var(--focus-room));
+  margin: calc(-1 * var(--focus-room)) calc(-1 * var(--focus-room)) 0;
+  padding: var(--focus-room) var(--focus-room) 0;
+  scroll-padding-block: var(--focus-room);
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
-}
-
-.code-card {
-  display: flex;
-  gap: 9px;
-  align-items: flex-start;
-  cursor: pointer;
+  scrollbar-color: var(--scrollbar) transparent;
 }
 
 .code-card.burning {
-  /* Через color-mix, а не rgba с зашитым числом: --accent теперь подвижен
-     (подбирается из арта или задаётся вручную), и подложка обязана следовать
-     за ним, а не расходиться с оригиналом по построению. */
+  /* Через color-mix, а не rgba с зашитым числом: подложка берёт цвет прямо из
+     --accent и не разойдётся с ним при смене палитры. */
   background: color-mix(in srgb, var(--accent) 10%, transparent);
   border-color: color-mix(in srgb, var(--accent) 55%, transparent);
 }
 
+/* Щелчок по карточке копирует код. Под курсором ярче проступает её рамка —
+   слоем поверх своей, прозрачностью; сама карточка не светлеет: самый тихий
+   текст на ней и так у предела контраста. Вместе с карточкой подсвечивается
+   кнопка копирования — щелчок по карточке и есть копирование. Нажатие чуть
+   вдавливает карточку, но не тогда, когда нажимают кнопку на ней. */
+.code-card::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  z-index: var(--z-below);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-lg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.code-card.burning::before {
+  border-color: color-mix(in srgb, var(--accent) 85%, transparent);
+}
+
+.code-card:hover::before,
+.code-card:hover:not(:has(button:hover)) .code-copy::before {
+  opacity: 1;
+}
+
+.code-card:active:not(:has(button:active)) {
+  transform: scale(0.98);
+  transition-duration: var(--move-fast);
+}
+
+/* Скопировать не удалось (буфер обмена занят другой программой): карточка на
+   миг принимает вид ошибки, как баннер ошибки, и коротко вздрагивает, а
+   строка срока говорит, что случилось. Через несколько секунд всё как было
+   (`lib/copyFeedback.ts`). */
+.code-card.copy-failed {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border-color: color-mix(in srgb, var(--danger) 70%, transparent);
+  animation: copy-shake var(--move-slow) var(--ease-out);
+}
+
+.code-card.copy-failed::before {
+  border-color: var(--danger);
+}
+
+.code-timer.is-failed {
+  color: var(--ink);
+}
+
+/* Повторная неудача с тем же кодом, пока ошибка ещё видна: у соседних
+   копирований имена кадров разные (`is-again` в `PromoCodes`), и новое имя
+   запускает вздрагивание заново — с тем же именем браузер счёл бы, что
+   анимация уже доиграла. Кадры одинаковые. */
+.code-card.copy-failed.is-again {
+  animation-name: copy-shake-again;
+}
+
+@keyframes copy-shake {
+  25% {
+    transform: translateX(-3px);
+  }
+  55% {
+    transform: translateX(2px);
+  }
+  80% {
+    transform: translateX(-1px);
+  }
+}
+
+@keyframes copy-shake-again {
+  25% {
+    transform: translateX(-3px);
+  }
+  55% {
+    transform: translateX(2px);
+  }
+  80% {
+    transform: translateX(-1px);
+  }
+}
+
 .code-main { flex: 1; min-width: 0; }
 
-.code-timer { font-size: 11.5px; color: var(--ink-dim); margin-top: 3px; }
+/* Строка срока — в ряд с часиками слева от текста (ниже). */
+.code-timer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+  margin-top: 3px;
+}
 .code-timer.soon { color: var(--accent); }
-.code-region { font-size: 10px; color: var(--ink-faint); margin-top: 3px; }
+.code-region { font-size: var(--text-xs); letter-spacing: 0.02em; color: var(--ink-faint); margin-top: 3px; }
+
+/* Часики сроков (`panel/DeadlineClock.tsx`) — слева от срока кода и от остатка
+   идущего баннера. Кольцо — доля оставшегося срока, по часовой от двенадцати:
+   тусклая дорожка и поверх неё дуга. Дуга — цвет содержимого, а в последние
+   сутки — цвет срока горящей карточки (`.code-timer.soon`). Стрелка цветом
+   текста спокойно бежит по кругу, в последние сутки быстрее; движется она одним
+   поворотом, и не сама линия, а её отдельный слой поверх кольца — кольцо не
+   перерисовывается.
+   Размер — полтора кегля строки срока. Строку часики не раздвигают: лишняя
+   высота уходит в отрицательные поля по вертикали, и карточка той же высоты,
+   что без них. Контраст дуги к карточкам и к дорожке —
+   `src/paletteContrast.test.ts`. */
+.clock {
+  position: relative;
+  flex: none;
+  width: calc(var(--text-xs) * 1.5);
+  height: calc(var(--text-xs) * 1.5);
+  margin-block: calc((1lh - var(--text-xs) * 1.5) / 2);
+}
+.clock-face,
+.clock-hand {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.clock-face circle {
+  fill: none;
+  stroke-width: 2.4;
+}
+.clock-track { stroke: var(--track); }
+.clock-arc { stroke: var(--content); stroke-linecap: round; }
+.clock.is-hot .clock-arc { stroke: var(--accent); }
+.clock-hand {
+  stroke: var(--ink);
+  stroke-width: 2;
+  stroke-linecap: round;
+  animation: clock-hand var(--move-clock) linear infinite;
+}
+.clock.is-hot .clock-hand { animation-duration: var(--move-clock-hot); }
+
+@keyframes clock-hand {
+  to {
+    transform: rotate(1turn);
+  }
+}
 
 .code-side { display: flex; flex-direction: column; align-items: center; gap: 6px; }
 .code-buttons { display: flex; gap: 4px; }
@@ -547,12 +1425,12 @@ body {
 .code-buttons button {
   width: 24px;
   height: 24px;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   border: 1px solid var(--line);
   background: transparent;
   color: var(--ink);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--text-sm);
   line-height: 1;
 }
 
@@ -562,8 +1440,117 @@ body {
   border-color: transparent;
 }
 
+/* Под курсором — слой внутри кнопки, как у кнопок настроек: у обычной подложка
+   карточки, у кнопки цвета действия — мягкое свечение вокруг. Нажатие —
+   заметное для такой маленькой кнопки вдавливание. */
+.code-buttons button {
+  position: relative;
+  isolation: isolate;
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.code-buttons button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: calc(var(--r-sm) - 1px);
+  background: var(--card);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.code-buttons button.primary::before {
+  inset: -1px;
+  border-radius: var(--r-sm);
+  background: none;
+  box-shadow: 0 2px 10px var(--accent-glow);
+}
+
+.code-buttons button:hover::before {
+  opacity: 1;
+}
+
+.code-buttons button:active {
+  transform: scale(0.9);
+  transition-duration: var(--move-fast);
+}
+
+/* Кнопки стоят парой через 4px: рамка вплотную, иначе легла бы на соседку. */
+.code-buttons button:focus-visible {
+  outline-offset: var(--focus-offset-tight);
+}
+
+/* Копирование: значок на время становится галочкой. Оба значка лежат в одной
+   клетке друг на друге; уходящий сжимается и гаснет, приходящий вырастает с
+   лёгкой пружиной. Через полторы секунды (`lib/copyFeedback.ts`) — обратно. */
+.code-copy {
+  display: grid;
+  place-items: center;
+}
+.code-copy-icon {
+  grid-area: 1 / 1;
+  transition:
+    transform var(--move) var(--ease-spring),
+    opacity var(--move-fast) var(--ease-out);
+}
+.code-copy-icon.is-check,
+.code-copy.is-copied .code-copy-icon.is-copy {
+  opacity: 0;
+  transform: scale(0.5);
+}
+.code-copy.is-copied .code-copy-icon.is-check {
+  opacity: 1;
+  transform: none;
+}
+
+/* Картинка панели (`panel/CachedImage.tsx`). Пока её нет, в рамке лежит тон
+   заглушки с тем же мерцанием, что у заглушек разделов. Скачанная, но ещё не
+   прочитанная картинка прозрачна, и под ней по-прежнему тон; прочитанная
+   проявляется, а тон в это же время гаснет — без пустого мига между ними.
+   Мерцание — на внутреннем слое, а гаснет внешний: иначе прозрачностью
+   спорили бы анимация и переход. Погасший тон замирает и сквозь прозрачные
+   места картинки не виден. Картинка позиционирована, чтобы лежать над тоном:
+   иначе позиционированный слой тона рисовался бы поверх неё. */
+.img-tone {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity var(--move-slow) var(--ease-out);
+}
+.img-tone::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--skeleton);
+  animation: skeleton-pulse calc(var(--move-scene) * 3) var(--ease-out) infinite;
+}
+.img-tone.is-gone {
+  opacity: 0;
+}
+.img-tone.is-gone::before {
+  animation-play-state: paused;
+}
+.img-reading,
+.img-shown {
+  position: relative;
+}
+.img-reading {
+  opacity: 0;
+}
+.img-shown {
+  animation: img-in var(--move-slow) var(--ease-out) backwards;
+}
+
+@keyframes img-in {
+  from {
+    opacity: 0;
+  }
+}
+
 /* Баннер */
-.banner-card { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.banner-card { border: 1px solid var(--line); border-radius: var(--r-lg); overflow: hidden; }
 .banner-art-wrap { position: relative; aspect-ratio: 16 / 9; }
 
 .banner-art {
@@ -572,17 +1559,18 @@ body {
 
 .banner-names {
   position: absolute; left: 10px; bottom: 8px;
-  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6);
+  text-shadow: var(--shadow-text);
 }
-.banner-who { font-size: 14px; font-weight: 600; }
-.banner-rarity { font-size: 11px; color: var(--content); }
+.banner-who { font-size: var(--text-md); font-weight: 600; }
+.banner-rarity { font-size: var(--text-xs); color: var(--content); }
 
 .banner-foot { padding: 8px 10px 9px; background: var(--card); }
-.banner-bar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, 0.14); overflow: hidden; }
+.banner-bar { height: 4px; border-radius: var(--r-pill); background: var(--track); overflow: hidden; }
 .banner-bar-fill { height: 100%; background: var(--content); }
 .banner-line {
   display: flex; justify-content: space-between; gap: 8px;
-  font-size: 11px; color: var(--ink-dim); margin-top: 6px;
+  font-size: var(--text-xs); font-variant-numeric: tabular-nums;
+  color: var(--ink-dim); margin-top: 6px;
 }
 .banner-title {
   overflow: hidden;
@@ -592,18 +1580,29 @@ body {
   color: var(--content-soft);
   overflow-wrap: anywhere;
 }
-.banner-left { flex: none; }
+/* Остаток идущего баннера — с часиками слева (у `.clock`). */
+.banner-left { flex: none; display: flex; align-items: center; gap: 5px; }
 
 .carousel-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
+/* Текущая точка чуть крупнее соседних и дорастает до размера с пружинкой. */
 .carousel-dots .dot {
   width: 5px; height: 5px; border-radius: 50%; padding: 0;
-  border: 0; background: rgba(255, 255, 255, 0.25); cursor: pointer;
+  border: 0; background: var(--dot); cursor: pointer;
+  transition: transform var(--move) var(--ease-spring);
 }
-.carousel-dots .dot.active { background: var(--content); }
+.carousel-dots .dot.active { background: var(--content); transform: scale(1.4); }
+/* Под курсором точка чуть подрастает, при нажатии сжимается; текущая при
+   нажатии сжимается от своего, крупного размера. */
+.carousel-dots .dot:hover:not(.active) { transform: scale(1.3); }
+.carousel-dots .dot:not(.active):active { transform: scale(0.8); transition-duration: var(--move-fast); }
+.carousel-dots .dot.active:active { transform: scale(1.15); transition-duration: var(--move-fast); }
+/* Точки стоят через 5px: рамка вплотную к точке, а не на соседних. */
+.carousel-dots .dot:focus-visible { outline-offset: var(--focus-offset-tight); }
 
-/* Карусель — лента карточек со сдвигом (спека этапа 7 §3.3). */
-.carousel-viewport { position: relative; overflow: hidden; border-radius: 8px; }
-.carousel-track { display: flex; transition: transform 450ms ease; }
+/* Карусель — лента карточек со сдвигом. Лента едет на сценической скорости, как
+   смена фона: быстро трогается и долго, мягко доезжает. */
+.carousel-viewport { position: relative; overflow: hidden; border-radius: var(--r-lg); }
+.carousel-track { display: flex; transition: transform var(--move-scene) var(--ease-out); }
 .carousel-track.instant { transition: none; }
 .carousel-slide { flex: 0 0 100%; min-width: 0; }
 
@@ -617,47 +1616,97 @@ body {
 .carousel-arrow {
   pointer-events: auto;
   width: 28px; height: 28px; border-radius: 50%; border: 0;
-  background: rgba(10, 10, 14, 0.45); color: var(--ink);
-  font-size: 18px; line-height: 1; cursor: pointer; opacity: 0.55;
-  transition: opacity var(--move) ease, background var(--move) ease;
+  background: var(--plate-soft); color: var(--ink);
+  font-size: var(--text-lg); line-height: 1; cursor: pointer; opacity: 0.55;
+  /* Плавно меняются только прозрачность и нажатие.
+     Подложка темнеет сразу — за одновременным проявлением самой кнопки этого
+     не видно. */
+  transition:
+    opacity var(--move) var(--ease-out),
+    transform var(--move) var(--ease-spring);
 }
 .carousel-arrow:hover,
-.carousel-arrow:focus-visible { opacity: 1; background: rgba(10, 10, 14, 0.7); }
+.carousel-arrow:focus-visible { opacity: 1; background: var(--plate-strong); }
+.carousel-arrow:active { transform: scale(0.88); transition-duration: var(--move-fast); }
+/* Стрелка лежит на арте: зазор под рамкой фокуса — тёмная подложка. */
+.carousel-arrow:focus-visible { box-shadow: var(--focus-halo); }
 
-.carousel-dots .dot.upcoming { background: rgba(255, 255, 255, 0.12); }
+.carousel-dots .dot.upcoming { background: var(--dot-dim); }
 /* Текущая точка всегда яркая, даже у будущего баннера: иначе пропадает,
    где ты в карусели. */
 .carousel-dots .dot.active.upcoming { background: var(--content); }
-.banner-soon { font-size: 11px; color: var(--content); }
+.banner-soon { font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--content); }
 
-/* Видео */
-.video-card { margin-bottom: 9px; cursor: pointer; }
-.video-thumb-wrap { position: relative; aspect-ratio: 16 / 9; border-radius: 8px; overflow: hidden; }
-.video-thumb { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Видео. Под курсором кадр чуть приближается внутри своей рамки, а тень под
+   рамкой становится глубже — превью будто приподнимается. Тень — отдельный
+   слой под рамкой, у которого меняется только прозрачность: сама тень не
+   пересчитывается. */
+.video-card {
+  position: relative; margin-bottom: 9px; cursor: pointer;
+  transition: transform var(--move) var(--ease-spring);
+}
+/* Нажатие чуть вдавливает всё превью с подписью. */
+.video-card:active { transform: scale(0.98); transition-duration: var(--move-fast); }
+/* Рамка фокуса — вокруг кадра, как у иконки дока, а не прямоугольником вокруг
+   кадра с подписью. Свой `overflow: hidden` у рамки кадра её не срезает: он
+   обрезает содержимое, а не собственную рамку. */
+.video-card:focus-visible { outline: none; }
+.video-card:focus-visible .video-thumb-wrap { outline: var(--focus-ring); outline-offset: var(--focus-offset); }
+.video-card::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  aspect-ratio: 16 / 9;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move-slow) var(--ease-out);
+}
+.video-card:hover::before,
+.video-card:focus-visible::before { opacity: 1; }
+.video-thumb-wrap {
+  position: relative; aspect-ratio: 16 / 9; border-radius: var(--r-lg); overflow: hidden;
+  box-shadow: var(--shadow-1);
+}
+.video-thumb {
+  width: 100%; height: 100%; object-fit: cover; display: block;
+  transition: transform var(--move-slow) var(--ease-out);
+}
+.video-card:hover .video-thumb,
+.video-card:focus-visible .video-thumb { transform: scale(1.04); }
 
 .video-badge {
   position: absolute; right: 6px; bottom: 6px;
-  background: rgba(0, 0, 0, 0.75); border-radius: 4px;
-  padding: 1px 5px; font-size: 10.5px;
+  background: var(--plate-badge); border-radius: var(--r-sm);
+  padding: 1px 5px; font-size: var(--text-xs); letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
 }
-.video-badge.premiere { background: #c0392b; }
+.video-badge.premiere { background: var(--premiere); }
 
 /* Слово из данных без пробелов должно переноситься, а не раздвигать панель. */
-.video-title { font-size: 12.5px; margin-top: 6px; line-height: 1.35; overflow-wrap: anywhere; }
-.video-meta { font-size: 11px; color: var(--ink-dim); margin-top: 3px; }
+.video-title { font-size: var(--text-sm); margin-top: 6px; line-height: 1.35; overflow-wrap: anywhere; }
+.video-meta {
+  font-size: var(--text-xs); font-variant-numeric: tabular-nums;
+  color: var(--ink-dim); margin-top: 3px;
+}
 
 /* Заглушка вместо картинки */
 .img-fallback-text {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
   padding: 10px; text-align: center;
-  font-size: 12px; color: rgba(255, 255, 255, 0.55);
+  font-size: var(--text-sm); color: var(--fallback-ink);
 }
 
 /* Шестерёнка настроек: крупная, без подписи, при наведении плавно
    поворачивается на пол-оборота и возвращается, когда курсор уходит. Восемь
-   зубцов, поэтому после пол-оборота значок выглядит так же, как в покое. */
+   зубцов, поэтому после пол-оборота значок выглядит так же, как в покое.
+   Подложка под курсором — отдельный слой, который проявляется прозрачностью:
+   плавно меняются только `transform` и `opacity`. */
 .panel-gear {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -666,21 +1715,38 @@ body {
   margin: 0 0 6px -8px;
   padding: 0;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: none;
   color: var(--ink);
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: transform var(--move) var(--ease-spring);
+}
+
+/* Нажатие чуть вдавливает шестерёнку вместе с подложкой. */
+.panel-gear:active {
+  transform: scale(0.92);
+  transition-duration: var(--move-fast);
+}
+
+.panel-gear::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-md);
+  background: var(--card);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
 }
 
 .panel-gear svg {
   width: 26px;
   height: 26px;
-  transition: transform 0.9s cubic-bezier(0.33, 0.8, 0.3, 1);
+  transition: transform var(--move-scene) var(--ease-out);
 }
 
-.panel-gear:hover {
-  background: var(--card);
+.panel-gear:hover::before {
+  opacity: 1;
 }
 
 .panel-gear:hover svg,
@@ -688,14 +1754,11 @@ body {
   transform: rotate(180deg);
 }
 
-.panel-gear:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Тумблер «Анимация» выключен — шестерёнка не поворачивается (спека этапа 5,
-   §12). */
-:root[data-motion="off"] .panel-gear svg {
+/* Тумблер «Анимация» выключен — шестерёнка не поворачивается, подложка под
+   курсором появляется сразу. */
+:root[data-motion="off"] .panel-gear,
+:root[data-motion="off"] .panel-gear svg,
+:root[data-motion="off"] .panel-gear::before {
   transition: none;
 }
 :root[data-motion="off"] .panel-gear:hover svg,
@@ -703,53 +1766,180 @@ body {
   transform: none;
 }
 
-.panel-stale { font-size: 10.5px; color: var(--ink-faint); }
+.panel-stale { font-size: var(--text-xs); font-variant-numeric: tabular-nums; color: var(--ink-faint); }
 
-/* Строка «Вышла версия» (спека 2026-10-01 §2.2): заметнее строки свежести,
-   тише заголовков; ссылка — цветом действия. */
-.panel-update { margin-bottom: 4px; font-size: 12px; color: var(--ink); }
+/* Строка «Вышла версия»: заметнее строки свежести, тише заголовков; ссылка —
+   цветом действия. */
+.panel-update { margin-bottom: 4px; font-size: var(--text-sm); color: var(--ink); }
 
-/* Кнопка, которая выглядит как ссылка в строке текста. */
+/* Кнопка, которая выглядит как ссылка в строке текста. Подчёркивание в покое
+   приглушено и под курсором становится полным; нажатие на миг гасит ссылку. */
 .link-button {
   padding: 0; border: 0; background: none;
   font: inherit; color: var(--accent);
   text-decoration: underline; text-underline-offset: 2px;
+  text-decoration-color: color-mix(in srgb, currentColor 45%, transparent);
+  border-radius: var(--r-sm);
   cursor: pointer;
+  transition: opacity var(--move-fast) var(--ease-out);
 }
-.link-button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 2px; }
+.link-button:hover { text-decoration-color: currentColor; }
+.link-button:active { opacity: 0.7; }
 
 /* Сообщение о новой версии на строке номера в «О программе»: тише самого номера. */
-.about-update { font-weight: normal; color: var(--ink-dim); }
+.about-update { font-weight: 400; color: var(--ink-dim); }
 
-/* Пустая панель: одна спокойная строка вместо трёх пропавших секций. */
-.panel-empty {
-  padding: 6px 2px;
-  font-size: 13px;
-  line-height: 1.5;
+/* Пустые места — панель без кодов, баннеров и видео, пустой список игр,
+   поиск, который ничего не нашёл (`EmptyState`). Не голая строка, а маленькая
+   сцена: очертание того, чего пока нет, — карточки или лупы, нарисованное
+   самими стилями, — короткий заголовок о том, что случилось, и строка о том,
+   что сделать. */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.empty-title {
+  font-size: var(--text-md);
+  font-weight: 600;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.empty-hint {
+  max-width: 34ch;
+  margin-top: 4px;
+  font-size: var(--text-sm);
+  line-height: 1.45;
   color: var(--ink-dim);
-}
-.panel-disclaimer {
-  font-size: 9.5px; color: var(--ink-faint);
-  line-height: 1.35; margin-top: 6px;
+  text-wrap: pretty;
 }
 
-/* Экран настроек (спека этапа 5, §7). Размеры — переменными здесь, а не
-   числами по месту: так же сделано у дока. */
+/* Карточка, которой пока нет: штриховой силуэт сзади, чуть повёрнутый, и
+   карточка спереди с двумя полосками текста — как заглушка, только неподвижная. */
+.empty-art {
+  position: relative;
+  width: 64px;
+  height: 50px;
+  margin-bottom: 14px;
+}
+
+.empty-art::before,
+.empty-art::after {
+  content: "";
+  position: absolute;
+  border-radius: var(--r-md);
+}
+
+.empty-art::before {
+  inset: 0 14px 14px 0;
+  border: 1px dashed var(--line-strong);
+  transform: rotate(-8deg);
+}
+
+.empty-art::after {
+  inset: 12px 0 0 12px;
+  border: 1px solid var(--line);
+  background:
+    linear-gradient(var(--skeleton), var(--skeleton)) 8px 9px / 46% 4px no-repeat,
+    linear-gradient(var(--skeleton), var(--skeleton)) 8px 18px / 28% 4px no-repeat,
+    var(--card);
+  box-shadow: var(--glass-edge), var(--shadow-1);
+}
+
+/* Лупа — для поиска, который ничего не нашёл: круг и ручка. */
+.empty-art.is-search::before {
+  inset: 2px auto auto 12px;
+  width: 30px;
+  height: 30px;
+  border: 2px solid var(--line-strong);
+  border-radius: 50%;
+  transform: none;
+}
+
+.empty-art.is-search::after {
+  inset: auto auto 6px 38px;
+  width: 4px;
+  height: 16px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--line-strong);
+  box-shadow: none;
+  transform: rotate(-45deg);
+}
+
+/* Пустая панель: сцена посередине высоты, чуть выше центра, — на месте трёх
+   пропавших разделов, а не строкой в углу. */
+.panel-empty {
+  min-height: 100%;
+  justify-content: center;
+  padding: 0 8px 18%;
+}
+
+.panel-disclaimer {
+  font-size: var(--text-xs); color: var(--ink-faint);
+  line-height: 1.35; margin-top: 6px;
+  text-wrap: pretty;
+}
+
+/* Тумблер «Анимация» выключен — панель не выезжает, разделы не поднимаются,
+   заглушки и качающиеся картинки не мерцают: бесконечное мерцание с нулевой
+   длительностью было бы не остановкой, а вырожденным циклом. Начатые переходы
+   обрываются сразу, как у дока. Приближение превью под курсором без анимации
+   было бы скачком — его нет. Галочка копирования и крупная текущая точка
+   карусели остаются: это состояние, а не движение. Стрелка часиков сроков
+   стоит на двенадцати, кольцо остаётся: доля срока — тоже состояние. */
+:root[data-motion="off"] .panel,
+:root[data-motion="off"] .panel .panel-scroll > *,
+:root[data-motion="off"] .panel :is(.panel-stale, .panel-update),
+:root[data-motion="off"] :is(.skeleton-block, .img-shown, .clock-hand),
+:root[data-motion="off"] .img-tone::before {
+  animation: none;
+}
+:root[data-motion="off"] :is(.code-copy-icon, .carousel-dots .dot, .video-thumb, .img-tone),
+:root[data-motion="off"] :is(.code-card, .code-buttons button, .carousel-arrow, .video-card, .link-button),
+:root[data-motion="off"] :is(.video-card, .code-card, .code-buttons button)::before {
+  transition: none;
+}
+:root[data-motion="off"] .video-card:hover .video-thumb,
+:root[data-motion="off"] .video-card:focus-visible .video-thumb {
+  transform: none;
+}
+/* Подрастающая под курсором точка карусели — тоже украшение; нажатие остаётся. */
+:root[data-motion="off"] .carousel-dots .dot:hover:not(.active) {
+  transform: none;
+}
+:root[data-motion="off"] .carousel-dots .dot:not(.active):active {
+  transform: scale(0.8);
+}
+
+/* Экран настроек. Размеры — переменными здесь, а не числами по месту: так же
+   сделано у дока. */
 .settings {
-  --s-text: 14px;
-  --s-hint: 13px;
-  --s-title: 22px;
-  --s-tab: 15px;
+  --s-text: var(--text-md);
+  --s-hint: var(--text-sm);
+  --s-title: var(--text-xl);
+  --s-tab: var(--text-md);
   --s-control-h: 34px;
-  --s-card-radius: 12px;
-  --s-control-radius: 8px;
+  --s-card-radius: var(--r-lg);
+  --s-control-radius: var(--r-md);
+  /* Скругления слоёв внутри карточки и кнопки: на толщину рамки меньше, чтобы
+     слой лёг ровно в её внутренний край. */
+  --s-row-radius: calc(var(--s-card-radius) - 1px);
+  --s-control-inner: calc(var(--s-control-radius) - 1px);
   --s-body-max: 760px;
 
   display: flex;
   height: 100%;
   background: var(--bg);
   font-size: var(--s-text);
-  animation: screen-in var(--move) ease-out;
+  /* Переход между экранами: настройки проявляются на медленной скорости,
+     колонка вкладок чуть выезжает слева, раздел поднимается на место. Главный
+     экран при возвращении входит сам: панель выезжает, разделы встают лесенкой,
+     фон проявляется. */
+  animation: screen-in var(--move-slow) var(--ease-out);
 }
 
 .settings-nav {
@@ -761,10 +1951,56 @@ body {
   padding: 18px 12px;
   background: var(--glass);
   border-right: 1px solid var(--line);
+  box-shadow: var(--glass-edge);
+  animation: settings-nav-in var(--move-slow) var(--ease-out) backwards;
 }
 
+/* Только `backwards`: доигравший вход ничего не держит. Кривая — плавное
+   торможение без перелёта, поэтому щели у левого края окна не бывает (панели
+   главного экрана, которая въезжает с пружиной, для этого нужна полоса стекла
+   за краем). */
+@keyframes settings-nav-in {
+  from {
+    transform: translateX(-10px);
+  }
+}
+
+/* Ряд вкладок под кнопкой «Назад» — та же колонка с тем же зазором. Свой
+   элемент нужен подложке: она лежит внутри ряда, её место считается от его
+   начала, а ширина — ширина ряда, то есть вкладки. */
+.settings-tabs {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Подложка выбранной вкладки — одна на весь ряд (`Settings.tsx`,
+   `lib/pill.ts`): при смене вкладки она скользит к новой, как метка в доке, а
+   не перескакивает. Встаёт по замеру вкладок; высота — высота вкладки. Чуть
+   приподнята кромкой и тенью, как карточка: выбранная вкладка не путается с
+   той, что просто под курсором. */
+.settings-tab-pill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: var(--pill-size);
+  border-radius: var(--s-control-radius);
+  background: var(--card);
+  box-shadow: var(--glass-edge), var(--shadow-1);
+  transform: translateY(var(--pill-y));
+  transition: transform var(--move-slow) var(--ease-out);
+}
+
+/* Вкладки и «Назад» лежат над подложкой. Подсветка под курсором — свой слой
+   внутри кнопки, он проявляется прозрачностью: плавно меняются только
+   `transform` и `opacity`. Нажатие чуть вдавливает
+   кнопку, отпускание возвращает её с пружинкой. */
 .settings-back,
 .settings-tab {
+  position: relative;
+  isolation: isolate;
   background: none;
   border: 0;
   border-radius: var(--s-control-radius);
@@ -774,52 +2010,111 @@ body {
   cursor: pointer;
   font: inherit;
   font-size: var(--s-tab);
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.settings-back::before,
+.settings-tab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--s-control-radius);
+  background: var(--hover);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+/* На стекле колонки полная подсветка была бы почти как подложка выбранной
+   вкладки — здесь она вдвое тише. */
+.settings-back:hover::before,
+.settings-tab:hover:not(.active)::before {
+  opacity: 0.55;
+}
+
+.settings-back:hover,
+.settings-tab:hover,
+.settings-tab.active {
+  color: var(--ink);
+}
+
+.settings-back:active,
+.settings-tab:active {
+  transform: scale(0.98);
+  transition-duration: var(--move-fast);
 }
 
 .settings-back {
   margin-bottom: 12px;
 }
 
-.settings-tab:hover {
-  color: var(--ink);
-}
-
-.settings-tab.active {
-  background: var(--card);
-  color: var(--ink);
-}
-
 .settings-body {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
+  /* Место под полосу прокрутки занято всегда: длинная вкладка с полосой и
+     короткая без неё не сдвигают содержимое при переключении. Полоса тонкая и
+     в цветах палитры, как у панели главного экрана. */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar) transparent;
   padding: 32px 40px;
 }
 
 /* Содержимое не растягивается на всю ширину: на развёрнутом окне строка
-   настройки иначе разъехалась бы между названием и переключателем. */
+   настройки иначе разъехалась бы между названием и переключателем.
+   Раздел поднимается на место и проявляется — при открытии настроек, при смене
+   вкладки (раздел появляется заново) и при переходе к поиску игр и обратно. */
 .settings-body > * {
   max-width: var(--s-body-max);
+  animation: settings-rise var(--move-slow) var(--ease-out) backwards;
+}
+
+/* Только `backwards`, как у подъёма кнопки PLAY: доигравшая анимация не держит
+   `transform`. */
+@keyframes settings-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* Первый запуск: колонки вкладок нет, и содержимое стоит посередине окна, а не
+   прижато к левому краю. Место под полосу прокрутки занято с обеих сторон:
+   занятое только справа сдвигало бы колонку на половину полосы влево. */
+.settings.is-first-run .settings-body {
+  scrollbar-gutter: stable both-edges;
+}
+
+.settings.is-first-run .settings-body > * {
+  margin-inline: auto;
 }
 
 .settings-section-title {
   font-size: var(--s-title);
   font-weight: 600;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
   margin-bottom: 6px;
 }
 
+/* Пояснения переносятся «красиво» (`text-wrap: pretty`): последняя строка не
+   остаётся одним словом. */
 .settings-hint {
   font-size: var(--s-hint);
   color: var(--ink-dim);
   line-height: 1.45;
+  text-wrap: pretty;
   margin-bottom: 18px;
 }
 
-/* Карточка: настройки раздела вместе, строки разделены тонкой линией. */
+/* Карточка: настройки раздела вместе, строки разделены тонкой линией. Глубина —
+   как у карточек панели: светлая кромка сверху и лёгкая тень. */
 .settings-card {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--s-card-radius);
+  box-shadow: var(--glass-edge), var(--shadow-1);
   margin-bottom: 14px;
 }
 
@@ -837,22 +2132,69 @@ body {
   border-top: 1px solid var(--line);
 }
 
+/* Подсветка под курсором у строк карточки, строки игры и найденной игры. Слой
+   внутри строки, под её содержимым (`--z-below`), проявляется прозрачностью.
+   Строка карточки сама не нажимается — нажимаются её кнопки, — поэтому у неё
+   только подсветка: видно, к какой строке относятся кнопки справа. Слой лежит
+   по внутреннему краю карточки: у первой строки скруглён сверху, у последней —
+   снизу. */
+.settings-card > .settings-row {
+  position: relative;
+  isolation: isolate;
+}
+
+.settings-card > .settings-row::before,
+.game-row-head::before,
+.found-row::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  background: var(--hover);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.settings-card > .settings-row:first-child::before {
+  border-radius: var(--s-row-radius) var(--s-row-radius) 0 0;
+}
+
+.settings-card > .settings-row:last-child::before {
+  border-radius: 0 0 var(--s-row-radius) var(--s-row-radius);
+}
+
+.settings-card > .settings-row:only-child::before {
+  border-radius: var(--s-row-radius);
+}
+
+.settings-card > .settings-row:hover::before,
+.game-row-head:hover::before,
+.found-row:not(:has(input:disabled)):hover::before {
+  opacity: 1;
+}
+
 .settings-row-text {
   flex: 1;
   min-width: 0;
 }
 
+/* Цифры в названиях и пояснениях строк — время обновления данных, размер
+   кэша, номер версии — одной ширины: при обновлении строка не дрожит. */
 .settings-row-title {
   display: block;
   line-height: 1.35;
+  font-variant-numeric: tabular-nums;
 }
 
 .settings-row-hint {
   display: block;
+  font-variant-numeric: tabular-nums;
   margin-top: 3px;
   font-size: var(--s-hint);
   color: var(--ink-dim);
   line-height: 1.4;
+  text-wrap: pretty;
 }
 
 .settings-row-control {
@@ -869,7 +2211,7 @@ body {
   width: 96px;
   height: 54px;
   object-fit: cover;
-  border-radius: 6px;
+  border-radius: var(--r-sm);
   border: 1px solid var(--line);
   background: var(--bg);
 }
@@ -883,6 +2225,7 @@ body {
   font-size: var(--s-hint);
   color: var(--ink-faint);
   line-height: 1.45;
+  text-wrap: pretty;
   margin: -4px 4px 18px;
 }
 
@@ -892,10 +2235,46 @@ body {
   padding: 12px 16px;
 }
 
+/* Заголовок блока нажимается, как кнопка: под курсором светлеет и получает
+   подсветку — слой под надписью, по её размеру, а не во всю строку, — при
+   нажатии чуть вдавливается. Поля вокруг надписи выбраны отрицательным
+   отступом: строка стоит, где стояла. */
 .settings-extra summary {
+  position: relative;
+  isolation: isolate;
+  width: fit-content;
+  margin: -4px -8px;
+  padding: 4px 8px;
+  border-radius: var(--r-sm);
   cursor: pointer;
   color: var(--ink-dim);
   font-size: var(--s-hint);
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.settings-extra summary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-sm);
+  background: var(--hover);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.settings-extra summary:hover {
+  color: var(--ink);
+}
+
+.settings-extra summary:hover::before {
+  opacity: 1;
+}
+
+.settings-extra summary:active {
+  transform: scale(0.97);
+  transition-duration: var(--move-fast);
 }
 
 .settings-extra .settings-row {
@@ -903,24 +2282,56 @@ body {
   padding-right: 0;
 }
 
+/* Строка игры. Нажатие на свёрнутую строку чуть вдавливает всю карточку,
+   отпускание возвращает её с пружинкой; развёрнутая слишком большая для
+   этого — ей хватает подсветки шапки. Перетаскивание строк (`GamesSection`)
+   родное, браузерное: картинку под курсором рисует сам браузер, и вдавленная
+   на время нажатия строка ему не мешает. */
 .game-row {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--s-card-radius);
+  box-shadow: var(--glass-edge), var(--shadow-1);
   margin-bottom: 8px;
+  transition: transform var(--move) var(--ease-spring);
 }
 
-.game-row.missing {
+.game-row:not(.is-open):active {
+  transform: scale(0.99);
+  transition-duration: var(--move-fast);
+}
+
+/* Пропавшая игра: приглушены ручка, название и источник, но не предупреждение
+   «файл пропал» — его-то и надо прочитать. Прозрачность на всей строке гасила
+   и его, ниже 3:1 (`src/paletteContrast.test.ts`). */
+.game-row.missing .game-row-grip,
+.game-row.missing .game-row-title,
+.game-row.missing .game-row-source {
   opacity: 0.62;
 }
 
+/* Шапка скруглена по внутреннему краю карточки — по этому же краю идут её
+   подсветка и рамка фокуса. У развёрнутой строки снизу шапки продолжается
+   правка, и низ у неё прямой. */
 .game-row-head {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 12px;
   min-height: 52px;
   padding: 0 16px;
+  border-radius: var(--s-row-radius);
   cursor: pointer;
+}
+
+.game-row-head::before {
+  border-radius: var(--s-row-radius);
+}
+
+.game-row.is-open .game-row-head,
+.game-row.is-open .game-row-head::before {
+  border-radius: var(--s-row-radius) var(--s-row-radius) 0 0;
 }
 
 .game-row-grip {
@@ -931,7 +2342,7 @@ body {
 .game-row-title {
   flex: 1;
   min-width: 0;
-  font-size: 15px;
+  font-size: var(--text-md);
 }
 
 .game-row-source {
@@ -956,18 +2367,75 @@ body {
   margin-top: 14px;
 }
 
+/* Ошибка в настройках — со значком, как ошибки главного экрана, но без тёмной
+   плашки: под ней не арт, а ровный фон. */
 .settings-error {
-  /* Значение совпадает с --danger (#ff8a76): CSS не умеет собрать rgba из
-     шестнадцатеричной переменной. */
-  background: rgba(255, 138, 118, 0.16);
-  border: 1px solid var(--danger);
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: color-mix(in srgb, var(--danger) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 70%, transparent);
   border-radius: var(--s-control-radius);
-  padding: 10px 14px;
+  padding: 10px 14px 10px 12px;
   margin-bottom: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-wrap: pretty;
+  animation: settings-rise var(--move-slow) var(--ease-out) backwards;
 }
 
-/* Кнопки и поля. Жёлтая кнопка — только главное действие раздела. */
+.settings-error::before {
+  margin-top: 2px;
+}
+
+/* Пустой список игр и поиск без находок: сцена пустого места (`EmptyState`) в
+   штриховой рамке на месте строк. */
+.settings-empty {
+  padding: 30px 24px 32px;
+  margin-bottom: 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--s-card-radius);
+}
+
+/* Шапка первого запуска выше заголовка — в ней переключатель языка, — и рамка
+   сразу под ней касалась бы его. Зазор — как между подписью и карточкой под ней
+   (`.settings-card-caption`). */
+.first-run-head + :is(.settings-empty, .settings-error) {
+  margin-top: 8px;
+}
+
+/* Экран отказа (`ErrorBoundary`): значок ошибки, крупно, и сообщение с кнопкой
+   посередине окна, а не строкой в углу. */
+.settings.is-crash .settings-body {
+  display: grid;
+  place-items: center;
+}
+
+.crash {
+  max-width: 440px;
+  padding-bottom: 8vh;
+  text-align: center;
+}
+
+.crash-mark {
+  --mark: 44px;
+  display: block;
+  margin: 0 auto 18px;
+}
+
+.crash .settings-hint {
+  margin-bottom: 22px;
+}
+
+/* Кнопки и поля. Оранжевая кнопка — только главное действие раздела.
+   Подсветка под курсором — слой внутри кнопки, он проявляется прозрачностью: у
+   обычной это подложка карточки, у главной — мягкое свечение цветом действия
+   вокруг неё, как у PLAY. Нажатие — лёгкое вдавливание, отпускание — с
+   пружинкой. Недоступная кнопка гаснет плавно: короткое сохранение на долю
+   секунды не мигает всеми кнопками раздела. */
 .button {
+  position: relative;
+  isolation: isolate;
   height: var(--s-control-h);
   padding: 0 14px;
   background: transparent;
@@ -978,10 +2446,30 @@ body {
   font-size: var(--s-text);
   white-space: nowrap;
   cursor: pointer;
+  transition:
+    transform var(--move) var(--ease-spring),
+    opacity var(--move) var(--ease-out);
 }
 
-.button:hover:not(:disabled) {
+.button::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--s-control-inner);
   background: var(--card);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.button:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.button:active:not(:disabled) {
+  transform: scale(0.97);
+  transition-duration: var(--move-fast);
 }
 
 .button:disabled {
@@ -994,6 +2482,15 @@ body {
   border-color: var(--accent);
   color: var(--accent-ink);
   font-weight: 600;
+}
+
+/* Свечение — тень снаружи кнопки, своего фона у слоя нет: ни цвет кнопки, ни
+   надпись он не трогает. */
+.button.accent::before {
+  inset: -1px;
+  border-radius: var(--s-control-radius);
+  background: none;
+  box-shadow: 0 4px 16px var(--accent-glow);
 }
 
 .button.danger {
@@ -1013,26 +2510,64 @@ body {
   font-size: var(--s-text);
 }
 
+/* Поле под курсором — рамка ярче, сразу, без перехода: у поля нет слоёв, а
+   плавно меняются только `transform` и `opacity`. Фокус — общая рамка,
+   спокойно, без вспышек. Выпадающий список тёмный, как само поле. */
+.input:hover:not(:disabled) {
+  border-color: var(--line-strong);
+}
+
+select.input {
+  color-scheme: dark;
+}
+
 .editor-input {
   width: 260px;
 }
 
 /* Переключатель вместо стандартной галочки: стандартная синяя не из палитры
-   приложения. Включённый — цвет действия. */
+   приложения. Включённый — цвет действия.
+   Бегунок едет с лёгкой пружинкой. Цвет дорожки и бегунка не перекрашивается, а
+   проявляется слоем поверх: у дорожки слой цвета действия выходит и на рамку, у
+   бегунка — тёмный слой. Нажатие чуть сжимает бегунок, как палец, придавивший
+   его. */
 .switch {
   position: relative;
   flex: none;
   width: 40px;
   height: 22px;
-  border-radius: 11px;
+  padding: 0;
+  border-radius: var(--r-pill);
   border: 1px solid var(--line);
   background: var(--card);
   cursor: pointer;
-  transition: background var(--move) ease;
+  transition: opacity var(--move) var(--ease-out);
 }
 
-.switch::after {
+.switch::before {
   content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.switch[aria-checked="true"]::before {
+  opacity: 1;
+}
+
+/* Наведение — бегунок чуть подрастает, нажатие — сжимается (ниже). */
+.switch:hover:not(:disabled) .switch-thumb {
+  transform: scale(1.12);
+}
+
+.switch[aria-checked="true"]:hover:not(:disabled) .switch-thumb {
+  transform: translateX(18px) scale(1.12);
+}
+
+.switch-thumb {
   position: absolute;
   top: 2px;
   left: 2px;
@@ -1040,17 +2575,34 @@ body {
   height: 16px;
   border-radius: 50%;
   background: var(--ink-dim);
-  transition: transform var(--move) ease, background var(--move) ease;
+  transition: transform var(--move) var(--ease-spring);
 }
 
-.switch[aria-checked="true"] {
-  background: var(--accent);
-  border-color: var(--accent);
-}
-
-.switch[aria-checked="true"]::after {
-  transform: translateX(18px);
+.switch-thumb::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
   background: var(--accent-ink);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.switch[aria-checked="true"] .switch-thumb {
+  transform: translateX(18px);
+}
+
+.switch[aria-checked="true"] .switch-thumb::after {
+  opacity: 1;
+}
+
+.switch:active:not(:disabled) .switch-thumb {
+  transform: scale(0.86);
+  transition-duration: var(--move-fast);
+}
+
+.switch[aria-checked="true"]:active:not(:disabled) .switch-thumb {
+  transform: translateX(18px) scale(0.86);
 }
 
 .switch:disabled {
@@ -1058,31 +2610,110 @@ body {
   cursor: default;
 }
 
-/* Выбор одного из вариантов — язык интерфейса и видео (спека этапа 6 §5.2). */
+/* Выбор одного из вариантов — язык интерфейса и видео.
+   Выбранный вариант отмечает одна таблетка на весь ряд (`Segmented.tsx`,
+   `lib/pill.ts`): она переезжает к новому варианту и по дороге растягивается до
+   его ширины. И сдвиг, и ширина — в `transform`: у самой таблетки постоянная
+   ширина (`PILL_BASE`, ставится по месту), а скругление по горизонтали заранее
+   сжато на то же растяжение, как у подложки дока, — растянутое, оно снова
+   круглое. */
 .segmented {
+  position: relative;
   display: inline-flex;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: var(--r-md);
   background: var(--card);
 }
 
+.segmented-pill {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  left: 0;
+  border-radius: calc(var(--r-sm) / var(--pill-scale)) / var(--r-sm);
+  background: var(--accent);
+  transform-origin: 0 50%;
+  transform: translateX(var(--pill-x)) scaleX(var(--pill-scale));
+  transition:
+    transform var(--move-slow) var(--ease-out),
+    opacity var(--move) var(--ease-out);
+}
+
+.segmented.is-disabled .segmented-pill {
+  opacity: 0.5;
+}
+
+/* Подпись — в двух цветах друг на друге: приглушённая без таблетки и тёмная на
+   ней. Они сменяют друг друга прозрачностью, пока таблетка едет: у варианта,
+   который таблетка покидает, быстро — его сразу открывает; у варианта, к
+   которому она едет, — с короткой задержкой, когда таблетка уже почти под ним.
+   Иначе тёмная подпись на миг легла бы на тёмный фон. */
 .segmented-option {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
   min-width: 64px;
   padding: 6px 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--r-sm);
   background: transparent;
   color: var(--ink-dim);
   font: inherit;
   cursor: pointer;
-  transition: background var(--move) ease, color var(--move) ease;
+  transition: opacity var(--move) var(--ease-out);
 }
 
-.segmented-option.active {
-  background: var(--accent);
+.segmented-option::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-sm);
+  background: var(--hover);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.segmented-option:hover:not(:disabled, .active)::before {
+  opacity: 1;
+}
+
+.segmented-label {
+  grid-area: 1 / 1;
+  transition:
+    opacity var(--move-fast) var(--ease-out),
+    transform var(--move) var(--ease-spring);
+}
+
+/* Буквы тёмной копии — из `data-label`: в разметке у неё текста нет, и в
+   выделение и поиск по странице попадает одна подпись, а не две. */
+.segmented-label.is-on {
   color: var(--accent-ink);
+  opacity: 0;
+  user-select: none;
+}
+
+.segmented-label.is-on::before {
+  content: attr(data-label);
+}
+
+.segmented-option.active .segmented-label {
+  opacity: 0;
+  transition:
+    opacity var(--move) var(--ease-out) calc(var(--move-fast) * 0.5),
+    transform var(--move) var(--ease-spring);
+}
+
+.segmented-option.active .segmented-label.is-on {
+  opacity: 1;
+}
+
+.segmented-option:active:not(:disabled, .active) .segmented-label {
+  transform: scale(0.95);
+  transition-duration: var(--move-fast);
 }
 
 .segmented-option:disabled {
@@ -1090,12 +2721,18 @@ body {
   cursor: default;
 }
 
+/* Варианты стоят через 2px, и до рамки ряда тоже 2px: рамка фокуса вплотную к
+   варианту ровно заполняет этот зазор и не ложится на соседа. */
+.segmented-option:focus-visible {
+  outline-offset: var(--focus-offset-tight);
+}
+
 /* Подпись над карточкой — «Language · Язык». */
 .settings-card-caption {
   margin: 0 0 8px;
-  font-size: var(--s-hint, 13px);
+  font-size: var(--s-hint, var(--text-sm));
   color: var(--ink-faint);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -1107,14 +2744,12 @@ body {
   gap: 12px;
 }
 
-/* Видимый фокус с клавиатуры у всех элементов управления настроек. */
-.settings :is(button, input, select, summary, [role="button"]):focus-visible,
-.segmented-option:focus-visible {
-  outline: 2px solid var(--ink-dim);
-  outline-offset: 2px;
-}
-
+/* Найденная игра: вся строка — подпись галочки, нажатие в любом месте строки
+   переключает её. Подсветка под курсором и лёгкое вдавливание — как у строки
+   игры. У уже добавленной игры галочка недоступна, и строка не откликается. */
 .found-row {
+  position: relative;
+  isolation: isolate;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1123,15 +2758,45 @@ body {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--s-card-radius);
+  box-shadow: var(--glass-edge), var(--shadow-1);
   margin-bottom: 8px;
+  cursor: pointer;
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.found-row::before {
+  border-radius: var(--s-row-radius);
+}
+
+.found-row:not(:has(input:disabled)):active {
+  transform: scale(0.99);
+  transition-duration: var(--move-fast);
+}
+
+.found-row:has(input:disabled) {
+  cursor: default;
+}
+
+/* Рамка фокуса — вокруг всей строки, а не маленькой галочки: нажимается вся
+   строка. */
+.found-row input:focus-visible {
+  outline: none;
+}
+
+.found-row:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: var(--focus-offset);
 }
 
 /* Галочки остаются: здесь выбирают несколько пунктов, а не включают настройку.
-   Цвет — цвет действия, а не стандартный синий. */
+   Цвет — цвет действия, а не стандартный синий; схема у самой галочки тёмная:
+   пустая стандартная — ярко-белый квадрат, чужой на тёмной карточке. */
 .found-row input[type="checkbox"] {
   accent-color: var(--accent);
+  color-scheme: dark;
   width: 16px;
   height: 16px;
+  cursor: inherit;
 }
 
 .found-title {
@@ -1149,15 +2814,72 @@ body {
   color: var(--ink-faint);
 }
 
-/* Единственное место, где обнуляется переменная --move — а с ней все переходы,
-   что берут длительность из неё. */
+/* Тумблер «Анимация» выключен — таблетки и бегунок встают на место сразу,
+   подсветка появляется без перехода. Начатые переходы обрываются сразу: сам
+   тумблер лежит на вкладке «Вид», и выключенный, он не оставляет за собой
+   недоигранного движения. Нажатие остаётся — это ответ на клик, мгновенный он
+   тоже понятен (как у дока). Блок стоит последним в группе стилей настроек,
+   чтобы побеждать правила выше.
+   Вход экрана, колонки вкладок и раздела здесь не выключается намеренно: он
+   одноразовый, и обнулённой --move хватает — при нуле он кончается сразу,
+   начатый тоже. А `animation: none` при обратном включении тумблера запустил
+   бы вход заново, и экран настроек, на котором тумблер и нажали, проявился
+   бы ещё раз. */
+:root[data-motion="off"] :is(.settings-tab-pill, .settings-back, .settings-tab, .game-row, .found-row, .button, .switch, .switch-thumb, .segmented-pill, .segmented-option, .segmented-label, .settings-extra summary),
+:root[data-motion="off"] :is(.settings-back, .settings-tab, .settings-card > .settings-row, .game-row-head, .found-row, .button, .switch, .segmented-option, .settings-extra summary)::before,
+:root[data-motion="off"] .switch-thumb::after {
+  transition: none;
+}
+/* Подрастающий под курсором бегунок — украшение, без анимации он был бы
+   скачком; нажатие остаётся, как у дока. */
+:root[data-motion="off"] .switch:hover:not(:disabled) .switch-thumb {
+  transform: none;
+}
+:root[data-motion="off"] .switch[aria-checked="true"]:hover:not(:disabled) .switch-thumb {
+  transform: translateX(18px);
+}
+:root[data-motion="off"] .switch:active:not(:disabled) .switch-thumb {
+  transform: scale(0.86);
+}
+:root[data-motion="off"] .switch[aria-checked="true"]:active:not(:disabled) .switch-thumb {
+  transform: translateX(18px) scale(0.86);
+}
+
+/* Единственное место, где обнуляется переменная --move — а с ней все
+   длительности, потому что остальные скорости считаются от неё. */
 :root[data-motion="off"] {
   --move: 0s;
 }
 
-/* Обнуления --move мало: дрейф длится сорок секунд, и это число задано у
-   самой анимации, а не через переменную. Бесконечное движение — именно то,
-   от чего защищает выключенный тумблер «Анимация» (спека этапа 5, §12). */
+/* Обнуления --move мало: бесконечная анимация с нулевой длительностью — не
+   остановка, а вырожденный цикл. Бесконечное движение — именно то, от чего
+   защищает выключенный тумблер «Анимация», поэтому дрейф выключается явно. */
 :root[data-motion="off"] .art-photo {
   animation: none;
+}
+
+/* Блик «запускается…» по той же причине убирается совсем: остановленная
+   полоса света посреди кнопки выглядела бы пятном. Состояние запуска и без
+   него видно по надписи. */
+:root[data-motion="off"] .play-sheen {
+  display: none;
+}
+
+/* Как у дока: переход, начатый до выключения тумблера, обрывается сразу. */
+:root[data-motion="off"] :is(.play, .play-label > span, .play-fix button),
+:root[data-motion="off"] :is(.play, .play-fix button)::before {
+  transition: none;
+}
+
+/* Окно неактивно — спрятано в трей, свёрнуто или не в фокусе, например
+   человек в игре (признак ставит `lib/windowActive.ts`).
+   Всё бесконечное фоновое движение замирает там, где его застало, и идёт
+   дальше, когда человек вернулся: дрейф арта, блик «запускается…», мерцание
+   заглушек, стрелки часиков сроков. Это не тумблер «Анимация» выше: тот
+   убирает движение совсем, а здесь оно только стоит; при обоих сразу правило
+   тумблера уже сняло анимацию, и пауза ей ничего не добавляет. Новое
+   бесконечное движение без строки здесь не пропустит `src/styles.test.ts`. */
+:root[data-active="off"] :is(.art-photo, .skeleton-block, .clock-hand),
+:root[data-active="off"] :is(.play-sheen, .img-tone)::before {
+  animation-play-state: paused;
 }

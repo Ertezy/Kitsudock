@@ -27,9 +27,9 @@ use tauri::Manager;
 use tauri_plugin_window_state::StateFlags;
 
 /// Слот на время между стартом ответчика и появлением `AppHandle`: значок
-/// трея и окно ещё не созданы, когда мог прийти первый запрос показать окно
-/// (спека этапа 7 §4.3). Пока `handle` нет, запрос откладывается в `pending`
-/// и выполняется, как только `setup()` отдаст сюда `AppHandle`.
+/// трея и окно ещё не созданы, когда мог прийти первый запрос показать окно.
+/// Пока `handle` нет, запрос откладывается в `pending` и выполняется, как
+/// только `setup()` отдаст сюда `AppHandle`.
 #[derive(Default)]
 struct ShowSlot {
     handle: Option<tauri::AppHandle>,
@@ -45,7 +45,7 @@ fn sync_games_with_stores(app: &tauri::AppHandle) {
     let mut cfg = config::load(app);
     let installed = stores::installed();
     // Локальная копия, без сети: setup() выполняется до появления окна,
-    // и сетевой запрос отсюда заставил бы окно ждать сеть (спека §3.4).
+    // и сетевой запрос отсюда заставил бы окно ждать сеть.
     let hub_games = hub::load_local(app).games;
 
     if catalog::enrich_from_stores(&mut cfg.games, &installed, &hub_games) {
@@ -58,8 +58,7 @@ fn sync_games_with_stores(app: &tauri::AppHandle) {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let identity = instance::current_identity();
-    // Второй запуск передаёт просьбу показать окно первому и закрывается
-    // (спека этапа 7 §4.3).
+    // Второй запуск передаёт просьбу показать окно первому и закрывается.
     let listener = match instance::claim(instance::PORT, &identity) {
         instance::Start::Handed => return,
         instance::Start::First(listener) => Some(listener),
@@ -87,10 +86,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        // Видимость окна решает код приложения (старт в трей при автозапуске,
-        // спека этапа 7 §4.2), плагин хранит только размер и положение: сам
-        // восстановленный «развёрнуто» на скрытом автозапуском окне на миг
-        // показал бы и активировал его при входе в систему.
+        // Видимость окна решает код приложения (старт в трей при автозапуске),
+        // плагин хранит только размер и положение: сам восстановленный
+        // «развёрнуто» на скрытом автозапуском окне на миг показал бы и
+        // активировал его при входе в систему.
         .plugin(
             tauri_plugin_window_state::Builder::default()
                 .with_state_flags(StateFlags::SIZE | StateFlags::POSITION)
@@ -150,7 +149,7 @@ pub fn run() {
             // Окно создаётся скрытым (tauri.conf.json). Показать его, если это
             // не автозапуск, если трея нет, или если во время старта уже
             // пришла просьба показать окно — иначе приложение было бы нечем
-            // вернуть (спека этапа 7 §4.2, §4.3).
+            // вернуть.
             if !autostarted || !tray_ok || pending {
                 tray::restore(&handle);
             }

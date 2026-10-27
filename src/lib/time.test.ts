@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { timeLeft, timeAgo, burnsToday, progress, hubFreshness } from "./time";
+import { timeLeft, timeAgo, burnsToday, progress, hubFreshness, codeShareLeft, bannerShareLeft, clockArc, CLOCK_MIN_ARC } from "./time";
 
 const HOUR = 3600;
 const DAY = 86400;
@@ -88,5 +88,54 @@ describe("progress", () => {
   });
   it("нулевая длительность не даёт деления на ноль", () => {
     expect(progress(NOW, NOW, NOW)).toBe(1);
+  });
+});
+
+describe("codeShareLeft — кольцо часиков у кода", () => {
+  it("неделя и больше до сгорания — полное кольцо", () => {
+    expect(codeShareLeft(NOW + 7 * DAY, NOW)).toBe(1);
+    expect(codeShareLeft(NOW + 30 * DAY, NOW)).toBe(1);
+  });
+  it("дальше кольцо убывает линейно", () => {
+    expect(codeShareLeft(NOW + 3.5 * DAY, NOW)).toBeCloseTo(0.5, 6);
+    expect(codeShareLeft(NOW + 2 * DAY, NOW)).toBeCloseTo(2 / 7, 6);
+    expect(codeShareLeft(NOW + 12 * HOUR, NOW)).toBeCloseTo(1 / 14, 6);
+  });
+  it("сгоревший код — пустое кольцо, а не отрицательное", () => {
+    expect(codeShareLeft(NOW, NOW)).toBe(0);
+    expect(codeShareLeft(NOW - DAY, NOW)).toBe(0);
+  });
+});
+
+describe("bannerShareLeft — кольцо часиков у баннера", () => {
+  it("доля оставшегося от всего срока баннера", () => {
+    expect(bannerShareLeft(NOW - 5 * DAY, NOW + 5 * DAY, NOW)).toBeCloseTo(0.5, 6);
+    expect(bannerShareLeft(NOW - 12 * DAY, NOW + 6 * DAY, NOW)).toBeCloseTo(1 / 3, 6);
+  });
+  it("только начался — полное кольцо; ещё не начался — тоже не больше полного", () => {
+    expect(bannerShareLeft(NOW, NOW + 10 * DAY, NOW)).toBe(1);
+    expect(bannerShareLeft(NOW + DAY, NOW + 10 * DAY, NOW)).toBe(1);
+  });
+  it("кончился — пустое кольцо", () => {
+    expect(bannerShareLeft(NOW - 10 * DAY, NOW, NOW)).toBe(0);
+    expect(bannerShareLeft(NOW - 10 * DAY, NOW - DAY, NOW)).toBe(0);
+  });
+  it("нулевой или обратный срок — пустое кольцо, без деления на ноль", () => {
+    expect(bannerShareLeft(NOW + DAY, NOW + DAY, NOW)).toBe(0);
+    expect(bannerShareLeft(NOW + 2 * DAY, NOW + DAY, NOW)).toBe(0);
+  });
+});
+
+describe("clockArc — дуга, которую рисуют часики", () => {
+  it("почти истёкший срок всё равно виден краешком дуги", () => {
+    expect(CLOCK_MIN_ARC).toBeGreaterThan(0);
+    expect(CLOCK_MIN_ARC).toBeLessThanOrEqual(0.06);
+    expect(clockArc(0)).toBe(CLOCK_MIN_ARC);
+    expect(clockArc(0.001)).toBe(CLOCK_MIN_ARC);
+  });
+  it("остальные доли рисуются как есть и не выходят за полное кольцо", () => {
+    expect(clockArc(0.5)).toBe(0.5);
+    expect(clockArc(1)).toBe(1);
+    expect(clockArc(1.5)).toBe(1);
   });
 });

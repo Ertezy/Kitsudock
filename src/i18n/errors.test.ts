@@ -14,8 +14,9 @@ describe("текст ошибки", () => {
   });
 
   it("незнакомый код — общая фраза с подробностью", () => {
-    expect(errorText(en, { code: "somethingNew", detail: "x" })).toBe("Something went wrong: x");
-    expect(errorText(en, { code: "somethingNew" })).toBe("Something went wrong");
+    expect(errorText(en, { code: "somethingNew", detail: "x" })).toBe("Unknown error: x");
+    expect(errorText(en, { code: "somethingNew" })).toBe("Unknown error");
+    expect(errorText(ru, { code: "somethingNew", detail: "x" })).toBe("Неизвестная ошибка: x");
   });
 
   it("обычная ошибка JavaScript и строка", () => {
@@ -33,38 +34,53 @@ describe("текст ошибки", () => {
     ];
     for (const code of codes) {
       const english = errorText(en, { code, detail: "d" });
-      if (code === "internal") expect(english).toBe("Something went wrong: d");
-      else expect(english).not.toBe("Something went wrong: d");
+      if (code === "internal") expect(english).toBe("Internal error: d");
+      expect(english).not.toBe("Unknown error: d");
       const russian = errorText(ru, { code, detail: "d" });
-      if (code === "internal") expect(russian).toBe("Что-то пошло не так: d");
-      else expect(russian).not.toBe("Что-то пошло не так: d");
+      if (code === "internal") expect(russian).toBe("Внутренняя ошибка: d");
+      expect(russian).not.toBe("Неизвестная ошибка: d");
     }
   });
 
-  it("русский — прежние тексты Rust дословно, с подробностью на месте переменной части", () => {
+  it("каждая фраза — отдельное предложение с заглавной буквы: она стоит одна в плашке ошибки", () => {
+    for (const dict of [en, ru]) {
+      for (const [code, phrase] of Object.entries(dict.errors)) {
+        const texts = typeof phrase === "function" ? [phrase(), phrase("d")] : [phrase];
+        for (const text of texts) {
+          expect(text.charAt(0), `${code}: ${text}`).toBe(text.charAt(0).toUpperCase());
+          expect(text, `${code}: ${text}`).not.toMatch(/!|Что-то пошло не так|Something went wrong|Упс|Oops/i);
+        }
+      }
+    }
+  });
+
+  it("русский — подробность на месте переменной части", () => {
     const ruText = (code: string, detail?: string) => errorText(ru, { code, detail });
-    expect(ruText("gameNotFound", "Genshin Impact")).toBe("игра больше не найдена: Genshin Impact");
-    expect(ruText("gameNotFound")).toBe("игра не найдена или правка невозможна");
-    expect(ruText("fileMissing", "C:\\g.exe")).toBe("файл не найден: C:\\g.exe");
-    expect(ruText("exePathMissing")).toBe("путь к игре не задан");
-    expect(ruText("argsUnclosedQuote", '-name "x')).toBe('не удалось разобрать аргументы «-name "x»: незакрытая кавычка.');
-    expect(ruText("exeStartFailed", "C:\\g.exe: отказано")).toBe("не удалось запустить C:\\g.exe: отказано");
+    expect(ruText("gameNotFound", "Genshin Impact")).toBe("Игра не найдена: Genshin Impact");
+    // Без подробности — и «Найти заново» без находки, и отказ правки: игра
+    // при этом может быть в доке, поэтому текст не говорит, что её нет в списке.
+    expect(ruText("gameNotFound")).toBe("Игра не найдена");
+    expect(ruText("fileMissing", "C:\\g.exe")).toBe("Файл не найден: C:\\g.exe");
+    expect(ruText("exePathMissing")).toBe("Путь к игре не указан. Укажите файл игры вручную.");
+    expect(ruText("argsUnclosedQuote", '-name "x')).toBe('Не удалось разобрать аргументы запуска «-name "x»: закройте кавычку.');
+    expect(ruText("exeStartFailed", "C:\\g.exe: отказано")).toBe("Не удалось запустить C:\\g.exe: отказано");
     expect(ruText("steamOpenFailed", "steam://rungameid/1: нет")).toBe(
-      "не удалось открыть steam://rungameid/1: нет. Проверь, что Steam установлен и хотя бы раз запускался.",
+      "Не удалось открыть steam://rungameid/1: нет. Проверьте, что Steam установлен и хотя бы раз запускался.",
     );
     expect(ruText("epicOpenFailed", "нет")).toBe(
-      "не удалось открыть Epic Games Launcher: нет. Проверь, что он установлен.",
+      "Не удалось открыть Epic Games Launcher: нет. Проверьте, что он установлен.",
     );
-    expect(ruText("emptyTitle")).toBe("название не может быть пустым");
-    expect(ruText("hubUrlNotHttps")).toBe("адрес должен начинаться с https://");
-    expect(ruText("videoPickFailed", "x")).toBe("Окну не открыть видео: x");
+    expect(ruText("emptyTitle")).toBe("Название не может быть пустым");
+    expect(ruText("hubUrlNotHttps")).toBe("Адрес должен начинаться с https://");
+    expect(ruText("videoPickFailed", "x")).toBe("Не удалось открыть видео: x");
     expect(ruText("videoWrongFormat")).toBe("Видео должно быть в формате mp4 или webm.");
     expect(ruText("videoFileMissing")).toBe("Файл видео не найден.");
     expect(ruText("videoTooLarge", "300")).toBe("Видео тяжелее 300 МБ — выберите файл поменьше.");
-    expect(ruText("cacheReadFailed", "x")).toBe("не читается кеш: x");
-    expect(ruText("logFolderMissing", "x")).toBe("не найдена папка журнала: x");
-    expect(ruText("openFolderFailed", "x")).toBe("не удалось открыть папку: x");
-    expect(ruText("configSaveFailed", "запись C:\\config.json.tmp: x")).toBe("запись C:\\config.json.tmp: x");
+    expect(ruText("cacheReadFailed", "x")).toBe("Не удалось прочитать кеш: x");
+    expect(ruText("logFolderMissing", "x")).toBe("Папка журнала не найдена: x");
+    expect(ruText("openFolderFailed", "x")).toBe("Не удалось открыть папку: x");
+    expect(ruText("configSaveFailed", "запись C:\\config.json.tmp: x")).toBe("Не удалось сохранить настройки: запись C:\\config.json.tmp: x");
+    expect(ruText("configSaveFailed")).toBe("Не удалось сохранить настройки");
   });
 
   it("английский — подробность на месте", () => {

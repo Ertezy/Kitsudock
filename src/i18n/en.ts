@@ -1,6 +1,6 @@
-// Английский словарь — основной (спека этапа 6 §4.1). Русский обязан повторять
-// его форму: иначе проект не соберётся. Термины — по глоссарию спеки §4.5.
-// Разделы добавляют задачи перевода: panel, main, settings, errors.
+// Английский словарь — основной. Русский обязан повторять его форму: иначе
+// проект не соберётся. Термины во всех разделах одни и те же.
+// Разделы: panel, main, settings, errors.
 
 import { plural } from "./format";
 
@@ -18,8 +18,21 @@ export const en = {
     dataFrom: (date: string) => `data from ${date}`,
   },
   panel: {
-    noDataYet: "Codes, banners and videos will appear once the data service is up.",
-    panelEmpty: "No codes, banners or videos yet. They will appear once the data service is up.",
+    noDataYet: "No fresh data yet. Refresh to check again.",
+    // Пустая панель (`EmptyState`): заголовок — что случилось, подсказка — что
+    // делать; причины — `lib/panel.ts`, `emptyReason`.
+    panelEmpty: "No codes, banners or videos yet",
+    emptyQuietHint: "New ones will show up here on their own once they're out.",
+    emptyStaleHint: "The data is over a week old, so codes and banners are hidden. They'll be back after the next update.",
+    unlinkedTitle: "No data for this game",
+    unlinkedHint: "You can link the game to data in its settings: \"Codes, banners and videos of\".",
+    uncollectedHint: "The game isn't linked to any data. If data is collected for it, link it in the game's settings.",
+    listFailedTitle: "The game list didn't load",
+    // Крестик по умолчанию прячет окно в трей и список не перечитывает, а
+    // возврат из настроек перечитывает (`closeSettings` → `load` в App.tsx).
+    listFailedHint: "Open Settings and come back to load the list again.",
+    noGamesTitle: "No games yet",
+    noGamesHint: "Add them in Settings: the gear at the bottom of this panel.",
     sources: { remote: "online", override: "local override", cache: "from cache", bundled: "bundled" },
     unknownSource: "unknown",
     dataStatus: (source: string, freshness: string) => `Source: ${source}, ${freshness}.`,
@@ -33,6 +46,10 @@ export const en = {
     timeRemaining: (t: string) => `${t} left`,
     regionOnly: (region: string) => `${region} only`,
     copyCode: "Copy code",
+    codeCopied: (code: string) => `Code ${code} copied`,
+    // Буфер обмена не принял код: строка на карточке коротко, диктору — полностью.
+    copyFailed: "Couldn't copy",
+    codeCopyFailed: (code: string) => `Couldn't copy code ${code}. Try again.`,
     redeem: "Redeem on the website",
     banners: "Banners",
     previousBanner: "Previous banner",
@@ -42,7 +59,7 @@ export const en = {
     videos: "Videos",
     premiere: "premiere",
   },
-  // Главный экран, док игр и общие обёртки страницы (спека этапа 6, Task 5).
+  // Главный экран, док игр и общие обёртки страницы.
   main: {
     launch: {
       note: { steam: "Launches via Steam", epic: "Launches via Epic Games", exe: "Launches directly" },
@@ -60,8 +77,9 @@ export const en = {
     launching: "Launching…",
     gameFileMissing: "Game file not found",
     dockFileMissing: (title: string) => `${title} — game file not found`,
-    noGameSelected: "No game selected",
-    loadFailed: (detail: string) => `Failed to load: ${detail}`,
+    noGameSelected: "No game selected — add a game in Settings.",
+    // Подробность — сама фраза ошибки, с заглавной буквы: отдельным предложением.
+    loadFailed: (detail: string) => `The game list didn't load. ${detail}`,
     relocate: "Find again",
     pickManually: "Specify manually",
     background: {
@@ -75,17 +93,17 @@ export const en = {
       image: "Image",
       video: "Video",
     },
-    refuseNonHttps: (url: string) => `refusing to open a non-https link: ${url}`,
+    refuseNonHttps: (url: string) => `This link isn't https, so it won't open: ${url}`,
   },
-  // Ошибки из Rust: код → фраза, подробность подставляется (спека §6.2,
-  // src/i18n/errors.ts). Имена полей — коды из src-tauri/src/error.rs.
+  // Ошибки из Rust: код → фраза, подробность подставляется
+  // (src/i18n/errors.ts). Имена полей — коды из src-tauri/src/error.rs.
   errors: {
-    unknown: "Something went wrong",
-    internal: (d?: string) => (d ? `Something went wrong: ${d}` : "Something went wrong"),
+    unknown: "Unknown error",
+    internal: (d?: string) => (d ? `Internal error: ${d}` : "Internal error"),
     gameNotFound: (d?: string) => (d ? `Game not found: ${d}` : "Game not found"),
     fileMissing: (d?: string) => (d ? `File not found: ${d}` : "File not found"),
-    exePathMissing: (_d?: string) => "The path to the game is not set",
-    argsUnclosedQuote: (d?: string) => `Can't read the launch arguments${d ? ` "${d}"` : ""}: a quote is not closed.`,
+    exePathMissing: (_d?: string) => "The game's path isn't set. Specify the game file manually.",
+    argsUnclosedQuote: (d?: string) => `Can't read the launch arguments${d ? ` "${d}"` : ""}: close the open quote.`,
     exeStartFailed: (d?: string) => (d ? `Couldn't start the game: ${d}` : "Couldn't start the game"),
     steamOpenFailed: (d?: string) => `Couldn't open Steam${d ? ` (${d})` : ""}. Check that Steam is installed and has been launched at least once.`,
     epicOpenFailed: (d?: string) => `Couldn't open the Epic Games Launcher${d ? ` (${d})` : ""}. Check that it is installed.`,
@@ -96,21 +114,21 @@ export const en = {
     videoFileMissing: (_d?: string) => "Video file not found.",
     videoTooLarge: (d?: string) =>
       d ? `The video is larger than ${d} MB — pick a smaller file.` : "The video is too large — pick a smaller file.",
-    cacheReadFailed: (d?: string) => (d ? `Can't read the cache: ${d}` : "Can't read the cache"),
-    logFolderMissing: (d?: string) => (d ? `The log folder was not found: ${d}` : "The log folder was not found"),
+    cacheReadFailed: (d?: string) => (d ? `Couldn't read the cache: ${d}` : "Couldn't read the cache"),
+    logFolderMissing: (d?: string) => (d ? `Couldn't find the log folder: ${d}` : "Couldn't find the log folder"),
     openFolderFailed: (d?: string) => (d ? `Couldn't open the folder: ${d}` : "Couldn't open the folder"),
     configSaveFailed: (d?: string) => (d ? `Couldn't save the settings: ${d}` : "Couldn't save the settings"),
     autostartFailed: (d?: string) => (d ? `Couldn't change autostart: ${d}` : "Couldn't change autostart"),
   },
   // Экран на месте окна, если отрисовка упала (src/components/ErrorBoundary.tsx).
   crash: {
-    title: "Something went wrong",
-    hint: "The window couldn't be displayed. Reloading usually fixes it. Your games and settings are not affected.",
+    title: "Couldn't show the window",
+    hint: "Reload it — that usually fixes it. Your games and settings are fine; details are in the log.",
     reload: "Reload",
   },
-  // Экран настроек и первый запуск (спека этапа 6, Task 6). Термины — по
-  // глоссарию §4.5; повторяющиеся надписи (вкладки, «Дополнительно»,
-  // «Сохранить», «Найти заново») используются из одного поля в нескольких местах.
+  // Экран настроек и первый запуск. Термины — те же, что везде; повторяющиеся
+  // надписи (вкладки, «Дополнительно», «Сохранить», «Найти заново»)
+  // используются из одного поля в нескольких местах.
   settings: {
     tabs: { games: "Games", look: "Appearance", behaviour: "Behavior", data: "Data", about: "About" },
     back: "← Back",
@@ -125,6 +143,12 @@ export const en = {
       alreadyAdded: "already added",
       addChecked: "Add checked",
       skip: "Skip",
+      // Поиск ещё идёт, и поиск ничего не нашёл.
+      scanning: "Looking for installed games…",
+      nothingTitle: "No installed games found",
+      nothingHint: "You can add a game manually in Settings, on the Games tab.",
+      continue: "Continue",
+      scanFailedTitle: "Couldn't check the installed games",
     },
     games: {
       hint: "The order in the list is the order in the dock at the bottom of the main screen. Drag a row to change it.",
@@ -132,6 +156,8 @@ export const en = {
       scanInstalled: "Find installed games",
       defaultTitle: "Game",
       fileMissing: "file missing",
+      emptyTitle: "No games yet",
+      emptyHint: "Add a game manually or find the installed ones with the buttons below.",
     },
     editor: {
       name: "Name",
@@ -158,7 +184,8 @@ export const en = {
       storeArtHint: "For Genshin Impact, Honkai: Star Rail and Zenless Zone Zero the current background of the official HoYoPlay launcher is used (a video when animation is on); for other games from Steam and Epic Games, the store's artwork. A custom image or video always takes priority.",
       animation: "Animation",
       animationHint: "Background video, slow image movement, dock icon zoom and the gear spinning. The Windows setting doesn't affect the app.",
-      noGames: "No games yet — add them in the Games section.",
+      noGames: "No games yet",
+      noGamesHint: "Add them on the Games tab, and their backgrounds will show up here.",
       pickImage: "Image…",
       pickVideo: "Video…",
       removeBackground: "Remove",

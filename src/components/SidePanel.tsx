@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PromoCodes from "./panel/PromoCodes";
 import Banners from "./panel/Banners";
 import Videos from "./panel/Videos";
-import { codesFor, panelIsEmpty, sourceLabel, videosFor } from "../lib/panel";
+import Skeleton from "./panel/Skeleton";
+import EmptyState from "./EmptyState";
+import { codesFor, emptyArt, emptyReason, linkable, panelIsEmpty, sourceLabel, videosFor } from "../lib/panel";
+import { entryEnded, hubChanged, isEntryAnimation, panelMounted, skeletonShown } from "../lib/panelEntry";
 import { hubFreshness } from "../lib/time";
 import { api } from "../lib/api";
 import { availableUpdate } from "../lib/update";
@@ -14,6 +17,12 @@ interface Props {
   hub: HubData | null;
   /** Игра, выбранная в доке. Коды, баннеры и видео — только по ней. */
   selectedContentId: string | null;
+  /** Название выбранной игры; null — игр нет вовсе. Нужно пустой панели:
+   *  сказать, что игр нет, или что для этой игры данных нет. */
+  selectedTitle: string | null;
+  /** Список игр не загрузился (над артом при этом баннер ошибки). Пустая
+   *  панель тогда не говорит «игр нет»: игры есть, их просто не прочитали. */
+  gamesFailed: boolean;
   /** Открыть экран настроек — вызывается по клику на шестерёнку. */
   onOpenSettings: () => void;
   /** Версия работающего приложения; null — ещё не узнали. */
@@ -25,7 +34,7 @@ const DAY = 86400;
 /** Как часто пересчитывается «сейчас». */
 const TICK_MS = 30_000;
 
-export default function SidePanel({ hub, selectedContentId, onOpenSettings, appVersion }: Props) {
+export default function SidePanel({ hub, selectedContentId, selectedTitle, gamesFailed, onOpenSettings, appVersion }: Props) {
   const lang = useLang();
   const t = useT();
   const videoLang = useVideoLanguage();
@@ -46,11 +55,44 @@ export default function SidePanel({ hub, selectedContentId, onOpenSettings, appV
     return () => window.clearInterval(id);
   }, []);
 
+  // Вход разделов (`lib/panelEntry.ts`): лесенкой — при появлении панели и
+  // когда данные пришли впервые, но не от каждого их обновления. Пришли
+  // данные — состояние поправляется прямо в отрисовке, а не эффектом: разделы
+  // должны появиться в разметке уже с отметкой входа, а не кадром позже.
+  const loaded = hub !== null;
+  const [entry, setEntry] = useState(() => panelMounted(loaded));
+  const nextEntry = hubChanged(entry, loaded);
+  if (nextEntry !== entry) setEntry(nextEntry);
+
+  // Вход кончается, когда доиграли его анимации: снятая раньше отметка
+  // оборвала бы их на середине, оставленная — подняла бы раздел, появившийся
+  // потом при смене игры. Длительность здесь не пишется — её знают только
+  // стили (переменные движения), поэтому ждём сами анимации. Без них (тумблер
+  // «Анимация» выключен) вход кончается сразу. Смена игры посреди входа
+  // собирает их заново: у новой игры могли появиться свои разделы.
+  const panelRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (entry.kind === null || !panel) return;
+    const run = entry.run;
+    let alive = true;
+    const running = panel
+      .getAnimations({ subtree: true })
+      .filter((a) => a instanceof CSSAnimation && isEntryAnimation(a.animationName));
+    // Прерванная анимация (тумблер выключили посреди входа) тоже конец.
+    void Promise.allSettled(running.map((a) => a.finished)).then(() => {
+      if (alive) setEntry((e) => entryEnded(e, run));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [entry.kind, entry.run, selectedContentId]);
+
   const age = hub ? nowSec - hub.updatedAt : 0;
 
   // Старше недели — коды и баннеры прячутся целиком. Код, который наверняка
   // сгорел, и баннер, который наверняка кончился, хуже, чем их отсутствие:
-  // таймер на протухших данных — это враньё в лицо (спека §6).
+  // таймер на протухших данных — это враньё в лицо.
   const tooOld = hub !== null && age > 7 * DAY;
 
   const selected = (gameId: string) => gameId === selectedContentId;
@@ -64,23 +106,42 @@ export default function SidePanel({ hub, selectedContentId, onOpenSettings, appV
   // тихая пауза до первого ответа, а не сообщение «кодов нет», которое
   // тут же сменится настоящими данными и будет выглядеть как ложная тревога.
   const empty = hub !== null && panelIsEmpty(codes, banners, videos, nowSec);
+  // Пустая панель говорит, почему пуста и что с этим сделать.
+  const reason = emptyReason({
+    hasGame: selectedTitle !== null,
+    contentId: selectedContentId,
+    linkable: linkable(hub, selectedTitle),
+    tooOld,
+    listFailed: gamesFailed,
+  });
+  const EMPTY = {
+    listFailed: [t.panel.listFailedTitle, t.panel.listFailedHint],
+    noGames: [t.panel.noGamesTitle, t.panel.noGamesHint],
+    unlinked: [t.panel.unlinkedTitle, t.panel.unlinkedHint],
+    uncollected: [t.panel.unlinkedTitle, t.panel.uncollectedHint],
+    stale: [t.panel.panelEmpty, t.panel.emptyStaleHint],
+    quiet: [t.panel.panelEmpty, t.panel.emptyQuietHint],
+  } as const;
+  const [emptyTitle, emptyHint] = EMPTY[reason];
 
-  // Источник данных виден в интерфейсе — требование общей спеки §9.4.
+  // Источник данных обязан быть виден в интерфейсе.
   // Без него невозможно отличить «сеть отвалилась, показываю прошлогодний
   // комплект» от «всё свежее», а это первое, что спросят при разборе жалобы.
   const origin = sourceLabel(hub?._source, t);
-  // Вышла версия новее этой — строка внизу панели (спека 2026-10-01 §2.2).
+  // Вышла версия новее этой — строка внизу панели.
   const update = availableUpdate(hub, appVersion);
 
   return (
-    <aside className="panel">
+    <aside className="panel" ref={panelRef} data-entry={entry.kind ?? undefined}>
       {/* Секции прокручиваются внутри себя, шестерёнка остаётся прибитой
-          к низу (спека §2.4). */}
-      <div className="panel-scroll">
+          к низу. Пока данных нет, на месте секций стоят
+          заглушки, а область помечена занятой. */}
+      <div className="panel-scroll" aria-busy={!loaded}>
+        {skeletonShown(loaded, selectedContentId) && <Skeleton />}
         {hub && <PromoCodes codes={codes} games={hub.games} nowSec={nowSec} />}
         <Banners banners={banners} nowSec={nowSec} />
         <Videos videos={videos} nowSec={nowSec} />
-        {empty && <p className="panel-empty">{t.panel.panelEmpty}</p>}
+        {empty && <EmptyState className="panel-empty" title={emptyTitle} hint={emptyHint} art={emptyArt(reason)} />}
       </div>
 
       <div className="panel-foot">

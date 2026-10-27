@@ -11,11 +11,14 @@ import { errorText } from "../../i18n/errors";
 import { LANGS, LANG_NAMES, LANGUAGE_BLOCK_TITLE, VIDEO_LANGS, VIDEO_LANG_NAMES } from "../../i18n/native";
 import Switch from "./Switch";
 import Segmented from "./Segmented";
+import EmptyState from "../../components/EmptyState";
 import type { GameView } from "../../types";
 
-/** Вкладка «Вид»: всё про фоны в одном месте (спека этапа 5, §7.3). */
+/** Вкладка «Вид»: всё про фоны в одном месте. */
 export default function LookSection() {
   const [games, setGames] = useState<GameView[]>([]);
+  // Как во вкладке «Игры»: пустое место — только когда список прочитан и пуст.
+  const [loaded, setLoaded] = useState(false);
   const [storeArt, setStoreArt] = useState<boolean | null>(null);
   const [animation, setAnimation] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,6 +69,7 @@ export default function LookSection() {
         api.getAnimation(),
       ]);
       setGames(list);
+      setLoaded(true);
       setStoreArt(storeArtEnabled);
       setAnimation(animationEnabled);
       setError("");
@@ -206,8 +210,8 @@ export default function LookSection() {
         </div>
       </div>
 
-      {games.length === 0 ? (
-        <p className="settings-note">{t.settings.look.noGames}</p>
+      {!loaded ? null : games.length === 0 ? (
+        <EmptyState className="settings-empty" title={t.settings.look.noGames} hint={t.settings.look.noGamesHint} />
       ) : (
         <div className="settings-card">
           {games.map((g) => (
@@ -257,8 +261,8 @@ export default function LookSection() {
 
 /**
  * Превью фона. Своё видео — неподвижным первым кадром, а не проигрыванием: пять
- * роликов сразу на одном экране грузили бы компьютер (спека §7.3). У официального
- * фона HoYoPlay берётся его картинка: первый кадр ролика часто чёрный.
+ * роликов сразу на одном экране грузили бы компьютер. У официального фона
+ * HoYoPlay берётся его картинка: первый кадр ролика часто чёрный.
  */
 function Preview({ game }: { game: GameView }) {
   if (game.videoPath && !(game.artSource === "hoyoplay" && game.artPath)) {

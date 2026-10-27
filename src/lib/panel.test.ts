@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { activeCodes, bannerKeys, codesFor, dataStatus, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
+import { activeCodes, bannerHasClock, bannerKeys, codeHasClock, codesFor, dataStatus, emptyArt, emptyReason, linkable, MAX_SHOWN_BANNERS, panelIsEmpty, plainSpaces, runningBanners, shownBanners, videosFor } from "./panel";
+import { burnsToday } from "./time";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
 import type { Banner, Code, HubData, Video } from "../types";
@@ -60,6 +61,56 @@ describe("runningBanners", () => {
   });
 });
 
+const HOUR = 3600;
+const DAY = 86400;
+
+describe("codeHasClock — где у кода нет часиков срока", () => {
+  it("у бессрочного кода часиков нет", () => {
+    expect(codeHasClock(code(null), NOW, false)).toBe(false);
+  });
+  it("у сгоревшего кода часиков нет, и у сгорающего ровно сейчас тоже", () => {
+    expect(codeHasClock(code(NOW - HOUR), NOW, false)).toBe(false);
+    expect(codeHasClock(code(NOW), NOW, false)).toBe(false);
+  });
+  it("у кода с идущим сроком часики есть", () => {
+    expect(codeHasClock(code(NOW + 2 * DAY), NOW, false)).toBe(true);
+    expect(codeHasClock(code(NOW + 30 * DAY), NOW, false)).toBe(true);
+  });
+  it("в последние сутки часики остаются — горячими", () => {
+    expect(burnsToday(NOW + 3 * HOUR, NOW)).toBe(true);
+    expect(codeHasClock(code(NOW + 3 * HOUR), NOW, false)).toBe(true);
+    expect(codeHasClock(code(NOW + 1), NOW, false)).toBe(true);
+  });
+  it("пока строка срока говорит, что код не скопировался, часиков нет", () => {
+    expect(codeHasClock(code(NOW + 2 * DAY), NOW, true)).toBe(false);
+    expect(codeHasClock(code(NOW + 3 * HOUR), NOW, true)).toBe(false);
+    expect(codeHasClock(code(null), NOW, true)).toBe(false);
+  });
+});
+
+describe("bannerHasClock — где у баннера нет часиков срока", () => {
+  it("у будущего баннера («Скоро») часиков нет", () => {
+    expect(bannerHasClock(banner(NOW + DAY, NOW + 10 * DAY), NOW)).toBe(false);
+    expect(bannerHasClock(banner(NOW + 1, NOW + 10 * DAY), NOW)).toBe(false);
+  });
+  it("у кончившегося баннера часиков нет, и у кончающегося ровно сейчас тоже", () => {
+    expect(bannerHasClock(banner(NOW - 10 * DAY, NOW - DAY), NOW)).toBe(false);
+    expect(bannerHasClock(banner(NOW - 10 * DAY, NOW), NOW)).toBe(false);
+  });
+  it("у идущего баннера часики есть, и у только что начавшегося тоже", () => {
+    expect(bannerHasClock(banner(NOW - 5 * DAY, NOW + 5 * DAY), NOW)).toBe(true);
+    expect(bannerHasClock(banner(NOW, NOW + 5 * DAY), NOW)).toBe(true);
+  });
+  it("в последние сутки часики остаются — горячими", () => {
+    expect(burnsToday(NOW + 3 * HOUR, NOW)).toBe(true);
+    expect(bannerHasClock(banner(NOW - 5 * DAY, NOW + 3 * HOUR), NOW)).toBe(true);
+  });
+  it("у баннера с нулевым или обратным сроком часиков нет", () => {
+    expect(bannerHasClock(banner(NOW, NOW), NOW)).toBe(false);
+    expect(bannerHasClock(banner(NOW + DAY, NOW - DAY), NOW)).toBe(false);
+  });
+});
+
 describe("panelIsEmpty", () => {
   it("пусто, когда коды сгорели, баннеры кончились и видео нет", () => {
     expect(panelIsEmpty([code(NOW - 1)], [banner(NOW - 10, NOW)], [], NOW)).toBe(true);
@@ -72,22 +123,95 @@ describe("panelIsEmpty", () => {
   });
 });
 
+describe("emptyReason", () => {
+  const base = { hasGame: true, contentId: "genshin", linkable: false, tooOld: false };
+
+  it("игр нет вовсе — так и говорится, что бы ни было с данными", () => {
+    expect(emptyReason({ ...base, hasGame: false, contentId: null })).toBe("noGames");
+    expect(emptyReason({ ...base, hasGame: false, contentId: null, linkable: true, tooOld: true })).toBe("noGames");
+  });
+  it("список игр не загрузился — игр не видно, но это не «игр нет»", () => {
+    expect(emptyReason({ ...base, hasGame: false, contentId: null, listFailed: true })).toBe("listFailed");
+    expect(emptyReason({ ...base, hasGame: false, contentId: null, linkable: true, tooOld: true, listFailed: true })).toBe("listFailed");
+  });
+  it("удачная перезагрузка снимает отметку провала, и причина снова настоящая", () => {
+    expect(emptyReason({ ...base, hasGame: false, contentId: null, listFailed: false })).toBe("noGames");
+    expect(emptyReason({ ...base, listFailed: false })).toBe("quiet");
+  });
+  it("провал перечитывания при уже показанных играх причину не меняет: игра выбрана", () => {
+    expect(emptyReason({ ...base, listFailed: true })).toBe("quiet");
+    expect(emptyReason({ ...base, contentId: null, listFailed: true })).toBe("uncollected");
+  });
+  it("игра не связана с данными, но данные под её названием есть — подсказка привязать", () => {
+    expect(emptyReason({ ...base, contentId: null, linkable: true })).toBe("unlinked");
+    expect(emptyReason({ ...base, contentId: null, linkable: true, tooOld: true })).toBe("unlinked");
+  });
+  it("игра не связана, и по названию данных не видно — общая подсказка, верная и для добавленной вручную", () => {
+    expect(emptyReason({ ...base, contentId: null })).toBe("uncollected");
+    expect(emptyReason({ ...base, contentId: null, tooOld: true })).toBe("uncollected");
+  });
+  it("данные старше недели — коды и баннеры спрятаны, причина в этом", () => {
+    expect(emptyReason({ ...base, tooOld: true })).toBe("stale");
+  });
+  it("данные свежие, просто сейчас ничего нет", () => {
+    expect(emptyReason(base)).toBe("quiet");
+  });
+});
+
+describe("emptyArt", () => {
+  it("отказ — без рисунка: сцена «пусто» сказала бы неправду", () => {
+    expect(emptyArt("listFailed")).toBe("none");
+  });
+  it("пустые места — карточка, которой пока нет", () => {
+    for (const reason of ["noGames", "unlinked", "uncollected", "stale", "quiet"] as const) expect(emptyArt(reason), reason).toBe("card");
+  });
+});
+
+describe("linkable", () => {
+  const hubWith = (games: { id: string; title: string }[], codeGames: string[] = [], videoGames: string[] = []): HubData => ({
+    ...hub("remote"),
+    games: games.map((g) => ({ ...g, redeemUrl: null })),
+    codes: codeGames.map((gameId) => ({ ...code(null), gameId })),
+    videos: videoGames.map((gameId) => ({ ...video, gameId })),
+  });
+
+  it("название совпадает с игрой из данных, у которой что-то есть, — как сопоставляет Rust: без регистра, пробелов и знаков", () => {
+    const h = hubWith([{ id: "endfield", title: "Arknights: Endfield" }], ["endfield"]);
+    expect(linkable(h, "arknights endfield")).toBe(true);
+    expect(linkable(h, "Arknights: Endfield")).toBe(true);
+  });
+  it("запись в данных есть, но по ней ничего не собрано — подсказки «привязать» нет", () => {
+    expect(linkable(hubWith([{ id: "endfield", title: "Arknights: Endfield" }]), "Arknights: Endfield")).toBe(false);
+  });
+  it("видео тоже считаются собранными данными", () => {
+    expect(linkable(hubWith([{ id: "endfield", title: "Arknights: Endfield" }], [], ["endfield"]), "Arknights: Endfield")).toBe(true);
+  });
+  it("незнакомое название, нет данных или нет игры — нет", () => {
+    const h = hubWith([{ id: "hsr", title: "Honkai: Star Rail" }], ["hsr"]);
+    expect(linkable(h, "Lantern Keeper Demo")).toBe(false);
+    expect(linkable(null, "Honkai: Star Rail")).toBe(false);
+    expect(linkable(h, null)).toBe(false);
+  });
+});
+
 describe("dataStatus", () => {
-  it("без данных говорит, что они появятся с сервисом", () => {
+  it("без данных говорит, что свежих данных нет и их можно проверить снова", () => {
     expect(dataStatus(null, NOW, "ru")).toBe(ru.panel.noDataYet);
   });
-  it("данные из комплекта — то же самое", () => {
-    expect(dataStatus(hub("bundled", [code(null)]), NOW, "ru")).toBe(ru.panel.noDataYet);
-  });
-  it("пустые данные из сети — то же самое", () => {
+  it("пустые данные из сети или из комплекта — то же самое", () => {
     expect(dataStatus(hub("remote"), NOW, "ru")).toBe(ru.panel.noDataYet);
+    expect(dataStatus(hub("bundled"), NOW, "ru")).toBe(ru.panel.noDataYet);
   });
   it("живые данные называют источник и свежесть", () => {
     expect(dataStatus(hub("remote", [code(null)]), NOW, "ru")).toBe("Источник — из сети, данные свежие.");
   });
+  it("данные из комплекта с содержимым — так же, как подвал панели: источник и свежесть", () => {
+    expect(dataStatus(hub("bundled", [code(null)]), NOW, "ru")).toBe("Источник — из комплекта, данные свежие.");
+  });
   it("то же по-английски", () => {
     expect(dataStatus(null, NOW, "en")).toBe(en.panel.noDataYet);
     expect(dataStatus(hub("remote", [code(null)]), NOW, "en")).toBe("Source: online, data is fresh.");
+    expect(dataStatus(hub("bundled", [code(null)]), NOW, "en")).toBe("Source: bundled, data is fresh.");
   });
 });
 

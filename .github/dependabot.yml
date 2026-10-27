@@ -11,7 +11,7 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
-    # ureq 3 — другой API; остаёмся на 2, пока он работает (решение владельца).
+    # ureq 3 — другой API; остаёмся на 2, пока он работает.
     ignore:
       - dependency-name: "ureq"
         update-types: ["version-update:semver-major"]

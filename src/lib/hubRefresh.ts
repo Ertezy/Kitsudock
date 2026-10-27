@@ -1,6 +1,6 @@
 import type { HubData } from "../types";
 
-/** Пока приложение открыто или лежит в трее, данные панели проверяются раз в 3 часа (спека сборщика §9). */
+/** Пока приложение открыто или лежит в трее, данные панели проверяются раз в 3 часа. */
 export const REFRESH_EVERY_MS = 3 * 60 * 60 * 1000;
 
 /** При возвращении окна данные проверяются, если с прошлой проверки прошёл час. */
@@ -11,8 +11,7 @@ export function shouldRefreshOnShow(lastCheckMs: number, nowMs: number): boolean
 }
 
 /** Сеть появилась — данные проверяются, если с прошлой проверки прошло больше
- *  минуты (спека этапа 7 §4.4): автозапуск мог стартовать раньше, чем
- *  подключился Wi-Fi. */
+ *  минуты: автозапуск мог стартовать раньше, чем подключился Wi-Fi. */
 export const ONLINE_REFRESH_AFTER_MS = 60 * 1000;
 
 export function shouldRefreshOnOnline(lastCheckMs: number, nowMs: number): boolean {
@@ -25,8 +24,8 @@ export function sameHub(a: HubData | null, b: HubData | null): boolean {
 }
 
 /** Отпечаток официальных фонов игр: сменился — список игр надо перечитать,
- *  чтобы Rust взял новые фоны (спека 2026-10-02 §3.1). Коды, баннеры и видео
- *  в отпечаток не входят. */
+ *  чтобы Rust взял новые фоны. Коды, баннеры и видео в отпечаток не
+ *  входят. */
 export function backgroundsKey(hub: HubData | null): string {
   return JSON.stringify((hub?.games ?? []).map((g) => [g.id, g.background ?? null]));
 }

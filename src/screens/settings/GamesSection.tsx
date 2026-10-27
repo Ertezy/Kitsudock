@@ -5,6 +5,7 @@ import { errorText } from "../../i18n/errors";
 import GameRow from "./GameRow";
 import GameEditor from "./GameEditor";
 import FirstRunView from "./FirstRunView";
+import EmptyState from "../../components/EmptyState";
 import type { GameView, HubGame } from "../../types";
 
 export default function GamesSection() {
@@ -12,6 +13,10 @@ export default function GamesSection() {
   const [hubGames, setHubGames] = useState<HubGame[]>([]);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [error, setError] = useState("");
+  // Список уже прочитан: до этого пустой массив значит «ещё не знаем», а не
+  // «игр нет», и пустое место не должно мелькнуть перед списком. Не прочитался —
+  // говорит ошибка, а не пустое место.
+  const [loaded, setLoaded] = useState(false);
   // Тот же экран с галочками, что и при первом запуске: список установленного
   // мог обновиться, а человеку — захотеться пересмотреть, что добавить.
   const [scanning, setScanning] = useState(false);
@@ -22,6 +27,7 @@ export default function GamesSection() {
   const reload = useCallback(async () => {
     try {
       setGames(await api.getGames());
+      setLoaded(true);
       setError("");
     } catch (e) {
       // `currentT()`, а не `t`: `reload` не должна меняться при смене языка,
@@ -29,6 +35,8 @@ export default function GamesSection() {
       setError(errorText(currentT(), e));
     }
   }, []);
+
+  const empty = loaded && games.length === 0;
 
   useEffect(() => {
     void reload();
@@ -78,9 +86,16 @@ export default function GamesSection() {
   return (
     <div>
       <h2 className="settings-section-title">{t.settings.tabs.games}</h2>
-      <p className="settings-hint">{t.settings.games.hint}</p>
+      {/* Подсказка про порядок нужна, только когда есть что упорядочивать;
+          пустой список вместо неё показывает, что сделать. До ответа нет ни
+          той, ни другого: подсказка не мелькает перед пустым местом. */}
+      {loaded && !empty && <p className="settings-hint">{t.settings.games.hint}</p>}
 
       {error && <div className="settings-error">{error}</div>}
+
+      {empty && (
+        <EmptyState className="settings-empty" title={t.settings.games.emptyTitle} hint={t.settings.games.emptyHint} />
+      )}
 
       {games.map((g, i) => (
         <GameRow

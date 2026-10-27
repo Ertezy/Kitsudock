@@ -162,7 +162,7 @@ fn needs_elevation(e: &std::io::Error) -> bool {
 /// ERROR_CANCELLED: в окне прав администратора нажали «Нет».
 const ERROR_CANCELLED: i32 = 1223;
 
-/// Отказ в окне прав — выбор человека, а не сбой запуска (спека 2026-10-01 §3).
+/// Отказ в окне прав — выбор человека, а не сбой запуска.
 fn is_cancelled(e: &std::io::Error) -> bool {
     e.raw_os_error() == Some(ERROR_CANCELLED)
 }
@@ -343,8 +343,7 @@ fn checked_epic_uri(
     }
 }
 
-/// Ошибка — код с подробностью: фразу на языке интерфейса собирает страница
-/// (спека этапа 6 §6.2).
+/// Ошибка — код с подробностью: фразу на языке интерфейса собирает страница.
 pub fn launch(app: &AppHandle, game: &Game) -> Result<(), AppError> {
     match &game.launch {
         Launch::Steam { appid } => {

@@ -10,9 +10,9 @@
 //! лаунчера по-прежнему ведут собственные потоки (`art.rs`, `launcher_art.rs`).
 //!
 //! Команда, ошибку которой страница показывает человеку, возвращает
-//! `AppError` — код и подробность; фразу на выбранном языке собирает страница
-//! (спека этапа 6 §6.2). Команды, чьи ошибки страница не показывает
-//! (`get_config_dir`, `get_hub`, `cache_image`), отдают текст, как раньше.
+//! `AppError` — код и подробность; фразу на выбранном языке собирает страница.
+//! Команды, чьи ошибки страница не показывает (`get_config_dir`, `get_hub`,
+//! `cache_image`), отдают текст, как раньше.
 
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -48,9 +48,9 @@ where
         .map_err(|e| format!("фоновая работа оборвалась: {e}"))?
 }
 
-/// Вид запуска кодом — слово на языке интерфейса подставляет страница
-/// (спека этапа 6 §6.3). Названия магазинов не переводятся, но и они живут
-/// в словаре страницы, рядом с остальным текстом подписи.
+/// Вид запуска кодом — слово на языке интерфейса подставляет страница.
+/// Названия магазинов не переводятся, но и они живут в словаре страницы,
+/// рядом с остальным текстом подписи.
 fn source_kind(launch: &Launch) -> &'static str {
     match launch {
         Launch::Steam { .. } => "steam",
@@ -87,12 +87,12 @@ pub struct GameView {
     pub icon_path: Option<String>,
     /// Путь к фоновой картинке. `None` — рисуется сгенерированная заливка.
     pub art_path: Option<String>,
-    /// Откуда взят фон, показанный первым (спека этапа 5, §2.1).
+    /// Откуда взят фон, показанный первым.
     pub art_source: crate::art::ArtSource,
     /// Видео фона: своё или официальное из HoYoPlay (смотри `art_source`).
     /// `None` — видео нет или файл пропал.
     pub video_path: Option<String>,
-    /// Своё видео задано, но файла нет на месте или это не mp4 и не webm (спека §6.1, §6.5).
+    /// Своё видео задано, но файла нет на месте или это не mp4 и не webm.
     pub video_missing: bool,
     /// Аргументы запуска. Действуют только при прямом запуске — Steam и Epic
     /// открывают ссылку магазина и передать их игре не могут (`launch.rs`).
@@ -138,13 +138,13 @@ pub fn view_of(app: &AppHandle, game: &Game, ctx: &crate::art::ArtContext) -> Ga
 #[tauri::command]
 pub async fn get_games(app: AppHandle) -> Vec<GameView> {
     let cfg = config::load(&app);
-    // Фоны официального лаунчера — из файла хаба, без сети (спека 2026-10-02 §3).
+    // Фоны официального лаунчера — из файла хаба, без сети.
     let hub = crate::hub::load_local(&app);
     let ctx = crate::art::ArtContext::build(cfg.store_art, &cfg.games, &hub.games);
     let views = cfg.games.iter().map(|g| view_of(&app, g, &ctx)).collect();
     // Докачка недостающих картинок Epic стартует отсюда: список игр строится
     // при запуске, после настроек и после каждой их правки, так что одна
-    // дорога покрывает все случаи (спека §3.3).
+    // дорога покрывает все случаи.
     crate::art::start_missing_downloads(&app, &cfg.games, &ctx);
     crate::launcher_art::start_downloads(&app, ctx.launcher_urls(&cfg.games));
     views
@@ -161,7 +161,7 @@ pub async fn get_config_dir(app: AppHandle) -> Result<String, String> {
 }
 
 /// Запуск игры и запоминание «последней» — общий путь для кнопки Play и
-/// меню трея (спека этапа 7 §5).
+/// меню трея.
 pub fn launch_and_remember(app: &AppHandle, game_id: &str) -> Result<(), AppError> {
     let mut cfg = config::load(app);
     let game = cfg
@@ -381,7 +381,7 @@ pub async fn update_game(
     }
     // Пустая строка стирает видео и проверке не подлежит. Непустая проходит
     // ту же проверку, что и перед выбором файла (`check_video`): страница не
-    // единственная защита (спека §12).
+    // единственная защита.
     if let Some(v) = &video {
         if !v.is_empty() {
             if let Some(problem) = crate::art::video_file_problem(std::path::Path::new(v)) {
@@ -497,7 +497,7 @@ pub async fn set_video_language(
     save_config(&app, &cfg)
 }
 
-/// Включён ли автозапуск — по реестру, а не по конфигу (спека этапа 7 §4.1).
+/// Включён ли автозапуск — по реестру, а не по конфигу.
 #[tauri::command]
 pub async fn get_autostart() -> bool {
     crate::autostart::read().is_some()
@@ -515,7 +515,7 @@ pub async fn set_autostart(enabled: bool) -> Result<(), AppError> {
 
 /// Проверяет выбранный файл видео и, если он годится, разрешает окну его
 /// прочитать — до записи в конфиг странице ещё нужно измерить размер кадра в
-/// точках, открыв файл детачнутым `<video>` (см. `LookSection.tsx`, §1.2).
+/// точках, открыв файл детачнутым `<video>` (см. `LookSection.tsx`).
 /// Разбор mp4 и webm на стороне Rust ради одних только размеров кадра
 /// пришлось бы писать вручную — своего парсера в зависимостях нет.
 #[tauri::command]

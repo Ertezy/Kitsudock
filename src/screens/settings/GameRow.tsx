@@ -22,9 +22,12 @@ export default function GameRow({
   children,
 }: Props) {
   const t = useT();
+  // `is-open` — для стилей: у развёрнутой строки подсветка под курсором только
+  // у шапки, а вся карточка при нажатии не вдавливается — она слишком большая.
+  const className = ["game-row", game.missing && "missing", expanded && "is-open"].filter(Boolean).join(" ");
   return (
     <div
-      className={game.missing ? "game-row missing" : "game-row"}
+      className={className}
       draggable
       onDragStart={onDragStart}
       onDragOver={(e) => {
@@ -37,6 +40,7 @@ export default function GameRow({
         className="game-row-head"
         role="button"
         tabIndex={0}
+        aria-expanded={expanded}
         onClick={onToggle}
         onKeyDown={(e) => {
           if (e.target !== e.currentTarget) return;

@@ -3,6 +3,7 @@ import { listen } from "@tauri-apps/api/event";
 import { api } from "./lib/api";
 import { launchNote } from "./lib/launch";
 import { setMotion } from "./lib/motion";
+import { watchWindowActivity } from "./lib/windowActive";
 import { REFRESH_EVERY_MS, backgroundsKey, sameHub, shouldRefreshOnShow, shouldRefreshOnOnline } from "./lib/hubRefresh";
 import SidePanel from "./components/SidePanel";
 import GameArt from "./components/GameArt";
@@ -22,10 +23,9 @@ export default function App() {
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Ошибка запуска из трея: держим отдельно от `error`, чтобы она показывалась
-  // у кнопки Play, а не общим баннером (спека этапа 7 §5). `id` растёт с
-  // каждым провалом — иначе повторный провал того же текста не отличался бы
-  // от предыдущего и PlayButton не показал бы его снова (правка финальной
-  // ревизии этапа 7).
+  // у кнопки Play, а не общим баннером. `id` растёт с каждым провалом — иначе
+  // повторный провал того же текста не отличался бы от предыдущего и
+  // PlayButton не показал бы его снова.
   const [trayFailure, setTrayFailure] = useState<{ gameId: string; text: string; id: number } | null>(null);
   const trayFailureId = useRef(0);
   // "loading" — пока не узнали, был ли уже первый запуск: не показывать
@@ -106,12 +106,12 @@ export default function App() {
     void refreshHub();
   }, [refreshHub]);
 
-  // Фоны Epic докачиваются после запуска (спека этапа 5, §3.3), и Rust сообщает
-  // об этом событием. Подписка регистрируется асинхронно, а Tauri не копит
-  // события для тех, кто подпишется позже: докачка, закончившаяся до
-  // регистрации, прошла бы мимо. Поэтому, как только подписка точно действует,
-  // список перечитывается один раз — картинка, успевшая скачаться, уже лежит в
-  // кеше. Всё, что докачается позже, придёт событием.
+  // Фоны Epic докачиваются после запуска, и Rust сообщает об этом событием.
+  // Подписка регистрируется асинхронно, а Tauri не копит события для тех, кто
+  // подпишется позже: докачка, закончившаяся до регистрации, прошла бы мимо.
+  // Поэтому, как только подписка точно действует, список перечитывается один
+  // раз — картинка, успевшая скачаться, уже лежит в кеше. Всё, что докачается
+  // позже, придёт событием.
   useEffect(() => {
     let active = true;
     const unlisten = listen("games-changed", () => void reloadGames());
@@ -125,7 +125,7 @@ export default function App() {
   }, [reloadGames]);
 
   // Запуск из трея не удался: окно уже открыто Rust — выбрать игру и
-  // показать ошибку у кнопки Play (спека этапа 7 §5).
+  // показать ошибку у кнопки Play.
   useEffect(() => {
     const unlisten = listen<{ gameId: string; error: unknown }>("tray-launch-failed", (e) => {
       setSelectedId(e.payload.gameId);
@@ -138,13 +138,13 @@ export default function App() {
   }, []);
 
   // Выбор другой игры гасит чужую ошибку трея: иначе при возврате к прежней
-  // игре она всплыла бы снова, хотя могла давно устареть (правка ревью 1).
+  // игре она всплыла бы снова, хотя могла давно устареть.
   useEffect(() => {
     setTrayFailure((current) => (current && current.gameId !== selectedId ? null : current));
   }, [selectedId]);
 
   // Приложение живёт в трее днями: данные панели проверяются раз в 3 часа и
-  // при возвращении окна, если с прошлой проверки прошёл час (спека сборщика §9).
+  // при возвращении окна, если с прошлой проверки прошёл час.
   useEffect(() => {
     const timer = window.setInterval(() => void refreshHub(), REFRESH_EVERY_MS);
     const onShown = () => {
@@ -182,10 +182,15 @@ export default function App() {
 
   // Тумблер «Анимация» читается один раз при запуске: дальше `motion.ts` сам
   // держит актуальное значение и рассылает его подписчикам при переключении
-  // на вкладке «Вид» (спека этапа 5, §12).
+  // на вкладке «Вид».
   useEffect(() => {
     api.getAnimation().then(setMotion).catch(() => {});
   }, []);
+
+  // Активно ли окно — одно слежение на всё приложение (`lib/windowActive.ts`):
+  // видео фона, карусель и бесконечное движение в стилях стоят, пока окно
+  // спрятано, свёрнуто или не в фокусе.
+  useEffect(() => watchWindowActivity(), []);
 
   // Экран первого запуска закрывается — список игр мог измениться.
   const finishFirstRun = useCallback(() => {
@@ -194,6 +199,11 @@ export default function App() {
   }, [load]);
 
   const selected = games.find((g) => g.id === selectedId) ?? games[0] ?? null;
+
+  // Фон какой игры уже начал проявляться. Подпись и кнопка PLAY поднимаются
+  // вслед за фоном своей игры, а не сразу после выбора: большая картинка
+  // может грузиться заметно дольше, чем длится их появление.
+  const [artShownFor, setArtShownFor] = useState<string | null>(null);
 
   const select = useCallback((id: string) => {
     setSelectedId(id);
@@ -211,10 +221,24 @@ export default function App() {
 
   // Возврат из настроек обязан перечитать список игр: человек мог там всё
   // поменять (добавить, убрать, переименовать, отвязать от хаба, сменить фон).
+  const backFromSettings = useRef(false);
   const closeSettings = useCallback(() => {
+    backFromSettings.current = true;
     setScreen("main");
     void load();
   }, [load]);
+
+  // Кнопка «Назад» пропала вместе с настройками — фокус возвращается на
+  // шестерёнку, которой их открыли, а не теряется в начале страницы. Если фокус
+  // уже где-то стоит, его не трогаем.
+  const mainRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (screen !== "main" || !backFromSettings.current) return;
+    backFromSettings.current = false;
+    const active = document.activeElement;
+    if (active && active !== document.body) return;
+    mainRef.current?.querySelector<HTMLElement>(".panel-gear")?.focus({ preventScroll: true });
+  }, [screen]);
 
   if (screen === "loading") {
     return <div className="screen" />;
@@ -222,9 +246,10 @@ export default function App() {
 
   if (screen === "firstRun") {
     // Тот же визуальный каркас, что и у настроек, но без навигации по
-    // вкладкам: настраивать пока нечего, кроме списка игр.
+    // вкладкам: настраивать пока нечего, кроме списка игр. Без колонки вкладок
+    // слева содержимое стоит посередине окна, а не прижато к краю.
     return (
-      <div className="settings">
+      <div className="settings is-first-run">
         <div className="settings-body">
           <FirstRunView onDone={finishFirstRun} />
         </div>
@@ -237,22 +262,26 @@ export default function App() {
   }
 
   return (
-    <div className="screen">
+    <div className="screen" ref={mainRef}>
       <SidePanel
         hub={hub}
         selectedContentId={selected?.contentId ?? null}
+        selectedTitle={selected?.title ?? null}
+        // Ошибка здесь бывает только от загрузки списка игр (`load`, `reloadGames`),
+        // и удачная загрузка её снимает.
+        gamesFailed={error !== ""}
         onOpenSettings={() => setScreen("settings")}
         appVersion={appVersion}
       />
       <main className="stage">
-        <GameArt game={selected} />
+        <GameArt game={selected} onShown={setArtShownFor} />
         {selected && (
           <PlayButton
             // key: при смене игры кнопка пересоздаётся, а не переиспользуется —
-            // иначе её состояние ошибки осталось бы висеть под новой игрой
-            // (правка ревью 1).
+            // иначе её состояние ошибки осталось бы висеть под новой игрой.
             key={selected.id}
             gameId={selected.id}
+            artShown={artShownFor === selected.id}
             note={launchNote(t, selected)}
             onLaunch={launch}
             onFixed={load}

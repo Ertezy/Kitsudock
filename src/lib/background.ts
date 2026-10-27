@@ -1,5 +1,5 @@
 // Какой слой фона показывать на главном экране. Отдельно от компонента, чтобы
-// порядок проверялся тестами без окна (спека этапа 5, §2.1 и §6.4).
+// порядок проверялся тестами без окна.
 
 import type { Dictionary } from "../i18n";
 import type { GameView } from "../types";
@@ -27,9 +27,8 @@ export function layerKey(layer: Layer): string {
   return layer.kind === "fill" ? "fill" : `${layer.kind}:${layer.path}`;
 }
 
-/** Откуда у игры фон — подпись на вкладке «Вид» (спека §7.3, §6.5). Магазины
- *  и официальный лаунчер делят подпись с `main.launch.from` — слово там то же
- *  самое. */
+/** Откуда у игры фон — подпись на вкладке «Вид». Магазины и официальный
+ *  лаунчер делят подпись с `main.launch.from` — слово там то же самое. */
 export function sourceText(t: Dictionary, game: Pick<GameView, "artSource" | "videoMissing">): string {
   const text =
     game.artSource === "steam" || game.artSource === "epic" || game.artSource === "hoyoplay"
@@ -44,10 +43,10 @@ export function hasOwnBackground(game: Pick<GameView, "artSource" | "videoMissin
   return game.artSource === "video" || game.artSource === "picture" || game.videoMissing;
 }
 
-/** Потолок размера своего видео в точках — решение владельца после живой
- *  проверки (спека этапа 5, §12). Ориентация не важна: предел проверяется по
- *  большей и меньшей стороне отдельно, а не по ширине и высоте буквально —
- *  ролик 1440×2560 такой же годный, как и 2560×1440. */
+/** Потолок размера своего видео в точках, подобранный живой проверкой.
+ *  Ориентация не важна: предел проверяется по большей и меньшей стороне
+ *  отдельно, а не по ширине и высоте буквально — ролик 1440×2560 такой же
+ *  годный, как и 2560×1440. */
 export function videoSizeProblem(t: Dictionary, width: number, height: number): string | null {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return t.main.background.videoUnreadable;
