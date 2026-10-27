@@ -42,16 +42,18 @@ struct ShowSlot {
 /// автоматически — на первом запуске это делает экран с галочками, и
 /// человек сам решает, что добавить.
 fn sync_games_with_stores(app: &tauri::AppHandle) {
-    let mut cfg = config::load(app);
     let installed = stores::installed();
     // Локальная копия, без сети: setup() выполняется до появления окна,
     // и сетевой запрос отсюда заставил бы окно ждать сеть.
     let hub_games = hub::load_local(app).games;
 
-    if catalog::enrich_from_stores(&mut cfg.games, &installed, &hub_games) {
-        if let Err(e) = config::save(app, &cfg) {
-            log::error!("[setup] не удалось сохранить конфиг: {e}");
-        }
+    // Ничего не дополнилось — `update` и не пишет файл.
+    let synced = config::update(app, |cfg| {
+        catalog::enrich_from_stores(&mut cfg.games, &installed, &hub_games);
+        Ok::<_, String>(())
+    });
+    if let Err(e) = synced {
+        log::error!("[setup] не удалось сохранить конфиг: {e}");
     }
 }
 
