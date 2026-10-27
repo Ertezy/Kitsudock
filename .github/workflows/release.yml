@@ -47,6 +47,18 @@ jobs:
             throw "тег $($env:TAG), а в tauri.conf.json версия $($conf.version)"
           }
 
+      # Те же проверки, что в ci.yml, до сборки: тег на красном коммите не
+      # должен давать черновик релиза.
+      - name: Types
+        run: npx tsc --noEmit
+
+      - name: Frontend tests
+        run: npx vitest run
+
+      - name: Rust tests
+        working-directory: src-tauri
+        run: cargo test --locked
+
       # В установщик кладётся самый свежий файл данных — на случай первого
       # запуска без интернета.
       - run: npm run update-hub
