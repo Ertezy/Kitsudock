@@ -5,7 +5,7 @@
 Please report suspected security vulnerabilities privately. Do not publish details,
 proof-of-concept files or sensitive logs in public issues, discussions or bug reports.
 
-1. Sign in to GitHub and open this repository's **Security (Security and quality) → Report a vulnerability**,
+1. Sign in to GitHub and open this repository's **Security → Report a vulnerability**,
    or use the [private reporting form](https://github.com/Ertezy/Kitsudock/security/advisories/new).
 2. Include the Kitsudock version, Windows version, affected component, steps to
    reproduce and the possible impact. Use fictional data where possible and remove
@@ -28,7 +28,7 @@ For ordinary bugs, use the [bug report form](https://github.com/Ertezy/Kitsudock
 эксплуатации или журналы с чувствительными данными в публичных issues, обсуждениях
 или сообщениях об ошибках.
 
-1. Войдите в GitHub и откройте в этом репозитории **Security (Security and quality) → Report a vulnerability**
+1. Войдите в GitHub и откройте в этом репозитории **Security → Report a vulnerability**
    или [форму приватного сообщения](https://github.com/Ertezy/Kitsudock/security/advisories/new).
 2. Укажите версию Kitsudock, версию Windows, затронутую часть программы, шаги
    воспроизведения и возможные последствия. По возможности используйте выдуманные

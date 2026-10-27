@@ -44,18 +44,14 @@ and cached pictures too, tick "Delete the application data" in the uninstaller, 
 
 ## Privacy
 
-Kitsudock has no account system or telemetry and does not upload logs automatically.
-Settings, caches and logs are stored locally. Servers receiving downloads can see
-your IP address and ordinary request metadata.
+No account or telemetry. Settings, cached files and logs stay on your computer;
+logs are not sent automatically. Download servers can see your IP address, just
+like any website.
 
-The app makes HTTPS GET requests for the data file from GitHub Pages, or from the
-custom data source URL set in Settings. It downloads banner pictures, YouTube
-thumbnails and background media from URLs in that file, including game wikis
-(Fandom, wiki.gg), YouTube image servers and the official HoYoPlay launcher's
-servers. Steam and Epic Games artwork
-can come from local launcher caches or be downloaded from their image servers.
-Media destinations depend on the data source and installed launchers. Clicking a
-video or a promo-code redemption link opens the external site in your browser.
+Data comes from GitHub Pages or your chosen address. Pictures and videos come from
+game wikis, YouTube, HoYoPlay, Steam and Epic servers; store artwork may also come
+from local caches. Media sources depend on the data file and installed launchers.
+Video and code redemption links open in your browser.
 
 ## Is it safe?
 
@@ -88,7 +84,7 @@ unsigned (see [Install](#install)).*
 - Committers and reviewers: [Ertezy](https://github.com/Ertezy)
 - Approvers: [Ertezy](https://github.com/Ertezy)
 - Privacy policy: see [Privacy](#privacy). No telemetry or automatic log uploads;
-  downloads expose ordinary request metadata to the receiving servers.
+  download servers can see your IP address, just like any website.
 
 ## Features
 
