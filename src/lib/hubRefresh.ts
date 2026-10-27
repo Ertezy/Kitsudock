@@ -10,12 +10,27 @@ export function shouldRefreshOnShow(lastCheckMs: number, nowMs: number): boolean
   return nowMs - lastCheckMs >= REFRESH_ON_SHOW_AFTER_MS;
 }
 
-/** Сеть появилась — данные проверяются, если с прошлой проверки прошло больше
- *  минуты: автозапуск мог стартовать раньше, чем подключился Wi-Fi. */
+/** Сеть появилась — данные проверяются, если с прошлой удачной проверки прошло
+ *  больше минуты: автозапуск мог стартовать раньше, чем подключился Wi-Fi. */
 export const ONLINE_REFRESH_AFTER_MS = 60 * 1000;
 
-export function shouldRefreshOnOnline(lastCheckMs: number, nowMs: number): boolean {
-  return nowMs - lastCheckMs > ONLINE_REFRESH_AFTER_MS;
+/** Последняя проверка данных панели: когда началась и дошла ли до сервера. */
+export interface HubCheck {
+  at: number;
+  reachedServer: boolean;
+}
+
+/** Проверка, которая не дошла до сервера, минуту не ждёт: приложение могло
+ *  стартовать без сети, и сеть вернулась через несколько секунд. Минута
+ *  сдерживает только повтор после удачной проверки. */
+export function shouldRefreshOnOnline(last: HubCheck, nowMs: number): boolean {
+  return !last.reachedServer || nowMs - last.at > ONLINE_REFRESH_AFTER_MS;
+}
+
+/** Дошёл ли запрос до сервера. Без сети `get_hub` не падает, а отдаёт кеш или
+ *  файл из комплекта — с другим `_source`. */
+export function reachedServer(hub: HubData): boolean {
+  return hub._source === "remote";
 }
 
 /** Те же ли данные. Сервер ответил «не изменилось» — панель перерисовывать незачем. */

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { REFRESH_EVERY_MS, REFRESH_ON_SHOW_AFTER_MS, ONLINE_REFRESH_AFTER_MS, backgroundsKey, sameHub, shouldRefreshOnShow, shouldRefreshOnOnline } from "./hubRefresh";
+import { REFRESH_EVERY_MS, REFRESH_ON_SHOW_AFTER_MS, ONLINE_REFRESH_AFTER_MS, backgroundsKey, reachedServer, sameHub, shouldRefreshOnShow, shouldRefreshOnOnline } from "./hubRefresh";
 import type { HubData, HubGame } from "../types";
 
 const hub = (updatedAt: number): HubData => ({
@@ -26,10 +26,26 @@ describe("hubRefresh", () => {
     expect(shouldRefreshOnShow(0, REFRESH_ON_SHOW_AFTER_MS)).toBe(true);
   });
 
-  it("при появлении сети проверяет, если с прошлой проверки прошло больше минуты", () => {
+  it("при появлении сети после удачной проверки ждёт минуту", () => {
     expect(ONLINE_REFRESH_AFTER_MS).toBe(60_000);
-    expect(shouldRefreshOnOnline(0, 60_000)).toBe(false);
-    expect(shouldRefreshOnOnline(0, 60_001)).toBe(true);
+    const ok = { at: 0, reachedServer: true };
+    expect(shouldRefreshOnOnline(ok, 60_000)).toBe(false);
+    expect(shouldRefreshOnOnline(ok, 60_001)).toBe(true);
+  });
+
+  it("при появлении сети после неудачной проверки проверяет сразу", () => {
+    // Приложение стартовало без сети, и Wi-Fi подключился через полминуты:
+    // ждать трёхчасового таймера незачем.
+    const failed = { at: 0, reachedServer: false };
+    expect(shouldRefreshOnOnline(failed, 1)).toBe(true);
+    expect(shouldRefreshOnOnline(failed, 30_000)).toBe(true);
+  });
+
+  it("до сервера дошли только данные из сети, а не из кеша или комплекта", () => {
+    expect(reachedServer(hub(1))).toBe(true);
+    for (const source of ["cache", "bundled", "override", undefined]) {
+      expect(reachedServer({ ...hub(1), _source: source })).toBe(false);
+    }
   });
 
   it("одинаковые данные не считаются новыми", () => {
