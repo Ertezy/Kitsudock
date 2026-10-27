@@ -197,6 +197,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }
     }
 

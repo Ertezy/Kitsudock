@@ -64,6 +64,12 @@ pub struct Game {
     /// Своё видео фона. Важнее своей картинки и картинки магазина.
     #[serde(default)]
     pub video: Option<PathBuf>,
+    /// Человек сам выбрал «нет данных» для этой игры. Пустой `content_id`
+    /// бывает и у игры, которую каталог просто не узнал при добавлении, и
+    /// такую сверка с магазинами при запуске привязывает заново; выбор
+    /// человека она трогать не должна. Нет поля в файле — `false`.
+    #[serde(default)]
+    pub content_unlinked: bool,
 }
 
 impl Game {
@@ -83,6 +89,7 @@ impl Game {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }
     }
 }
@@ -250,6 +257,7 @@ pub fn migrate_v1(raw: &serde_json::Value) -> Option<AppConfig> {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         });
     }
 
@@ -1157,6 +1165,39 @@ mod tests {
         let id = update_at(&path, |_| Ok::<_, String>(7)).unwrap();
         assert_eq!(id, 7);
         assert_eq!(fs::metadata(&path).unwrap().modified().unwrap(), written);
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn a_game_saved_before_the_unlink_flag_loads_with_it_off() {
+        // Поле необязательное, и версия конфига ради него не поднимается.
+        let raw = serde_json::json!({
+            "version": 3,
+            "games": [
+                {"id":"a","title":"A","contentId":null,"launch":{"kind":"exe"},"args":""}
+            ]
+        });
+        let path = temp_config("unlink-old");
+        fs::write(&path, raw.to_string()).unwrap();
+        let cfg = load_from(&path);
+        assert_eq!(cfg.games.len(), 1);
+        assert!(!cfg.games[0].content_unlinked);
+
+        let migrated = migrate_v2(&serde_json::from_str(V2_SAMPLE).unwrap()).unwrap();
+        assert!(migrated.games.iter().all(|g| !g.content_unlinked));
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn the_unlink_flag_survives_a_save_round_trip() {
+        let mut cfg = AppConfig::default();
+        let mut g = Game::manual("a".into(), "A".into());
+        g.content_unlinked = true;
+        cfg.games.push(g);
+        let path = temp_config("unlink-round-trip");
+        save_to(&path, &cfg).unwrap();
+        assert!(fs::read_to_string(&path).unwrap().contains("\"contentUnlinked\": true"));
+        assert!(load_from(&path).games[0].content_unlinked);
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 

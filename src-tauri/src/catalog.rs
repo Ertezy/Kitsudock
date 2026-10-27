@@ -96,7 +96,8 @@ pub fn already_configured(found: &InstalledGame, games: &[Game], hub_games: &[Hu
 /// общему лаунчеру — это решение не трогаем.
 ///
 /// Заодно дозаполняет ещё два поля, тем же правилом «пишем только в пустое»:
-/// идентификатор контента, если он не был присвоен при первом запуске (см.
+/// идентификатор контента, если он не был присвоен при первом запуске и
+/// человек не отвязал игру от данных сам (`Game::content_unlinked`; см.
 /// комментарий у соответствующей ветки ниже), и название — но только у
 /// записи, перенесённой из v1, где `title` равен `id`, потому что ключ
 /// словаря стал и тем, и другим.
@@ -118,7 +119,8 @@ pub fn enrich_from_stores(
         // не прочитался — остаётся пустым навсегда: на последующих запусках
         // работает уже эта функция, а не посев. Панель для такой игры молча
         // пуста. Пишем только в пустое: заполненный идентификатор не трогаем.
-        if game.content_id.is_none() {
+        // И не трогаем пустой, если человек сам выбрал «нет данных».
+        if game.content_id.is_none() && !game.content_unlinked {
             if let Some(found_id) = content_id_for(found, hub_games) {
                 game.content_id = Some(found_id);
                 changed = true;
@@ -252,6 +254,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }];
         let installed = vec![InstalledGame {
             title: "Honkai: Star Rail".into(),
@@ -292,6 +295,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }];
         let installed = vec![InstalledGame {
             title: "Wuthering Waves".into(),
@@ -328,6 +332,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }];
         let installed: Vec<InstalledGame> = Vec::new();
 
@@ -352,6 +357,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }];
         let installed = vec![InstalledGame {
             title: "Wuthering Waves".into(),
@@ -380,6 +386,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }];
         let found = vec![installed("Wuthering Waves", Launch::Steam { appid: 3513350 })];
 
@@ -404,6 +411,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }];
         let found = vec![installed("Wuthering Waves", Launch::Steam { appid: 3513350 })];
 
@@ -501,6 +509,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         };
         let found = vec![installed("Wuthering Waves", Launch::Steam { appid: 3513350 })];
 
@@ -524,6 +533,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         };
         let found = vec![installed("Wuthering Waves", Launch::Steam { appid: 3513350 })];
 
@@ -548,6 +558,7 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         };
         let found = vec![installed("Wuthering Waves", Launch::Steam { appid: 3513350 })];
 
@@ -574,10 +585,47 @@ mod tests {
             background: None,
             icon: None,
             video: None,
+            content_unlinked: false,
         }];
         let found = installed("Wuthering Waves", Launch::Steam { appid: 3513350 });
 
         assert!(already_configured(&found, &games, &hub_games()));
+    }
+
+    #[test]
+    fn enrich_does_not_relink_a_game_the_person_unlinked() {
+        // Человек выбрал «нет данных»: при следующем запуске сверка с
+        // магазинами не должна вернуть привязку.
+        let mut games = vec![Game {
+            id: "wuthering".into(),
+            title: "Wuthering Waves".into(),
+            content_id: None,
+            launch: Launch::Steam { appid: 3513350 },
+            install_path: Some(PathBuf::from(r"C:\Games\X")),
+            exe_path: None,
+            args: String::new(),
+            background: None,
+            icon: None,
+            video: None,
+            content_unlinked: true,
+        }];
+        let found = vec![installed("Wuthering Waves", Launch::Steam { appid: 3513350 })];
+
+        let changed = enrich_from_stores(&mut games, &found, &hub_games());
+
+        assert!(!changed);
+        assert_eq!(games[0].content_id, None);
+    }
+
+    #[test]
+    fn enrich_still_links_a_game_the_catalog_missed() {
+        // Без выбора человека пустая привязка по-прежнему восстанавливается.
+        let mut games = vec![Game::manual("wuthering".into(), "Wuthering Waves".into())];
+        let found = vec![installed("Wuthering Waves", Launch::Steam { appid: 3513350 })];
+
+        enrich_from_stores(&mut games, &found, &hub_games());
+
+        assert_eq!(games[0].content_id.as_deref(), Some("wuthering"));
     }
 
     #[test]

@@ -83,6 +83,7 @@ pub fn add(cfg: &mut AppConfig, title: String, exe: PathBuf) -> String {
         background: None,
         icon: None,
         video: None,
+        content_unlinked: false,
     });
     id
 }
@@ -133,6 +134,7 @@ pub fn add_found(
         background: None,
         icon: None,
         video: None,
+        content_unlinked: false,
     });
     Ok(id)
 }
@@ -197,6 +199,10 @@ pub fn update(cfg: &mut AppConfig, id: &str, patch: GamePatch) -> bool {
         game.video = video;
     }
     if let Some(content) = patch.content_id {
+        // «Нет данных» запоминается отдельно от пустой привязки: иначе сверка
+        // с магазинами при следующем запуске вернула бы её
+        // (`catalog::enrich_from_stores`).
+        game.content_unlinked = content.is_none();
         game.content_id = content;
     }
     if let Some(args) = patch.args {
@@ -280,6 +286,7 @@ mod tests {
                     background: None,
                     icon: None,
                     video: None,
+                    content_unlinked: false,
                 })
                 .collect(),
         }
@@ -509,6 +516,39 @@ mod tests {
             GamePatch { content_id: Some(None), ..Default::default() },
         );
         assert_eq!(cfg.games[0].content_id, None);
+    }
+
+    #[test]
+    fn choosing_no_content_remembers_the_choice() {
+        let mut cfg = cfg_with(&["a"]);
+        cfg.games[0].content_id = Some("genshin".into());
+        update(
+            &mut cfg,
+            "a",
+            GamePatch { content_id: Some(None), ..Default::default() },
+        );
+        assert!(cfg.games[0].content_unlinked);
+    }
+
+    #[test]
+    fn choosing_content_clears_the_unlink_flag() {
+        let mut cfg = cfg_with(&["a"]);
+        cfg.games[0].content_unlinked = true;
+        update(
+            &mut cfg,
+            "a",
+            GamePatch { content_id: Some(Some("genshin".into())), ..Default::default() },
+        );
+        assert_eq!(cfg.games[0].content_id.as_deref(), Some("genshin"));
+        assert!(!cfg.games[0].content_unlinked);
+    }
+
+    #[test]
+    fn a_patch_without_content_keeps_the_unlink_flag() {
+        let mut cfg = cfg_with(&["a"]);
+        cfg.games[0].content_unlinked = true;
+        update(&mut cfg, "a", GamePatch { title: Some("B".into()), ..Default::default() });
+        assert!(cfg.games[0].content_unlinked);
     }
 
     #[test]
