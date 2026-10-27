@@ -150,6 +150,21 @@ describe("ответы стенда на состояния данных", () =>
     expect(hub.codes.length).toBeGreaterThan(0);
   });
 
+  it("normal: у нескольких игр есть соцсети — столбик видно, в том числе список только на одном языке", async () => {
+    const call = await stand("normal");
+    const hub = (await call("get_hub")) as HubData;
+    const withSocials = hub.games.filter((g) => (g.socials?.ru?.length ?? 0) + (g.socials?.en?.length ?? 0) > 0);
+    expect(withSocials.length).toBeGreaterThanOrEqual(2);
+    expect(hub.games.some((g) => g.socials && (!g.socials.ru || !g.socials.en))).toBe(true);
+    for (const g of withSocials) {
+      for (const list of [g.socials?.ru ?? [], g.socials?.en ?? []]) {
+        expect(list.length).toBeLessThanOrEqual(10);
+        expect(new Set(list.map((s) => s.url)).size).toBe(list.length);
+        for (const s of list) expect(s.url.startsWith("https://")).toBe(true);
+      }
+    }
+  });
+
   it("loading: список игр отвечает сразу, хаб — только через минуту", async () => {
     vi.useFakeTimers();
     const call = await stand("loading");
