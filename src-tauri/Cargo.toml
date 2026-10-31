@@ -1,6 +1,6 @@
 [package]
 name = "kitsudock"
-version = "0.1.1"
+version = "0.1.2"
 description = "Free Windows launcher for gacha games with promo codes, banners and videos"
 authors = ["Ertezy"]
 license = "MIT"
