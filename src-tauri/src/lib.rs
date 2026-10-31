@@ -218,6 +218,8 @@ pub fn run() {
             commands::set_language,
             commands::get_video_language,
             commands::set_video_language,
+            commands::get_collapsed,
+            commands::set_collapsed,
             commands::get_autostart,
             commands::set_autostart,
             commands::check_video,

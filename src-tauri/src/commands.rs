@@ -19,7 +19,7 @@
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
-use crate::config::{self, Game, Language, Launch, LaunchWay, VideoLanguage};
+use crate::config::{self, Collapsed, Fold, Game, Language, Launch, LaunchWay, VideoLanguage};
 use crate::error::{code, AppError};
 use crate::hub;
 use crate::launch;
@@ -565,6 +565,21 @@ pub async fn set_video_language(
 ) -> Result<(), AppError> {
     config::update(&app, |cfg| {
         cfg.video_language = language;
+        Ok(())
+    })
+}
+
+/// Что свёрнуто на главном экране. Страница спрашивает до первой отрисовки:
+/// свёрнутое после перезапуска сразу свёрнуто, без анимации.
+#[tauri::command]
+pub async fn get_collapsed(app: AppHandle) -> Collapsed {
+    config::load(&app).collapsed
+}
+
+#[tauri::command]
+pub async fn set_collapsed(app: AppHandle, fold: Fold, collapsed: bool) -> Result<(), AppError> {
+    config::update(&app, |cfg| {
+        cfg.collapsed.set(fold, collapsed);
         Ok(())
     })
 }
