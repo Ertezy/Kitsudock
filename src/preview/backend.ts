@@ -185,7 +185,7 @@ const CACHE_AGE_SEC = 30 * HOUR;
 /** Возраст хаба из комплекта в сценарии `stale`: старше недели, когда панель прячет коды и баннеры. */
 const BUNDLED_AGE_SEC = 8 * DAY;
 /** Версия приложения на стенде (`get_about`). */
-const STAND_VERSION = "0.1.3";
+const STAND_VERSION = "0.1.4";
 /** Вышедшая версия при `update=on`: новее работающей, ссылка — на страницу релиза. */
 const NEXT_RELEASE: AppRelease = {
   version: "0.2.0",
