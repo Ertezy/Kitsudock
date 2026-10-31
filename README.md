@@ -102,7 +102,8 @@ unsigned (see [Install](#install)).*
   double-clicking the game's `.exe`. Kitsudock does not modify game files or
   interact with a running game. If a game can start more than one way, the tab under
   **Play** switches between directly, its own launcher (HoYoPlay, the Kuro launcher,
-  GRYPHLINK — when installed) and the store; the choice is remembered per game.
+  GRYPHLINK — if the game was installed through it) and the store; the choice is
+  remembered per game.
 - **Side panel** for the selected game: promo codes with expiry, current and upcoming
   banners (the carousel slides on its own), and the latest official videos.
 - **Languages:** interface in English or Russian; videos in English or Japanese.

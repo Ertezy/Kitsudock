@@ -8,10 +8,11 @@
 //! под `#[cfg(windows)]`, как в `steam.rs`.
 //!
 //! Найденная игра запускается напрямую: `Launch::Exe` плюс `exe_path`, ровно как
-//! игра, добавленная вручную. Сам лаунчер (`launcher_path`) — ещё один способ
+//! игра, добавленная вручную. Сам лаунчер (`LauncherPaths`) — ещё один способ
 //! запуска на выбор человека: его ищут тем же реестром, только при запуске и
 //! при построении списка игр, а в конфиг путь не пишется — лаунчер могут
-//! переставить или удалить.
+//! переставить или удалить. Предлагается он только игре, которую сам и
+//! поставил: копию из магазина он не знает.
 
 use std::path::{Path, PathBuf};
 
@@ -326,110 +327,112 @@ impl Launcher {
     }
 }
 
-/// Файл лаунчера HoYoPlay в его папке. Так он назван и в записи удаления
-/// (`ExeName`), и на диске.
+/// Файл лаунчера HoYoPlay в папке из его ключа (`InstallPath`).
 const HOYOPLAY_EXE: &str = "launcher.exe";
 /// Файл лаунчера Kuro рядом с папкой игры `Wuthering Waves Game`.
 const KURO_EXE: &str = "launcher.exe";
 /// Файл GRYPHLINK — тот же, что запускает находка `gryphlink`.
 const GRYPHLINK_EXE: &str = "Launcher.exe";
 
-/// Имя файла из реестра — только имя, без папок: `..\` в нём увёл бы запуск за
-/// пределы папки лаунчера.
-fn plain_exe_name(name: &str) -> Option<&str> {
-    let is_plain = !name.contains(['\\', '/', ':']) && name != "." && name != "..";
-    (is_plain && name.to_ascii_lowercase().ends_with(".exe")).then_some(name)
+/// Лаунчер на компьютере и папки игр, которые он сам поставил. Предлагать его
+/// можно только игре из этих папок: копию из магазина он не знает и показал
+/// бы на её месте кнопку загрузки.
+#[derive(Debug, Clone)]
+pub struct KnownLauncher {
+    pub exe: PathBuf,
+    pub installs: Vec<PathBuf>,
 }
 
-/// HoYoPlay: `<HYP>\<версия>\InstallPath` — папка самого лаунчера (игр под
-/// ключом при этом может не быть), а если ключа нет — запись удаления `HYP_…`
-/// с той же папкой и именем файла.
-fn hoyoplay_launcher(reg: &dyn Registry) -> Option<PathBuf> {
-    let mut candidates = Vec::new();
+/// HoYoPlay: `<HYP>\<версия>\InstallPath` — папка самого лаунчера, а под тем же
+/// ключом `<игра>\GameInstallPath` — его установки. Пустой путь — игра в
+/// лаунчере есть в списке, но не поставлена. Подраздел `standalone` — копии
+/// из магазинов со встроенным лаунчером, не его установки.
+fn hoyoplay_launchers(reg: &dyn Registry) -> Vec<KnownLauncher> {
+    let mut found = Vec::new();
     for hyp in HOYOPLAY_ROOTS {
         for version in reg.subkeys(Root::CurrentUser, hyp) {
             if !is_version_key(&version) {
                 continue;
             }
             let key = format!(r"{hyp}\{version}");
-            if let Some(dir) = text(reg.value(Root::CurrentUser, &key, "InstallPath")) {
-                candidates.push(Path::new(&dir).join(HOYOPLAY_EXE));
-            }
+            let Some(dir) = text(reg.value(Root::CurrentUser, &key, "InstallPath")) else {
+                continue;
+            };
+            let Some(exe) = first_existing(HOYOPLAY_LABEL, vec![Path::new(&dir).join(HOYOPLAY_EXE)]) else {
+                continue;
+            };
+            let installs = reg
+                .subkeys(Root::CurrentUser, &key)
+                .into_iter()
+                .filter(|biz| HOYOPLAY_GAMES.iter().any(|(known, _, _)| known.eq_ignore_ascii_case(biz)))
+                .filter_map(|biz| {
+                    text(reg.value(Root::CurrentUser, &format!(r"{key}\{biz}"), "GameInstallPath"))
+                })
+                .map(PathBuf::from)
+                .collect();
+            found.push(KnownLauncher { exe, installs });
         }
     }
-    for (root, key, name) in uninstall_entries(reg) {
-        if !name.to_ascii_lowercase().starts_with("hyp_") {
-            continue;
-        }
-        let exe_name = text(reg.value(root, &key, "ExeName"));
-        let Some(exe_name) = exe_name.as_deref().map_or(Some(HOYOPLAY_EXE), plain_exe_name) else {
-            log::debug!("[launchers] HoYoPlay: странное имя файла в записи {key}");
-            continue;
-        };
-        if let Some(dir) = install_dir(reg, root, &key, &["InstallPath", "InstallLocation"]) {
-            candidates.push(dir.join(exe_name));
-        }
-    }
-    first_existing(HOYOPLAY_LABEL, candidates)
+    found
 }
 
 /// Лаунчер Kuro лежит в папке из записи удаления `KRInstall Wuthering Waves…`,
-/// рядом с папкой игры. Папка по умолчанию не перебирается: только то, что
-/// записал сам лаунчер.
-fn kuro_launcher(reg: &dyn Registry) -> Option<PathBuf> {
-    let candidates = uninstall_entries(reg)
+/// и его установка — эта же папка: игра в ней, как её находит `kuro`.
+fn kuro_launchers(reg: &dyn Registry) -> Vec<KnownLauncher> {
+    uninstall_entries(reg)
         .into_iter()
         .filter(|(_, _, name)| name.to_lowercase().starts_with(&KURO_KEY_PREFIX.to_lowercase()))
         .filter_map(|(root, key, _)| install_dir(reg, root, &key, &["InstallPath", "InstallLocation"]))
-        .map(|dir| dir.join(KURO_EXE))
-        .collect();
-    first_existing(KURO_LABEL, candidates)
+        .filter_map(|dir| {
+            let exe = first_existing(KURO_LABEL, vec![dir.join(KURO_EXE)])?;
+            Some(KnownLauncher { exe, installs: vec![dir] })
+        })
+        .collect()
 }
 
 /// GRYPHLINK — по записи удаления с этим именем, как и находка `gryphlink`.
-/// Свой ключ `Software\GRYPHLINK` пути к лаунчеру не хранит.
-fn gryphlink_launcher(reg: &dyn Registry) -> Option<PathBuf> {
-    let candidates = uninstall_entries(reg)
+/// Свой ключ `Software\GRYPHLINK` пути не хранит, а где лаунчер держит игру,
+/// публично не описано: его установкой считается только то, что лежит в его
+/// же папке.
+fn gryphlink_launchers(reg: &dyn Registry) -> Vec<KnownLauncher> {
+    uninstall_entries(reg)
         .into_iter()
         .filter(|(root, key, _)| {
             text(reg.value(*root, key, "DisplayName"))
                 .is_some_and(|n| n.to_lowercase().contains(&GRYPHLINK_NAME.to_lowercase()))
         })
         .filter_map(|(root, key, _)| install_dir(reg, root, &key, &["InstallLocation"]))
-        .map(|dir| dir.join(GRYPHLINK_EXE))
-        .collect();
-    first_existing(GRYPHLINK_NAME, candidates)
-}
-
-/// Файл лаунчера, если он стоит на компьютере: путь из реестра и файл на месте.
-pub fn launcher_path(reg: &dyn Registry, launcher: Launcher) -> Option<PathBuf> {
-    match launcher {
-        Launcher::HoYoPlay => hoyoplay_launcher(reg),
-        Launcher::Kuro => kuro_launcher(reg),
-        Launcher::Gryphlink => gryphlink_launcher(reg),
-    }
+        .filter_map(|dir| {
+            let exe = first_existing(GRYPHLINK_NAME, vec![dir.join(GRYPHLINK_EXE)])?;
+            Some(KnownLauncher { exe, installs: vec![dir] })
+        })
+        .collect()
 }
 
 /// Найденные лаунчеры: реестр читается один раз на весь список игр, а не на
 /// каждую игру.
 #[derive(Debug, Clone, Default)]
 pub struct LauncherPaths {
-    pub hoyoplay: Option<PathBuf>,
-    pub kuro: Option<PathBuf>,
-    pub gryphlink: Option<PathBuf>,
+    pub hoyoplay: Vec<KnownLauncher>,
+    pub kuro: Vec<KnownLauncher>,
+    pub gryphlink: Vec<KnownLauncher>,
 }
 
 impl LauncherPaths {
+    /// Все три из данного реестра.
+    pub fn read(reg: &dyn Registry) -> Self {
+        Self {
+            hoyoplay: hoyoplay_launchers(reg),
+            kuro: kuro_launchers(reg),
+            gryphlink: gryphlink_launchers(reg),
+        }
+    }
+
     /// Все три с настоящим реестром. Вне Windows лаунчеров нет.
     pub fn find() -> Self {
         #[cfg(windows)]
         {
-            let reg = WinRegistry;
-            Self {
-                hoyoplay: launcher_path(&reg, Launcher::HoYoPlay),
-                kuro: launcher_path(&reg, Launcher::Kuro),
-                gryphlink: launcher_path(&reg, Launcher::Gryphlink),
-            }
+            Self::read(&WinRegistry)
         }
         #[cfg(not(windows))]
         {
@@ -437,15 +440,24 @@ impl LauncherPaths {
         }
     }
 
-    /// Лаунчер этой игры и путь к нему, если он стоит на компьютере.
-    pub fn for_game(&self, content_id: Option<&str>, title: &str) -> Option<(Launcher, &Path)> {
-        let launcher = Launcher::of_game(content_id, title)?;
-        let path = match launcher {
+    /// Лаунчер этой игры, если он стоит на компьютере и сам поставил именно
+    /// эту её копию: файл игры (или её папка) лежит в одной из его установок.
+    pub fn for_game(&self, game: &crate::config::Game) -> Option<(Launcher, &Path)> {
+        let launcher = Launcher::of_game(game.content_id.as_deref(), &game.title)?;
+        let own = game
+            .exe_path
+            .as_deref()
+            .or(game.install_path.as_deref())
+            .filter(|p| !p.as_os_str().is_empty())?;
+        let known = match launcher {
             Launcher::HoYoPlay => &self.hoyoplay,
             Launcher::Kuro => &self.kuro,
             Launcher::Gryphlink => &self.gryphlink,
         };
-        path.as_deref().map(|p| (launcher, p))
+        known
+            .iter()
+            .find(|l| l.installs.iter().any(|dir| super::is_inside(own, dir)))
+            .map(|l| (launcher, l.exe.as_path()))
     }
 }
 
@@ -1015,126 +1027,184 @@ mod tests {
 
     // ---------------------------------------------------------- сами лаунчеры
 
+    /// Игра конфига с файлом по этому пути.
+    fn game_at(id: &str, title: &str, exe: &Path) -> crate::config::Game {
+        let mut g = crate::config::Game::manual(id.into(), title.into());
+        g.content_id = Some(id.into());
+        g.exe_path = Some(exe.to_path_buf());
+        g
+    }
+
     #[test]
-    fn the_hoyoplay_launcher_is_found_by_the_install_path_of_its_own_key() {
-        // Как на живой машине: `HYP\1_0` хранит папку лаунчера, а игры под ним
-        // может не быть вовсе (её поставили из Epic).
+    fn hoyoplay_is_offered_for_a_game_installed_in_it() {
         let dir = scratch("hyp-launcher");
-        let exe = touch(&dir, "launcher.exe");
+        let launcher = touch(&dir, r"HoYoPlay\launcher.exe");
+        let game = touch(&dir, r"games\Genshin Impact game\GenshinImpact.exe");
         let reg = FakeRegistry::default()
-            .with(Root::CurrentUser, r"Software\Cognosphere\HYP\1_0", &[("InstallPath", s(&dir))])
+            .with(Root::CurrentUser, r"Software\Cognosphere\HYP\1_0", &[("InstallPath", s(&dir.join("HoYoPlay")))])
             .with(
                 Root::CurrentUser,
                 r"Software\Cognosphere\HYP\1_0\hk4e_global",
-                &[("GameInstallPath", "")],
+                &[("GameInstallPath", s(&dir.join(r"games\Genshin Impact game")))],
             );
 
-        assert_eq!(launcher_path(&reg, Launcher::HoYoPlay), Some(exe));
+        let found = LauncherPaths::read(&reg);
+        assert_eq!(
+            found.for_game(&game_at("genshin", "Genshin Impact", &game)),
+            Some((Launcher::HoYoPlay, launcher.as_path()))
+        );
         fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
-    fn the_cn_hoyoplay_launcher_is_found_too() {
+    fn an_installed_launcher_without_this_game_offers_nothing() {
+        // Как на живой машине: HoYoPlay стоит, `GameInstallPath` у игры пуст, а
+        // сама игра поставлена из Epic. Открылся бы лаунчер с кнопкой загрузки.
+        let dir = scratch("hyp-launcher-empty");
+        touch(&dir, r"HoYoPlay\launcher.exe");
+        let epic_copy = touch(&dir, r"Epic Games\GenshinImpact\launcher_epic.exe");
+        let reg = FakeRegistry::default()
+            .with(Root::CurrentUser, r"Software\Cognosphere\HYP\1_0", &[("InstallPath", s(&dir.join("HoYoPlay")))])
+            .with(Root::CurrentUser, r"Software\Cognosphere\HYP\1_0\hk4e_global", &[("GameInstallPath", "")])
+            // Копия из Epic записана в `standalone` — это не установка лаунчера.
+            .with(
+                Root::CurrentUser,
+                r"Software\Cognosphere\HYP\standalone\1_3\hk4e_global\x\hk4e_global",
+                &[("GameInstallPath", s(&dir.join(r"Epic Games\GenshinImpact")))],
+            );
+
+        let found = LauncherPaths::read(&reg);
+        assert_eq!(found.for_game(&game_at("genshin", "Genshin Impact", &epic_copy)), None);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn another_copy_of_the_game_in_the_launcher_does_not_count() {
+        // Лаунчер знает свою установку, а в конфиге — другая, из магазина.
+        let dir = scratch("hyp-launcher-other-copy");
+        touch(&dir, r"HoYoPlay\launcher.exe");
+        touch(&dir, r"hyp-games\ZZZ\ZenlessZoneZero.exe");
+        let store_copy = touch(&dir, r"Epic\ZZZ\launcher_epic.exe");
+        let reg = FakeRegistry::default()
+            .with(Root::CurrentUser, r"Software\Cognosphere\HYP\1_0", &[("InstallPath", s(&dir.join("HoYoPlay")))])
+            .with(
+                Root::CurrentUser,
+                r"Software\Cognosphere\HYP\1_0\nap_global",
+                &[("GameInstallPath", s(&dir.join(r"hyp-games\ZZZ")))],
+            );
+
+        let found = LauncherPaths::read(&reg);
+        assert_eq!(found.for_game(&game_at("zzz", "Zenless Zone Zero", &store_copy)), None);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn the_cn_hoyoplay_knows_its_own_games() {
         let dir = scratch("hyp-launcher-cn");
-        let exe = touch(&dir, "launcher.exe");
-        let reg = FakeRegistry::default().with(
-            Root::CurrentUser,
-            r"Software\miHoYo\HYP\1_2",
-            &[("InstallPath", &format!("\"{}\"", dir.display()))],
-        );
+        let launcher = touch(&dir, r"launcher\launcher.exe");
+        let game = touch(&dir, r"ys\YuanShen.exe");
+        let reg = FakeRegistry::default()
+            .with(
+                Root::CurrentUser,
+                r"Software\miHoYo\HYP\1_2",
+                &[("InstallPath", &format!("\"{}\"", dir.join("launcher").display()))],
+            )
+            .with(Root::CurrentUser, r"Software\miHoYo\HYP\1_2\hk4e_cn", &[("GameInstallPath", s(&dir.join("ys")))]);
 
-        assert_eq!(launcher_path(&reg, Launcher::HoYoPlay), Some(exe));
+        let found = LauncherPaths::read(&reg);
+        assert_eq!(
+            found.for_game(&game_at("genshin", "Genshin Impact", &game)),
+            Some((Launcher::HoYoPlay, launcher.as_path()))
+        );
         fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
-    fn the_hoyoplay_launcher_falls_back_to_its_uninstall_entry() {
-        let dir = scratch("hyp-launcher-uninstall");
-        let exe = touch(&dir, "launcher.exe");
-        let reg = FakeRegistry::default().with(
-            Root::LocalMachine,
-            &kuro_key(UNINSTALL_HKLM, "HYP_1_0_global"),
-            &[("DisplayName", "HoYoPlay"), ("InstallPath", s(&dir)), ("ExeName", "launcher.exe")],
-        );
-
-        assert_eq!(launcher_path(&reg, Launcher::HoYoPlay), Some(exe));
-        fs::remove_dir_all(&dir).ok();
-    }
-
-    #[test]
-    fn an_exe_name_that_is_a_path_is_not_followed() {
-        // Имя файла из реестра — только имя: путь в нём увёл бы запуск из папки
-        // лаунчера куда угодно.
-        let dir = scratch("hyp-launcher-exename");
-        touch(&dir, r"elsewhere\run.exe");
-        let inner = dir.join("HoYoPlay");
-        fs::create_dir_all(&inner).unwrap();
-        let reg = FakeRegistry::default().with(
-            Root::LocalMachine,
-            &kuro_key(UNINSTALL_HKLM, "HYP_1_0_global"),
-            &[("InstallPath", s(&inner)), ("ExeName", r"..\elsewhere\run.exe")],
-        );
-
-        assert_eq!(launcher_path(&reg, Launcher::HoYoPlay), None);
-        fs::remove_dir_all(&dir).ok();
-    }
-
-    #[test]
-    fn no_hoyoplay_launcher_without_its_file_or_its_keys() {
+    fn no_hoyoplay_without_its_file_or_with_a_key_that_is_not_a_version() {
         let dir = scratch("hyp-launcher-none");
-        let other = dir.join("standalone-only");
+        let game = touch(&dir, r"g\GenshinImpact.exe");
         touch(&dir, r"standalone-only\launcher.exe");
         let reg = FakeRegistry::default()
+            // Папка записана, а файла лаунчера в ней нет.
             .with(Root::CurrentUser, r"Software\Cognosphere\HYP\1_0", &[("InstallPath", s(&dir))])
+            .with(Root::CurrentUser, r"Software\Cognosphere\HYP\1_0\hk4e_global", &[("GameInstallPath", s(&dir.join("g")))])
             // Не версия — не настройки лаунчера.
-            .with(Root::CurrentUser, r"Software\Cognosphere\HYP\standalone", &[("InstallPath", s(&other))]);
+            .with(Root::CurrentUser, r"Software\Cognosphere\HYP\standalone", &[("InstallPath", s(&dir.join("standalone-only")))]);
 
-        assert_eq!(launcher_path(&reg, Launcher::HoYoPlay), None);
-        assert_eq!(launcher_path(&FakeRegistry::default(), Launcher::HoYoPlay), None);
+        let genshin = game_at("genshin", "Genshin Impact", &game);
+        assert_eq!(LauncherPaths::read(&reg).for_game(&genshin), None);
+        assert_eq!(LauncherPaths::read(&FakeRegistry::default()).for_game(&genshin), None);
         fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
-    fn the_kuro_launcher_lies_in_the_folder_of_its_uninstall_entry() {
+    fn kuro_is_offered_for_the_game_in_the_folder_of_its_uninstall_entry() {
         let dir = scratch("kuro-launcher");
-        let exe = touch(&dir, "launcher.exe");
-        touch(&dir, r"Wuthering Waves Game\Wuthering Waves.exe");
+        let launcher = touch(&dir, r"Kuro\launcher.exe");
+        let game = touch(&dir, r"Kuro\Wuthering Waves Game\Wuthering Waves.exe");
+        let elsewhere = touch(&dir, r"Other\Wuthering Waves.exe");
         let reg = FakeRegistry::default().with(
             Root::LocalMachine,
             &kuro_key(UNINSTALL_HKLM, "KRInstall Wuthering Waves Overseas"),
-            &[("InstallPath", s(&dir))],
+            &[("InstallPath", s(&dir.join("Kuro")))],
         );
 
-        assert_eq!(launcher_path(&reg, Launcher::Kuro), Some(exe));
+        let found = LauncherPaths::read(&reg);
+        assert_eq!(
+            found.for_game(&game_at("wuthering", "Wuthering Waves", &game)),
+            Some((Launcher::Kuro, launcher.as_path()))
+        );
+        // Копия в другой папке — не его установка.
+        assert_eq!(found.for_game(&game_at("wuthering", "Wuthering Waves", &elsewhere)), None);
         fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
-    fn no_kuro_launcher_when_only_the_game_is_in_the_folder() {
+    fn no_kuro_when_only_the_game_is_in_the_folder() {
         let dir = scratch("kuro-launcher-none");
-        touch(&dir, "Wuthering Waves.exe");
+        let game = touch(&dir, "Wuthering Waves.exe");
         let reg = FakeRegistry::default().with(
             Root::LocalMachine,
             &kuro_key(UNINSTALL_HKLM, "KRInstall Wuthering Waves Overseas"),
             &[("InstallPath", s(&dir))],
         );
 
-        assert_eq!(launcher_path(&reg, Launcher::Kuro), None);
+        assert_eq!(LauncherPaths::read(&reg).for_game(&game_at("wuthering", "Wuthering Waves", &game)), None);
         fs::remove_dir_all(&dir).ok();
     }
 
     #[test]
-    fn the_gryphlink_launcher_comes_from_its_uninstall_entry() {
+    fn gryphlink_is_offered_only_for_a_game_inside_its_folder() {
         let dir = scratch("gryph-launcher");
-        let exe = touch(&dir, "Launcher.exe");
+        let launcher = touch(&dir, "Launcher.exe");
+        let inside = touch(&dir, r"games\Endfield\Endfield.exe");
         let reg = FakeRegistry::default().with(
             Root::CurrentUser,
             &kuro_key(UNINSTALL_HKCU, "GRYPHLINK"),
             &[("DisplayName", "GRYPHLINK"), ("InstallLocation", s(&dir))],
         );
 
-        assert_eq!(launcher_path(&reg, Launcher::Gryphlink), Some(exe));
-        assert_eq!(launcher_path(&FakeRegistry::default(), Launcher::Gryphlink), None);
+        let found = LauncherPaths::read(&reg);
+        assert_eq!(
+            found.for_game(&game_at("endfield", "Arknights: Endfield", &inside)),
+            Some((Launcher::Gryphlink, launcher.as_path()))
+        );
+        let epic = Path::new(r"C:\Program Files\Epic Games\ArknightsEndfieldgowoU\Launcher.exe");
+        assert_eq!(found.for_game(&game_at("endfield", "Arknights: Endfield", epic)), None);
+        fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn a_launcher_is_not_offered_to_a_game_that_is_not_its_own() {
+        // Файл лежит в папке игры HoYoPlay, но сама игра — не из HoYoPlay.
+        let dir = scratch("hyp-launcher-foreign");
+        touch(&dir, r"HoYoPlay\launcher.exe");
+        let reg = FakeRegistry::default()
+            .with(Root::CurrentUser, r"Software\Cognosphere\HYP\1_0", &[("InstallPath", s(&dir.join("HoYoPlay")))])
+            .with(Root::CurrentUser, r"Software\Cognosphere\HYP\1_0\hk4e_global", &[("GameInstallPath", s(&dir))]);
+
+        let found = LauncherPaths::read(&reg);
+        assert_eq!(found.for_game(&game_at("lantern", "Lantern Keeper", &dir.join("Lantern.exe"))), None);
         fs::remove_dir_all(&dir).ok();
     }
 
@@ -1153,25 +1223,6 @@ mod tests {
         // Привязка важнее названия: игру переименовали, но каталог её знает.
         assert_eq!(Launcher::of_game(Some("wuthering"), "Genshin Impact"), Some(Launcher::Kuro));
         assert_eq!(Launcher::of_game(Some("other"), "Genshin Impact"), None);
-    }
-
-    #[test]
-    fn a_game_gets_its_own_launcher_only_when_that_one_is_installed() {
-        let paths = LauncherPaths {
-            hoyoplay: Some(PathBuf::from(r"C:\HoYoPlay\launcher.exe")),
-            kuro: None,
-            gryphlink: Some(PathBuf::from(r"C:\GRYPHLINK\Launcher.exe")),
-        };
-        assert_eq!(
-            paths.for_game(Some("zzz"), "Zenless Zone Zero"),
-            Some((Launcher::HoYoPlay, Path::new(r"C:\HoYoPlay\launcher.exe")))
-        );
-        assert_eq!(paths.for_game(Some("wuthering"), "Wuthering Waves"), None);
-        assert_eq!(paths.for_game(None, "Lantern Keeper"), None);
-        assert_eq!(
-            paths.for_game(None, "Arknights: Endfield"),
-            Some((Launcher::Gryphlink, Path::new(r"C:\GRYPHLINK\Launcher.exe")))
-        );
     }
 
     #[test]

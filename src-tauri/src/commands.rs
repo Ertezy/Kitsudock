@@ -161,7 +161,7 @@ pub fn view_of(
         art_path: art.art_path.map(|p| p.to_string_lossy().into_owned()),
         art_source: art.source,
         video_path: art.video_path.map(|p| p.to_string_lossy().into_owned()),
-        ..view_with_launcher(game, launchers.for_game(game.content_id.as_deref(), &game.title))
+        ..view_with_launcher(game, launchers.for_game(game))
     }
 }
 
@@ -209,7 +209,7 @@ pub fn launch_and_remember(app: &AppHandle, game_id: &str) -> Result<(), AppErro
     // Лаунчер ищется заново при каждом запуске: его могли поставить или
     // удалить, пока окно было открыто. Реестр только читается, без замка.
     let launchers = crate::stores::launchers::LauncherPaths::find();
-    let launcher = launchers.for_game(game.content_id.as_deref(), &game.title);
+    let launcher = launchers.for_game(&game);
     launch::launch(app, &game, launcher.map(|(_, path)| path))?;
 
     let remembered = config::update(app, |cfg| {
