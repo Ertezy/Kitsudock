@@ -172,11 +172,15 @@ export default function GameEditor({ game, hubGames, onChanged }: Props) {
 
       <details className="settings-extra">
         <summary>{t.settings.advanced}</summary>
-        {game.sourceKind === "exe" ? (
+        {/* Аргументы доходят до игры только при прямом запуске: у игры из
+            магазина поле есть, если её можно запустить и напрямую. */}
+        {game.sourceKind === "exe" || game.ways.includes("direct") ? (
           <div className="settings-row">
             <div className="settings-row-text">
               <span className="settings-row-title">{t.settings.editor.args}</span>
-              <span className="settings-row-hint">{t.settings.editor.argsHint}</span>
+              <span className="settings-row-hint">
+                {game.way === "direct" ? t.settings.editor.argsHint : t.settings.editor.argsDirectOnly}
+              </span>
             </div>
             <div className="settings-row-control">
               <input

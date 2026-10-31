@@ -698,7 +698,8 @@ body::after {
    выбрать с клавиатуры. Ошибка запуска и выходы из неё не ждут никогда: это
    ответ на действие человека. */
 .play-area.is-waiting > .play-note,
-.play-area.is-waiting > .play {
+.play-area.is-waiting .play,
+.play-area.is-waiting .ways {
   visibility: hidden;
   animation: none;
 }
@@ -946,6 +947,222 @@ body::after {
 .play-fix button:disabled {
   opacity: 0.65;
   cursor: default;
+}
+
+/* Переключатель способа запуска (`LaunchWays`). Кнопка PLAY и язычок под ней
+   стоят в одной колонке: язычок растягивается на её ширину, а своей ширины в
+   колонку не вносит (`width: 0` с `min-width: 100%`), иначе длинное название
+   способа расширило бы и кнопку. Язычок занимает место под кнопкой, а не
+   поверх дока: колонка встаёт на тот же отступ от низа сцены, и всё над
+   язычком поднимается на его высоту. */
+.play-core {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* Панель выезжает из язычка в место, где стояла кнопка, а кнопка, подпись и
+   ошибка над ней поднимаются на высоту панели (`--ways-shift` считает
+   `LaunchWays` по раскладке): ничто не ложится поверх подписи, и колонка не
+   растёт вниз, к доку. Поднимаются обёртка кнопки и соседи над ней, а не сама
+   кнопка: у кнопки свой `transform` — вдавливание при нажатии. Обёртка лежит
+   над панелью: пока панель уезжает, она не проступает поверх кнопки. */
+.play-lift,
+.play-area > .play-note,
+.play-area > .play-error,
+.play-area > .play-fix {
+  transition: transform var(--move) var(--ease-out);
+}
+
+.play-lift {
+  position: relative;
+  z-index: var(--z-ui);
+}
+
+.play-area.ways-open .play-lift,
+.play-area.ways-open > .play-note,
+.play-area.ways-open > .play-error,
+.play-area.ways-open > .play-fix {
+  transform: translateY(calc(var(--ways-shift) * -1));
+}
+
+.ways {
+  position: relative;
+  width: 0;
+  min-width: 100%;
+  margin-top: 6px;
+  animation: play-rise var(--move-slow) var(--ease-out) var(--move) backwards;
+}
+
+/* Язычок: узкая таблетка на тёмной плашке, как подпись над кнопкой, — на
+   светлом арте прозрачной она терялась бы. Название способа и стрелка; стрелка
+   смотрит вверх, туда, куда выедет панель, и переворачивается, пока панель
+   открыта. */
+.ways-tab {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: var(--plate);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--glass-edge);
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform var(--move-fast) var(--ease-spring);
+}
+
+.ways-tab-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ways-arrow {
+  flex: none;
+  color: var(--ink-dim);
+  transition: transform var(--move) var(--ease-out);
+}
+
+.ways-tab[aria-expanded="true"] .ways-arrow {
+  transform: rotate(180deg);
+}
+
+/* Подсветка под курсором — тонкий светлый слой и кромка, как у выходов из
+   ошибки запуска: плашка не светлеет, и текст на белом арте остаётся читаемым. */
+.ways-tab::before,
+.ways-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.ways-tab::before {
+  border-radius: var(--r-pill);
+}
+
+.ways-item::before {
+  border-radius: var(--r-md);
+}
+
+.ways-tab:hover::before,
+.ways-item:hover::before {
+  opacity: 1;
+}
+
+.ways-tab:active {
+  transform: scale(0.97);
+}
+
+.ways-tab:focus-visible,
+.ways-item:focus-visible {
+  box-shadow: var(--glass-edge), var(--focus-halo);
+}
+
+/* Панель шириной с кнопку. Закрытая — прозрачная, чуть ниже своего места, мышь
+   и клавиатура её не замечают (`inert` ставит `LaunchWays`). Низ панели — на
+   месте низа кнопки, то есть над язычком с тем же зазором. */
+.ways-panel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border-radius: var(--r-lg);
+  background: var(--plate);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--glass-edge), var(--shadow-2);
+  opacity: 0;
+  transform: translateY(12px);
+  pointer-events: none;
+  transition:
+    opacity var(--move) var(--ease-out),
+    transform var(--move) var(--ease-out);
+}
+
+.ways-panel.is-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+/* Строка способа — как переключатель: круглая отметка слева, у выбранного она
+   залита цветом текста. Под названием — мелкое пояснение, если оно есть. */
+.ways-item {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 8px;
+  align-items: baseline;
+  width: 100%;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--move-fast) var(--ease-spring);
+}
+
+.ways-item:active {
+  transform: scale(0.98);
+}
+
+.ways-mark {
+  --mark: 12px;
+  width: var(--mark);
+  height: var(--mark);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1.5px var(--ink-dim);
+}
+
+.ways-item[aria-checked="true"] .ways-mark {
+  background: var(--ink);
+  box-shadow: inset 0 0 0 2px var(--ink), inset 0 0 0 4px var(--plate);
+}
+
+.ways-hint {
+  grid-column: 2;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--ink-dim);
+}
+
+/* Тумблер «Анимация» выключен — панель появляется и уходит без движения, кнопка
+   встаёт на место сразу, стрелка переворачивается скачком. Начатые переходы
+   обрываются, как у дока. */
+:root[data-motion="off"] :is(.play-lift, .ways-panel, .ways-arrow, .ways-tab, .ways-item),
+:root[data-motion="off"] .play-area > :is(.play-note, .play-error, .play-fix),
+:root[data-motion="off"] :is(.ways-tab, .ways-item)::before {
+  transition: none;
+}
+:root[data-motion="off"] .ways-panel {
+  transform: none;
 }
 
 /* Столбик официальных соцсетей выбранной игры — у правого края сцены, сверху

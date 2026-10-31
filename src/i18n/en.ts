@@ -69,7 +69,23 @@ export const en = {
   main: {
     launch: {
       note: { steam: "Launches via Steam", epic: "Launches via Epic Games", exe: "Launches directly" },
+      viaLauncher: {
+        hoyoplay: "Launches via HoYoPlay",
+        kuro: "Launches via the Kuro launcher",
+        gryphlink: "Launches via GRYPHLINK",
+      },
       fileMissing: "game file not found",
+      // Переключатель способа под кнопкой «Играть».
+      way: {
+        direct: "Directly",
+        store: { steam: "Via Steam", epic: "Via Epic Games" },
+        launcher: { hoyoplay: "Via HoYoPlay", kuro: "Via the Kuro launcher", gryphlink: "Via GRYPHLINK" },
+        // Магазин не всегда пускает игру мимо себя — обещать запуск нельзя.
+        directHint: (store: string) => `May not start: the game may need to be launched through ${store}`,
+        list: "How to launch",
+        tab: (way: string) => `How to launch: ${way}`,
+        saveFailed: (reason: string) => `Couldn't save how to launch the game. ${reason}`,
+      },
       from: {
         steam: "from Steam",
         epic: "from Epic Games",
@@ -202,6 +218,7 @@ export const en = {
       removeCancel: "Cancel",
       args: "Launch arguments",
       argsHint: "Passed to the game as-is. A wrong value can prevent it from launching.",
+      argsDirectOnly: "Passed to the game only when it launches directly. It's set to launch another way now.",
       argsPlaceholder: "e.g. -window",
       argsUnavailable: (source: string) => `Launch arguments aren't available here: the game is opened by ${source} via its own link, and nothing extra can be passed to it.`,
     },

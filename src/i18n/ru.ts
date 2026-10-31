@@ -73,7 +73,23 @@ export const ru: Dictionary = {
   main: {
     launch: {
       note: { steam: "Запустится через Steam", epic: "Запустится через Epic Games", exe: "Запустится напрямую" },
+      viaLauncher: {
+        hoyoplay: "Запустится через HoYoPlay",
+        kuro: "Запустится через лаунчер Kuro",
+        gryphlink: "Запустится через GRYPHLINK",
+      },
       fileMissing: "файл не найден",
+      // Переключатель способа под кнопкой «Играть».
+      way: {
+        direct: "Напрямую",
+        store: { steam: "Через Steam", epic: "Через Epic Games" },
+        launcher: { hoyoplay: "Через HoYoPlay", kuro: "Через лаунчер Kuro", gryphlink: "Через GRYPHLINK" },
+        // Магазин не всегда пускает игру мимо себя — обещать запуск нельзя.
+        directHint: (store: string) => `Может не запуститься: игре бывает нужен запуск через ${store}`,
+        list: "Способ запуска",
+        tab: (way: string) => `Способ запуска: ${way}`,
+        saveFailed: (reason: string) => `Не удалось сохранить способ запуска. ${reason}`,
+      },
       from: {
         steam: "из Steam",
         epic: "из Epic Games",
@@ -211,6 +227,7 @@ export const ru: Dictionary = {
       removeCancel: "Отмена",
       args: "Аргументы запуска",
       argsHint: "Передаются игре как есть. Неверное значение может помешать ей запуститься.",
+      argsDirectOnly: "Передаются игре только при запуске напрямую, а сейчас выбран другой способ.",
       argsPlaceholder: "например, -window",
       argsUnavailable: (source: string) => `Аргументы запуска здесь недоступны: игру открывает ${source} по собственной ссылке, и передать ей что-то дополнительное нельзя.`,
     },
