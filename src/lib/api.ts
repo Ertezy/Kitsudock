@@ -2,7 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import type { About, AppConfig, Behaviour, FoundGame, GameView, HubData } from "../types";
+import type { About, AppConfig, Behaviour, FoundGame, GameView, HubData, LaunchWay } from "../types";
 import { currentT, type Lang, type VideoLang } from "../i18n";
 
 /**
@@ -59,6 +59,9 @@ export const api = {
     // а обычное значение — «запускать без аргументов».
     args?: string;
   }) => invoke<void>("update_game", args),
+  /** Запомнить, как запускать игру. Недоступный сейчас способ не действует,
+   *  пока не станет доступен (Rust: `launch::chosen_way`). */
+  setLaunchWay: (gameId: string, way: LaunchWay) => invoke<void>("set_launch_way", { gameId, way }),
   removeGame: (gameId: string) => invoke<void>("remove_game", { gameId }),
   reorderGames: (ids: string[]) => invoke<void>("reorder_games", { ids }),
   relocateGame: (gameId: string) => invoke<void>("relocate_game", { gameId }),

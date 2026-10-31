@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer, useState, type CSSProperties } from "react";
 import { api } from "../lib/api";
 import { useT } from "../i18n";
 import { errorText } from "../i18n/errors";
@@ -6,7 +6,9 @@ import { useMotionOn } from "../lib/motion";
 import { ART_WAIT_MS, playAreaWaiting } from "../lib/playArea";
 import { LAUNCH_HOLD_MS, launchHeld } from "../lib/launchHold";
 import { useWindowActive, windowActive } from "../lib/windowActive";
-import type { LaunchResult } from "../types";
+import type { WayChoice } from "../lib/launch";
+import type { LaunchResult, LaunchWay } from "../types";
+import LaunchWays from "./LaunchWays";
 
 interface Props {
   gameId: string;
@@ -25,13 +27,20 @@ interface Props {
   /** Фон игры начал проявляться. С анимацией до этого подпись и кнопка ждут
    *  невидимыми (недолго) и поднимаются вслед за фоном, а не раньше него. */
   artShown: boolean;
+  /** Способы запуска на выбор (`wayChoices`); пусто — переключателя нет. */
+  choices: WayChoice[];
+  /** Запомнить выбранный способ. Ответ — текст ошибки или `null`. */
+  onChooseWay: (way: LaunchWay) => Promise<string | null>;
 }
 
-export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, externalFailure, artShown }: Props) {
+export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, externalFailure, artShown, choices, onChooseWay }: Props) {
   const [busy, setBusy] = useState(false);
   const [fixing, setFixing] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [waitedEnough, setWaitedEnough] = useState(false);
+  // Открытая панель способов поднимает всё над язычком на свою высоту.
+  const [waysShift, setWaysShift] = useState<number | null>(null);
+  const [wayFailure, setWayFailure] = useState<string | null>(null);
   const motion = useMotionOn();
   const t = useT();
 
@@ -93,6 +102,11 @@ export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, 
 
   const relocate = () => runFix(() => api.relocateGame(gameId));
 
+  const chooseWay = async (way: LaunchWay) => {
+    setWayFailure(null);
+    setWayFailure(await onChooseWay(way));
+  };
+
   const pickManually = () =>
     runFix(async () => {
       const exe = await api.pickExe();
@@ -100,7 +114,10 @@ export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, 
     });
 
   return (
-    <div className={waiting ? "play-area is-waiting" : "play-area"}>
+    <div
+      className={["play-area", waiting && "is-waiting", waysShift !== null && "ways-open"].filter(Boolean).join(" ")}
+      style={waysShift !== null ? ({ "--ways-shift": `${waysShift}px` } as CSSProperties) : undefined}
+    >
       {failure && (
         <>
           <div className="play-error">{failure}</div>
@@ -114,24 +131,31 @@ export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, 
           </div>
         </>
       )}
+      {/* Выбор способа не сохранился — без выходов «найти заново»: файл тут ни при чём. */}
+      {wayFailure && <div className="play-error">{wayFailure}</div>}
       <div className="play-note">{note}</div>
-      <button
-        className={launching ? "play launching" : "play"}
-        disabled={launching || fixing || disabled}
-        aria-busy={launching || undefined}
-        onClick={() => void click()}
-      >
-        {/* Блик «запускается…» — только пока идёт запуск: появляется вместе с
-            состоянием и начинает проход с начала, а не с середины. */}
-        {launching && <span className="play-sheen" aria-hidden="true" />}
-        {/* Обе надписи всегда в разметке, видна одна: кнопка шириной с
-            длинную и не прыгает, когда «Играть» сменяется на «Запускаю…».
-            Спрятанную стили убирают и от экранного диктора. */}
-        <span className="play-label">
-          <span className={launching ? "is-off" : undefined}>{t.main.play}</span>
-          <span className={launching ? undefined : "is-off"}>{t.main.launching}</span>
-        </span>
-      </button>
+      <div className="play-core">
+        <div className="play-lift">
+          <button
+            className={launching ? "play launching" : "play"}
+            disabled={launching || fixing || disabled}
+            aria-busy={launching || undefined}
+            onClick={() => void click()}
+          >
+            {/* Блик «запускается…» — только пока идёт запуск: появляется вместе с
+                состоянием и начинает проход с начала, а не с середины. */}
+            {launching && <span className="play-sheen" aria-hidden="true" />}
+            {/* Обе надписи всегда в разметке, видна одна: кнопка шириной с
+                длинную и не прыгает, когда «Играть» сменяется на «Запускаю…».
+                Спрятанную стили убирают и от экранного диктора. */}
+            <span className="play-label">
+              <span className={launching ? "is-off" : undefined}>{t.main.play}</span>
+              <span className={launching ? undefined : "is-off"}>{t.main.launching}</span>
+            </span>
+          </button>
+        </div>
+        {choices.length > 1 && <LaunchWays choices={choices} onChoose={(way) => void chooseWay(way)} onShift={setWaysShift} />}
+      </div>
     </div>
   );
 }

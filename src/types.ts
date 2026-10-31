@@ -4,7 +4,13 @@
 export type SourceKind = "steam" | "epic" | "exe";
 /** Откуда найдена игра на экране сканирования: к способам запуска добавляются
  *  собственные лаунчеры — после добавления такая игра запускается как `exe`. */
-export type FoundSourceKind = SourceKind | "hoyoplay" | "kuro" | "gryphlink";
+export type FoundSourceKind = SourceKind | LauncherKind;
+
+/** Собственный лаунчер игры. */
+export type LauncherKind = "hoyoplay" | "kuro" | "gryphlink";
+
+/** Способ запуска на выбор человека: магазином, файлом игры или её лаунчером. */
+export type LaunchWay = "store" | "direct" | "launcher";
 
 export interface GameView {
   id: string;
@@ -27,6 +33,13 @@ export interface GameView {
   args: string;
   /** Файл или папка игры пропали с диска. */
   missing: boolean;
+  /** Чем игру можно запустить сейчас, в порядке показа. Один способ или ни
+   *  одного — переключателя нет. */
+  ways: LaunchWay[];
+  /** Каким способом она запустится: выбранный, а если он недоступен — как всегда. */
+  way: LaunchWay;
+  /** Лаунчер игры, если он среди способов. */
+  launcher: LauncherKind | null;
 }
 
 export interface HubGame {
@@ -67,6 +80,8 @@ export interface Code {
   rewards: string;
   /** unix-секунды; null — бессрочный. */
   expiresAt: number | null;
+  /** Срок у источника был одной датой: `expiresAt` — оценка конца дня. Нет поля — срок точный. */
+  expiresDayOnly?: boolean;
   region: string;
   source: string | null;
 }

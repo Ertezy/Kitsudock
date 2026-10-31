@@ -3,7 +3,7 @@
 // свои нарисованные заглушки (`art.ts`), а не арт игр. Времена считаются от
 // «сейчас», чтобы таймеры на стенде выглядели одинаково при каждом открытии.
 
-import type { Banner, Code, FoundGame, GameView, HubData, HubGame, Social, SourceKind, Video } from "../types";
+import type { Banner, Code, FoundGame, GameView, HubData, HubGame, LauncherKind, LaunchWay, Social, SourceKind, Video } from "../types";
 import { backgroundArt, iconArt, imageUrl } from "./art";
 
 const H = 3600;
@@ -21,13 +21,19 @@ interface Preset {
   ownPicture?: boolean;
   /** Два оттенка заглушек; `null` — у игры нет ни фона, ни иконки (рисуются запасные). */
   hues: [number, number] | null;
+  /** Способы запуска на выбор, если их больше одного: на стенде у игр разный
+   *  набор — один, два, три, — чтобы был виден и переключатель, и его отсутствие. */
+  ways?: LaunchWay[];
+  /** Выбранный способ; без него — как в приложении: магазин или напрямую. */
+  way?: LaunchWay;
+  launcher?: LauncherKind;
 }
 
 const PRESETS: Preset[] = [
-  { id: "genshin", title: "Genshin Impact", contentId: "genshin", sourceKind: "epic", artSource: "hoyoplay", hues: [38, 205] },
-  { id: "hsr", title: "Honkai: Star Rail", contentId: "hsr", sourceKind: "exe", artSource: "hoyoplay", hues: [268, 218] },
+  { id: "genshin", title: "Genshin Impact", contentId: "genshin", sourceKind: "epic", artSource: "hoyoplay", hues: [38, 205], ways: ["direct", "launcher", "store"], launcher: "hoyoplay" },
+  { id: "hsr", title: "Honkai: Star Rail", contentId: "hsr", sourceKind: "exe", artSource: "hoyoplay", hues: [268, 218], ways: ["direct", "launcher"], way: "launcher", launcher: "hoyoplay" },
   { id: "zzz", title: "Zenless Zone Zero", contentId: "zzz", sourceKind: "exe", artSource: "hoyoplay", ownPicture: true, hues: [338, 28] },
-  { id: "wuthering", title: "Wuthering Waves", contentId: "wuthering", sourceKind: "steam", artSource: "steam", hues: [188, 140] },
+  { id: "wuthering", title: "Wuthering Waves", contentId: "wuthering", sourceKind: "steam", artSource: "steam", hues: [188, 140], ways: ["direct", "store"] },
   // Игра без данных хаба и без картинок: на ней видны запасные фон и иконка-буква.
   { id: "endfield", title: "Arknights: Endfield", contentId: null, sourceKind: "exe", artSource: "fill", hues: null },
 ];
@@ -45,7 +51,15 @@ function toView(p: Preset, index: number): GameView {
     videoMissing: false,
     args: "",
     missing: false,
+    ...waysOf(p),
   };
+}
+
+/** Способы запуска пресета. По умолчанию — как в Rust (`launch::default_way`):
+ *  игра из магазина — магазином, остальные — напрямую. */
+function waysOf(p: Pick<Preset, "sourceKind" | "ways" | "way" | "launcher">): Pick<GameView, "ways" | "way" | "launcher"> {
+  const fallback: LaunchWay = p.sourceKind === "exe" ? "direct" : "store";
+  return { ways: p.ways ?? [fallback], way: p.way ?? fallback, launcher: p.launcher ?? null };
 }
 
 /** Какой фон у игры без своей картинки и своего видео: тот, что был бы у неё из лаунчера или магазина. */
@@ -95,6 +109,7 @@ export function gameFromScan(title: string, taken: number): GameView {
     videoMissing: false,
     args: "",
     missing: false,
+    ...waysOf({ sourceKind: "exe" }),
   };
 }
 
@@ -198,7 +213,8 @@ function codes(now: number): Code[] {
     c("genshin", "LANTERNFEST", "Gems ×40, Coins ×30000", now + 2 * D + 5 * H),
     c("genshin", "FOXFIRE100", "Coins ×50000, Ore ×5", null),
     c("genshin", "HOLLOWSEA", "Gems ×30, Tickets ×1", now + 9 * D, "NA"),
-    c("hsr", "QUIETORCHARD", "Gems ×50, Coins ×40000", now + 6 * H + 10 * 60),
+    // Срок у источника одной датой: строка называет день, а не часы.
+    { ...c("hsr", "QUIETORCHARD", "Gems ×50, Coins ×40000", now + 6 * H + 10 * 60), expiresDayOnly: true },
     c("hsr", "RAILSFROST", "Gems ×60, Coins ×30000, Fuel ×2", now + 4 * D),
     c("hsr", "STARDUSTFOX", "Coins ×60000", null),
     c("zzz", "NEONSTATIC", "Tickets ×40, Coins ×30000", now + 20 * H),

@@ -95,6 +95,31 @@ pub struct Game {
     /// человека она трогать не должна. Нет поля в файле — `false`.
     #[serde(default)]
     pub content_unlinked: bool,
+    /// Как человек выбрал запускать игру. `None` — как было всегда: через
+    /// магазин, если игра оттуда, иначе напрямую. Выбранный способ, который
+    /// стал недоступен (лаунчер удалили), просто не действует, пока не вернётся:
+    /// запуск берёт умолчание, а запись остаётся как есть (`launch::chosen_way`).
+    /// Незнакомое значение — тоже `None`, а не потерянная игра.
+    #[serde(default, deserialize_with = "lenient_way")]
+    pub launch_way: Option<LaunchWay>,
+}
+
+/// Способ запуска на выбор человека. Какие из них доступны игре, решает
+/// `launch::available_ways`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum LaunchWay {
+    /// Ссылкой Steam или Epic (`Launch::Steam`, `Launch::Epic`).
+    Store,
+    /// Файлом игры (`exe_path`) с её аргументами.
+    Direct,
+    /// Собственным лаунчером игры (`stores::launchers::Launcher`).
+    Launcher,
+}
+
+fn lenient_way<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<LaunchWay>, D::Error> {
+    let value = serde_json::Value::deserialize(d)?;
+    Ok(serde_json::from_value(value).ok())
 }
 
 impl Game {
@@ -115,6 +140,7 @@ impl Game {
             icon: None,
             video: None,
             content_unlinked: false,
+            launch_way: None,
         }
     }
 }
@@ -283,6 +309,7 @@ pub fn migrate_v1(raw: &serde_json::Value) -> Option<AppConfig> {
             icon: None,
             video: None,
             content_unlinked: false,
+            launch_way: None,
         });
     }
 
@@ -1234,6 +1261,58 @@ mod tests {
         save_to(&path, &cfg).unwrap();
         assert!(fs::read_to_string(&path).unwrap().contains("\"contentUnlinked\": true"));
         assert!(load_from(&path).games[0].content_unlinked);
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn a_game_saved_before_the_launch_choice_loads_with_the_default_way() {
+        // Поле необязательное, и версия конфига ради него не поднимается.
+        let raw = serde_json::json!({
+            "version": 3,
+            "games": [
+                {"id":"a","title":"A","contentId":null,"launch":{"kind":"exe"},"exePath":"C:\\a.exe","args":""}
+            ]
+        });
+        let path = temp_config("way-old");
+        fs::write(&path, raw.to_string()).unwrap();
+        let cfg = load_from(&path);
+        assert_eq!(cfg.games.len(), 1);
+        assert_eq!(cfg.games[0].launch_way, None);
+
+        let migrated = migrate_v2(&serde_json::from_str(V2_SAMPLE).unwrap()).unwrap();
+        assert!(migrated.games.iter().all(|g| g.launch_way.is_none()));
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn the_launch_choice_survives_a_save_round_trip_as_a_word() {
+        let mut cfg = AppConfig::default();
+        let mut g = Game::manual("a".into(), "A".into());
+        g.launch_way = Some(LaunchWay::Launcher);
+        cfg.games.push(g);
+        let path = temp_config("way-round-trip");
+        save_to(&path, &cfg).unwrap();
+        assert!(fs::read_to_string(&path).unwrap().contains("\"launchWay\": \"launcher\""));
+        assert_eq!(load_from(&path).games[0].launch_way, Some(LaunchWay::Launcher));
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn an_unknown_launch_choice_is_the_default_way_not_a_lost_game() {
+        // Значение из будущей версии не должно стоить человеку игры в списке.
+        let raw = serde_json::json!({
+            "version": 3,
+            "games": [
+                {"id":"a","title":"A","launch":{"kind":"exe"},"launchWay":"cloud"},
+                {"id":"b","title":"B","launch":{"kind":"exe"},"launchWay":7},
+                {"id":"c","title":"C","launch":{"kind":"steam","appid":1},"launchWay":"direct"}
+            ]
+        });
+        let path = temp_config("way-unknown");
+        fs::write(&path, raw.to_string()).unwrap();
+        let cfg = load_from(&path);
+        let ways: Vec<_> = cfg.games.iter().map(|g| g.launch_way).collect();
+        assert_eq!(ways, [None, None, Some(LaunchWay::Direct)]);
         let _ = fs::remove_dir_all(path.parent().unwrap());
     }
 

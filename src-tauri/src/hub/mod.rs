@@ -54,7 +54,10 @@ pub fn effective_url(hub_url: Option<&str>) -> &str {
 ///
 /// 4 — у `HubGame` появилось поле `socials` (официальные соцсети игры): та же
 /// история, кеш прежних сборок записан без него.
-const CACHE_FORMAT: u32 = 4;
+///
+/// 5 — у кода появилась пометка `expiresDayOnly` (срок на странице был одной
+/// датой): кеш прежних сборок записан без неё.
+const CACHE_FORMAT: u32 = 5;
 
 /// Метка версии последнего удачного ответа и адрес, для которого она получена.
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]

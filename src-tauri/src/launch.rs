@@ -1,5 +1,7 @@
-//! Запуск игры. Три способа, но для пользователя их два: через магазин
-//! и напрямую.
+//! Запуск игры. Человек выбирает из того, что игре доступно
+//! (`available_ways`): через магазин, напрямую или через собственный лаунчер
+//! игры. Ниже — как устроен каждый из них; лаунчер запускается так же, как
+//! свой .exe, только без аргументов игры.
 //!
 //! 1. Steam — `steam://rungameid/<appid>`. Клиент Steam сам разбирается
 //!    с обновлениями и авторизацией.
@@ -32,7 +34,7 @@ use std::process::{Command, Stdio};
 use tauri::AppHandle;
 use tauri_plugin_opener::OpenerExt;
 
-use crate::config::{Game, Launch};
+use crate::config::{Game, Launch, LaunchWay};
 use crate::error::{code, AppError};
 use crate::stores::epic::first_bad_launch_id;
 
@@ -343,61 +345,134 @@ fn checked_epic_uri(
     }
 }
 
-/// Ошибка — код с подробностью: фразу на языке интерфейса собирает страница.
-pub fn launch(app: &AppHandle, game: &Game) -> Result<(), AppError> {
-    match &game.launch {
-        Launch::Steam { appid } => {
-            let uri = format!("steam://rungameid/{appid}");
-            app.opener()
-                .open_url(&uri, None::<String>)
-                .map_err(|e| AppError::with(code::STEAM_OPEN_FAILED, format!("{uri}: {e}")))
+/// Файл игры, если он записан. Пустой путь — то же, что никакого.
+fn game_exe(game: &Game) -> Option<&Path> {
+    game.exe_path.as_deref().filter(|p| !p.as_os_str().is_empty())
+}
+
+/// Способы, которыми эту игру можно запустить сейчас, в порядке показа:
+/// напрямую — если известен её файл; лаунчером — если он найден и это не сам
+/// файл игры (GRYPHLINK находится как игра, и его файл — лаунчер); магазином —
+/// если игра оттуда.
+pub fn available_ways(game: &Game, launcher: Option<&Path>) -> Vec<LaunchWay> {
+    let exe = game_exe(game);
+    let mut ways = Vec::new();
+    if exe.is_some() {
+        ways.push(LaunchWay::Direct);
+    }
+    if let Some(launcher) = launcher {
+        if !exe.is_some_and(|e| crate::stores::same_path(e, launcher)) {
+            ways.push(LaunchWay::Launcher);
         }
-        Launch::Epic {
-            namespace,
-            catalog_item_id,
-            app_name,
-        } => {
-            let uri = checked_epic_uri(namespace, catalog_item_id, app_name)?;
-            app.opener()
-                .open_url(&uri, None::<String>)
-                .map_err(|e| AppError::with(code::EPIC_OPEN_FAILED, e.to_string()))
+    }
+    if !matches!(game.launch, Launch::Exe) {
+        ways.push(LaunchWay::Store);
+    }
+    ways
+}
+
+/// Как игра запускалась всегда: магазином, если она оттуда, иначе напрямую.
+pub fn default_way(game: &Game) -> LaunchWay {
+    match game.launch {
+        Launch::Steam { .. } | Launch::Epic { .. } => LaunchWay::Store,
+        Launch::Exe => LaunchWay::Direct,
+    }
+}
+
+/// Выбранный человеком способ, пока он доступен; иначе — умолчание. Запись
+/// игры не меняется: вернётся лаунчер — вернётся и выбор.
+pub fn chosen_way(game: &Game, available: &[LaunchWay]) -> LaunchWay {
+    game.launch_way
+        .filter(|way| available.contains(way))
+        .unwrap_or_else(|| default_way(game))
+}
+
+/// Что сделать, чтобы запустить игру. Отдельно от самого запуска, чтобы выбор
+/// способа проверялся без настоящего запуска.
+#[derive(Debug, PartialEq)]
+enum Plan {
+    Steam(String),
+    Epic(String),
+    /// Файл и строка его аргументов (ещё не разобранная: разбор — при запуске).
+    Exe { exe: PathBuf, args: String },
+}
+
+fn plan(game: &Game, launcher: Option<&Path>) -> Result<Plan, AppError> {
+    let way = chosen_way(game, &available_ways(game, launcher));
+    match (way, &game.launch, launcher) {
+        (LaunchWay::Store, Launch::Steam { appid }, _) => {
+            Ok(Plan::Steam(format!("steam://rungameid/{appid}")))
         }
-        Launch::Exe => {
-            let exe = game
-                .exe_path
-                .clone()
-                .filter(|p| !p.as_os_str().is_empty())
-                .ok_or_else(|| AppError::new(code::EXE_PATH_MISSING))?;
+        (
+            LaunchWay::Store,
+            Launch::Epic {
+                namespace,
+                catalog_item_id,
+                app_name,
+            },
+            _,
+        ) => checked_epic_uri(namespace, catalog_item_id, app_name).map(Plan::Epic),
+        // Лаунчеру аргументы игры ни к чему: он их не понимает.
+        (LaunchWay::Launcher, _, Some(launcher)) => Ok(Plan::Exe {
+            exe: launcher.to_path_buf(),
+            args: String::new(),
+        }),
+        _ => {
+            let exe = game_exe(game).ok_or_else(|| AppError::new(code::EXE_PATH_MISSING))?;
+            Ok(Plan::Exe {
+                exe: exe.to_path_buf(),
+                args: game.args.clone(),
+            })
+        }
+    }
+}
 
-            if !exe.is_file() {
-                return Err(AppError::with(code::FILE_MISSING, exe.display().to_string()));
-            }
+/// Запуск файла: игры или её лаунчера.
+fn start_exe(exe: &Path, args: &str) -> Result<(), AppError> {
+    if !exe.is_file() {
+        return Err(AppError::with(code::FILE_MISSING, exe.display().to_string()));
+    }
 
-            let parsed = split_args(&game.args)
-                .ok_or_else(|| AppError::with(code::ARGS_UNCLOSED_QUOTE, game.args.clone()))?;
+    let parsed =
+        split_args(args).ok_or_else(|| AppError::with(code::ARGS_UNCLOSED_QUOTE, args.to_string()))?;
 
-            let cwd = exe
-                .parent()
-                .map(|p| p.to_path_buf())
-                .unwrap_or_else(|| PathBuf::from("."));
+    let cwd = exe
+        .parent()
+        .map(|p| p.to_path_buf())
+        .unwrap_or_else(|| PathBuf::from("."));
 
-            match Command::new(&exe).args(&parsed).current_dir(&cwd).spawn() {
-                Ok(_) => Ok(()),
-                // 740: игре нужны права администратора. Только в этом случае
-                // отдаём запуск оболочке Windows, чтобы она показала окно прав.
-                Err(first) if needs_elevation(&first) => start_with_elevation(&exe, &cwd, &parsed)
-                    .map_err(|second| {
-                        AppError::with(
-                            code::EXE_START_FAILED,
-                            format!("{}: {first}; {second}", exe.display()),
-                        )
-                    }),
-                Err(e) => Err(AppError::with(
+    match Command::new(exe).args(&parsed).current_dir(&cwd).spawn() {
+        Ok(_) => Ok(()),
+        // 740: файлу нужны права администратора. Только в этом случае отдаём
+        // запуск оболочке Windows, чтобы она показала окно прав.
+        Err(first) if needs_elevation(&first) => start_with_elevation(exe, &cwd, &parsed)
+            .map_err(|second| {
+                AppError::with(
                     code::EXE_START_FAILED,
-                    format!("{}: {e}", exe.display()),
-                )),
-            }
-        }
+                    format!("{}: {first}; {second}", exe.display()),
+                )
+            }),
+        Err(e) => Err(AppError::with(
+            code::EXE_START_FAILED,
+            format!("{}: {e}", exe.display()),
+        )),
+    }
+}
+
+/// Запуск выбранным способом (`chosen_way`); `launcher` — файл лаунчера игры,
+/// если он стоит на компьютере. Ошибка — код с подробностью: фразу на языке
+/// интерфейса собирает страница.
+pub fn launch(app: &AppHandle, game: &Game, launcher: Option<&Path>) -> Result<(), AppError> {
+    match plan(game, launcher)? {
+        Plan::Steam(uri) => app
+            .opener()
+            .open_url(&uri, None::<String>)
+            .map_err(|e| AppError::with(code::STEAM_OPEN_FAILED, format!("{uri}: {e}"))),
+        Plan::Epic(uri) => app
+            .opener()
+            .open_url(&uri, None::<String>)
+            .map_err(|e| AppError::with(code::EPIC_OPEN_FAILED, e.to_string())),
+        Plan::Exe { exe, args } => start_exe(&exe, &args),
     }
 }
 
@@ -453,6 +528,137 @@ mod launch_tests {
             checked_epic_uri("ns", "x/y", "p q"),
             Err(AppError::with(code::EPIC_OPEN_FAILED, "CatalogItemId"))
         );
+    }
+
+    // ------------------------------------------------------- способ запуска
+
+    use crate::config::LaunchWay;
+
+    const HYP: &str = r"C:\Program Files\HoYoPlay\launcher.exe";
+
+    fn epic_game() -> Game {
+        let mut g = Game::manual("genshin".into(), "Genshin Impact".into());
+        g.launch = Launch::Epic {
+            namespace: "879b0d87".into(),
+            catalog_item_id: "7d690c12".into(),
+            app_name: "41869934".into(),
+        };
+        g.exe_path = Some(PathBuf::from(r"D:\Games\GenshinImpact\launcher_epic.exe"));
+        g.args = "-dx12".into();
+        g
+    }
+
+    fn steam_game() -> Game {
+        let mut g = Game::manual("ww".into(), "Wuthering Waves".into());
+        g.launch = Launch::Steam { appid: 3513350 };
+        g
+    }
+
+    fn exe_game() -> Game {
+        let mut g = Game::manual("hsr".into(), "Honkai: Star Rail".into());
+        g.exe_path = Some(PathBuf::from(r"C:\Games\Star Rail\StarRail.exe"));
+        g
+    }
+
+    #[test]
+    fn only_the_ways_this_game_really_has_are_offered_in_a_fixed_order() {
+        use LaunchWay::*;
+        assert_eq!(available_ways(&epic_game(), Some(Path::new(HYP))), [Direct, Launcher, Store]);
+        assert_eq!(available_ways(&epic_game(), None), [Direct, Store]);
+        // Файл игры из Steam неизвестен — напрямую её не запустить.
+        assert_eq!(available_ways(&steam_game(), None), [Store]);
+        assert_eq!(available_ways(&exe_game(), Some(Path::new(HYP))), [Direct, Launcher]);
+        assert_eq!(available_ways(&exe_game(), None), [Direct]);
+        let mut no_file = exe_game();
+        no_file.exe_path = Some(PathBuf::new());
+        assert_eq!(available_ways(&no_file, None), Vec::<LaunchWay>::new());
+    }
+
+    #[test]
+    fn a_launcher_that_is_the_game_file_itself_is_not_a_second_way() {
+        // GRYPHLINK находится как игра: её файл и есть лаунчер.
+        let mut g = Game::manual("endfield".into(), "Arknights: Endfield".into());
+        g.exe_path = Some(PathBuf::from(r"C:\Program Files\GRYPHLINK\Launcher.exe"));
+        let launcher = Path::new(r"c:\program files\gryphlink\launcher.exe");
+        assert_eq!(available_ways(&g, Some(launcher)), [LaunchWay::Direct]);
+    }
+
+    #[test]
+    fn by_default_a_store_game_starts_through_the_store_and_the_rest_directly() {
+        assert_eq!(default_way(&epic_game()), LaunchWay::Store);
+        assert_eq!(default_way(&steam_game()), LaunchWay::Store);
+        assert_eq!(default_way(&exe_game()), LaunchWay::Direct);
+    }
+
+    #[test]
+    fn the_chosen_way_holds_while_it_is_available_and_falls_back_to_the_default_otherwise() {
+        let mut g = epic_game();
+        assert_eq!(chosen_way(&g, &available_ways(&g, Some(Path::new(HYP)))), LaunchWay::Store);
+        g.launch_way = Some(LaunchWay::Launcher);
+        assert_eq!(chosen_way(&g, &available_ways(&g, Some(Path::new(HYP)))), LaunchWay::Launcher);
+        // Лаунчер удалили: умолчание, а сам выбор в записи игры остаётся.
+        assert_eq!(chosen_way(&g, &available_ways(&g, None)), LaunchWay::Store);
+        assert_eq!(g.launch_way, Some(LaunchWay::Launcher));
+
+        let mut s = steam_game();
+        s.launch_way = Some(LaunchWay::Direct);
+        assert_eq!(chosen_way(&s, &available_ways(&s, None)), LaunchWay::Store);
+    }
+
+    #[test]
+    fn the_store_way_opens_the_store_link() {
+        assert_eq!(
+            plan(&epic_game(), None),
+            Ok(Plan::Epic(epic_uri("879b0d87", "7d690c12", "41869934")))
+        );
+        assert_eq!(
+            plan(&steam_game(), None),
+            Ok(Plan::Steam("steam://rungameid/3513350".into()))
+        );
+    }
+
+    #[test]
+    fn the_direct_way_starts_the_game_file_with_its_arguments() {
+        let mut g = epic_game();
+        g.launch_way = Some(LaunchWay::Direct);
+        assert_eq!(
+            plan(&g, Some(Path::new(HYP))),
+            Ok(Plan::Exe {
+                exe: PathBuf::from(r"D:\Games\GenshinImpact\launcher_epic.exe"),
+                args: "-dx12".into(),
+            })
+        );
+        assert_eq!(
+            plan(&exe_game(), None),
+            Ok(Plan::Exe { exe: PathBuf::from(r"C:\Games\Star Rail\StarRail.exe"), args: String::new() })
+        );
+    }
+
+    #[test]
+    fn the_launcher_way_starts_the_launcher_without_the_game_arguments() {
+        // Аргументы игры лаунчеру не годятся: он их не понимает.
+        let mut g = epic_game();
+        g.launch_way = Some(LaunchWay::Launcher);
+        assert_eq!(
+            plan(&g, Some(Path::new(HYP))),
+            Ok(Plan::Exe { exe: PathBuf::from(HYP), args: String::new() })
+        );
+    }
+
+    #[test]
+    fn a_launcher_choice_without_the_launcher_starts_the_default_way() {
+        let mut g = epic_game();
+        g.launch_way = Some(LaunchWay::Launcher);
+        assert_eq!(plan(&g, None), Ok(Plan::Epic(epic_uri("879b0d87", "7d690c12", "41869934"))));
+        let mut e = exe_game();
+        e.launch_way = Some(LaunchWay::Launcher);
+        assert!(matches!(plan(&e, None), Ok(Plan::Exe { ref exe, .. }) if exe.ends_with("StarRail.exe")));
+    }
+
+    #[test]
+    fn a_game_without_a_file_still_reports_the_missing_path() {
+        let g = Game::manual("x".into(), "X".into());
+        assert_eq!(plan(&g, None), Err(AppError::new(code::EXE_PATH_MISSING)));
     }
 
     #[test]

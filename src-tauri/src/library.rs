@@ -84,6 +84,7 @@ pub fn add(cfg: &mut AppConfig, title: String, exe: PathBuf) -> String {
         icon: None,
         video: None,
         content_unlinked: false,
+        launch_way: None,
     });
     id
 }
@@ -135,6 +136,7 @@ pub fn add_found(
         icon: None,
         video: None,
         content_unlinked: false,
+        launch_way: None,
     });
     Ok(id)
 }
@@ -192,6 +194,17 @@ pub fn update(cfg: &mut AppConfig, id: &str, patch: GamePatch) -> bool {
     if let Some(args) = patch.args {
         game.args = args;
     }
+    true
+}
+
+/// Запоминает, как запускать игру. Доступен ли способ сейчас, здесь не
+/// проверяется: недоступный просто не действует (`launch::chosen_way`), а
+/// вернётся лаунчер — вернётся и выбор. `false` — игры с таким идентификатором нет.
+pub fn set_launch_way(cfg: &mut AppConfig, id: &str, way: crate::config::LaunchWay) -> bool {
+    let Some(game) = cfg.games.iter_mut().find(|g| g.id == id) else {
+        return false;
+    };
+    game.launch_way = Some(way);
     true
 }
 
@@ -271,6 +284,7 @@ mod tests {
                     icon: None,
                     video: None,
                     content_unlinked: false,
+                    launch_way: None,
                 })
                 .collect(),
         }
@@ -581,6 +595,17 @@ mod tests {
         let patch = GamePatch { background: Some(None), ..Default::default() };
         assert!(update(&mut cfg, "a", patch));
         assert_eq!(cfg.games[0].background, None);
+    }
+
+    #[test]
+    fn the_launch_choice_is_remembered_for_that_game_only() {
+        let mut cfg = cfg_with(&["a", "b"]);
+        assert!(set_launch_way(&mut cfg, "b", crate::config::LaunchWay::Launcher));
+        assert_eq!(cfg.games[0].launch_way, None);
+        assert_eq!(cfg.games[1].launch_way, Some(crate::config::LaunchWay::Launcher));
+        assert!(set_launch_way(&mut cfg, "b", crate::config::LaunchWay::Direct));
+        assert_eq!(cfg.games[1].launch_way, Some(crate::config::LaunchWay::Direct));
+        assert!(!set_launch_way(&mut cfg, "нет-такой", crate::config::LaunchWay::Store));
     }
 
     #[test]

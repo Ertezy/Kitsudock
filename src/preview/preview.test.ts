@@ -331,3 +331,27 @@ describe("ответы стенда повторяют команды Rust", () 
     expect(games.find((g) => g.id === "hsr")!.title).toBe("Renamed");
   });
 });
+
+describe("способы запуска на стенде", () => {
+  it("у игр разный набор: три, два, один — переключатель виден и не виден", async () => {
+    const call = await stand("normal");
+    const games = (await call("get_games")) as GameView[];
+    const counts = new Set(games.map((g) => g.ways.length));
+    expect([...counts].sort()).toEqual([1, 2, 3]);
+    for (const g of games) {
+      // Действующий способ — всегда из доступных, а лаунчер назван, только если он среди них.
+      if (g.ways.length > 0) expect(g.ways).toContain(g.way);
+      expect(g.launcher !== null).toBe(g.ways.includes("launcher"));
+    }
+  });
+
+  it("выбор запоминается, недоступный способ не действует", async () => {
+    const call = await stand("normal");
+    await call("set_launch_way", { gameId: "genshin", way: "launcher" });
+    await call("set_launch_way", { gameId: "zzz", way: "launcher" });
+    const games = (await call("get_games")) as GameView[];
+    expect(games.find((g) => g.id === "genshin")!.way).toBe("launcher");
+    expect(games.find((g) => g.id === "zzz")!.way).toBe("direct");
+    await expect(call("set_launch_way", { gameId: "nope", way: "direct" })).rejects.toEqual({ code: "gameNotFound" });
+  });
+});

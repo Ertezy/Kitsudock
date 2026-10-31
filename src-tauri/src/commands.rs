@@ -19,7 +19,7 @@
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
-use crate::config::{self, Game, Language, Launch, VideoLanguage};
+use crate::config::{self, Game, Language, Launch, LaunchWay, VideoLanguage};
 use crate::error::{code, AppError};
 use crate::hub;
 use crate::launch;
@@ -96,6 +96,30 @@ pub struct GameView {
     pub args: String,
     /// Файл или папка игры пропали с диска.
     pub missing: bool,
+    /// Чем игру можно запустить сейчас (`launch::available_ways`). Один способ
+    /// или ни одного — переключателя на экране нет.
+    pub ways: Vec<LaunchWay>,
+    /// Каким способом она запустится (`launch::chosen_way`).
+    pub way: LaunchWay,
+    /// Лаунчер игры, если он среди способов: слово подписи — у страницы.
+    pub launcher: Option<crate::stores::launchers::Launcher>,
+}
+
+/// Представление без иконки и фона, со способами запуска. Лаунчер игры —
+/// найденный (`LauncherPaths::for_game`) или `None`.
+fn view_with_launcher(
+    game: &Game,
+    launcher: Option<(crate::stores::launchers::Launcher, &std::path::Path)>,
+) -> GameView {
+    let ways = launch::available_ways(game, launcher.map(|(_, path)| path));
+    GameView {
+        way: launch::chosen_way(game, &ways),
+        launcher: launcher
+            .map(|(kind, _)| kind)
+            .filter(|_| ways.contains(&LaunchWay::Launcher)),
+        ways,
+        ..view_of_without_icon(game)
+    }
 }
 
 /// Часть представления игры, не требующая `AppHandle`.
@@ -104,9 +128,13 @@ pub struct GameView {
 /// тестах напрямую: `AppHandle` там взять неоткуда (тот же приём, что и у
 /// `is_fresh` в `icons.rs` или `reject_if_newer_than_current` в `config.rs`).
 /// `icon_path` и `art_path` здесь всегда `None` — их выставляет только
-/// `view_of`.
+/// `view_of`. Способы запуска — без лаунчера: его добавляет `view_with_launcher`.
 fn view_of_without_icon(game: &Game) -> GameView {
+    let ways = launch::available_ways(game, None);
     GameView {
+        way: launch::chosen_way(game, &ways),
+        ways,
+        launcher: None,
         id: game.id.clone(),
         title: game.title.clone(),
         content_id: game.content_id.clone(),
@@ -121,14 +149,19 @@ fn view_of_without_icon(game: &Game) -> GameView {
     }
 }
 
-pub fn view_of(app: &AppHandle, game: &Game, ctx: &crate::art::ArtContext) -> GameView {
+pub fn view_of(
+    app: &AppHandle,
+    game: &Game,
+    ctx: &crate::art::ArtContext,
+    launchers: &crate::stores::launchers::LauncherPaths,
+) -> GameView {
     let art = crate::art::resolve(app, game, ctx);
     GameView {
         icon_path: crate::icons::ensure(app, game).map(|p| p.to_string_lossy().into_owned()),
         art_path: art.art_path.map(|p| p.to_string_lossy().into_owned()),
         art_source: art.source,
         video_path: art.video_path.map(|p| p.to_string_lossy().into_owned()),
-        ..view_of_without_icon(game)
+        ..view_with_launcher(game, launchers.for_game(game))
     }
 }
 
@@ -138,7 +171,9 @@ pub async fn get_games(app: AppHandle) -> Vec<GameView> {
     // Фоны официального лаунчера — из файла хаба, без сети.
     let hub = crate::hub::load_local(&app);
     let ctx = crate::art::ArtContext::build(cfg.store_art, &cfg.games, &hub.games);
-    let views = cfg.games.iter().map(|g| view_of(&app, g, &ctx)).collect();
+    // Лаунчеры ищутся в реестре один раз на весь список.
+    let launchers = crate::stores::launchers::LauncherPaths::find();
+    let views = cfg.games.iter().map(|g| view_of(&app, g, &ctx, &launchers)).collect();
     // Докачка недостающих картинок Epic стартует отсюда: список игр строится
     // при запуске, после настроек и после каждой их правки, так что одна
     // дорога покрывает все случаи.
@@ -171,7 +206,11 @@ pub fn launch_and_remember(app: &AppHandle, game_id: &str) -> Result<(), AppErro
         .find(|g| g.id == game_id)
         .ok_or_else(|| AppError::with(code::GAME_NOT_FOUND, game_id.to_string()))?;
 
-    launch::launch(app, &game)?;
+    // Лаунчер ищется заново при каждом запуске: его могли поставить или
+    // удалить, пока окно было открыто. Реестр только читается, без замка.
+    let launchers = crate::stores::launchers::LauncherPaths::find();
+    let launcher = launchers.for_game(&game);
+    launch::launch(app, &game, launcher.map(|(_, path)| path))?;
 
     let remembered = config::update(app, |cfg| {
         cfg.last_played = Some(game_id.to_string());
@@ -420,6 +459,13 @@ pub async fn update_game(
         args,
     };
     with_config(&app, |cfg| crate::library::update(cfg, &game_id, patch))
+}
+
+/// Запомнить, как запускать игру. Пишется через общий замок конфига, как и
+/// любая другая правка игры.
+#[tauri::command]
+pub async fn set_launch_way(app: AppHandle, game_id: String, way: LaunchWay) -> Result<(), AppError> {
+    with_config(&app, |cfg| crate::library::set_launch_way(cfg, &game_id, way))
 }
 
 #[tauri::command]
@@ -792,6 +838,7 @@ mod tests {
             icon: None,
             video: None,
             content_unlinked: false,
+            launch_way: None,
         }
     }
 
@@ -875,6 +922,41 @@ mod tests {
     #[test]
     fn view_labels_the_store_a_game_starts_through() {
         assert_eq!(view_of_without_icon(&steam_game()).source_kind, "steam");
+    }
+
+    #[test]
+    fn view_lists_the_ways_and_the_one_that_will_be_used() {
+        use crate::config::LaunchWay;
+        use crate::stores::launchers::Launcher;
+        let mut g = steam_game();
+        g.exe_path = Some(std::path::PathBuf::from(r"C:\nope\ww.exe"));
+        g.launch_way = Some(LaunchWay::Launcher);
+        let kuro = std::path::Path::new(r"C:\Kuro\launcher.exe");
+
+        let view = view_with_launcher(&g, Some((Launcher::Kuro, kuro)));
+        assert_eq!(view.ways, [LaunchWay::Direct, LaunchWay::Launcher, LaunchWay::Store]);
+        assert_eq!(view.way, LaunchWay::Launcher);
+        assert_eq!(view.launcher, Some(Launcher::Kuro));
+
+        // Лаунчер пропал: способ по умолчанию, и о лаунчере ни слова.
+        let view = view_with_launcher(&g, None);
+        assert_eq!(view.ways, [LaunchWay::Direct, LaunchWay::Store]);
+        assert_eq!(view.way, LaunchWay::Store);
+        assert_eq!(view.launcher, None);
+    }
+
+    #[test]
+    fn the_ways_go_over_the_wire_as_words() {
+        let mut g = steam_game();
+        g.exe_path = Some(std::path::PathBuf::from(r"C:\nope\ww.exe"));
+        let json = serde_json::to_value(view_with_launcher(
+            &g,
+            Some((crate::stores::launchers::Launcher::Kuro, std::path::Path::new(r"C:\k.exe"))),
+        ))
+        .unwrap();
+        assert_eq!(json["ways"], serde_json::json!(["direct", "launcher", "store"]));
+        assert_eq!(json["way"], "store");
+        assert_eq!(json["launcher"], "kuro");
     }
 
     #[test]

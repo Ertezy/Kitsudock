@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { api } from "./lib/api";
-import { launchNote } from "./lib/launch";
+import { launchNote, wayChoices } from "./lib/launch";
 import { setMotion } from "./lib/motion";
 import { watchWindowActivity } from "./lib/windowActive";
 import { REFRESH_EVERY_MS, backgroundsKey, finishCheck, sameHub, startCheck, shouldRefreshOnShow, shouldRefreshOnOnline, type HubCheck } from "./lib/hubRefresh";
@@ -14,7 +14,7 @@ import Settings from "./screens/Settings";
 import FirstRunView from "./screens/settings/FirstRunView";
 import { currentT, useT } from "./i18n";
 import { errorText } from "./i18n/errors";
-import type { GameView, HubData, LaunchResult } from "./types";
+import type { GameView, HubData, LaunchResult, LaunchWay } from "./types";
 
 type Screen = "loading" | "firstRun" | "main" | "settings";
 
@@ -225,6 +225,25 @@ export default function App() {
     }
   }, [selected, t]);
 
+  // Выбор способа запуска виден сразу — подпись над кнопкой следует за ним, —
+  // а сохраняется следом. Не сохранился — список перечитывается, и на экране
+  // снова то, что записано на самом деле.
+  const chooseWay = useCallback(
+    async (way: LaunchWay): Promise<string | null> => {
+      if (!selected) return null;
+      const id = selected.id;
+      setGames((list) => list.map((g) => (g.id === id ? { ...g, way } : g)));
+      try {
+        await api.setLaunchWay(id, way);
+        return null;
+      } catch (e) {
+        void reloadGames();
+        return t.main.launch.way.saveFailed(errorText(t, e));
+      }
+    },
+    [selected, t, reloadGames],
+  );
+
   // Возврат из настроек обязан перечитать список игр: человек мог там всё
   // поменять (добавить, убрать, переименовать, отвязать от хаба, сменить фон).
   const backFromSettings = useRef(false);
@@ -289,6 +308,8 @@ export default function App() {
             gameId={selected.id}
             artShown={artShownFor === selected.id}
             note={launchNote(t, selected)}
+            choices={wayChoices(t, selected)}
+            onChooseWay={chooseWay}
             onLaunch={launch}
             onFixed={load}
             externalFailure={trayFailure?.gameId === selected.id ? { id: trayFailure.id, text: trayFailure.text } : null}

@@ -6,7 +6,7 @@
 // попадает: его тянет только `src/preview/main.tsx`, а сборка берёт `index.html`.
 
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { About, AppConfig, AppRelease, Behaviour, FoundGame, GameView, HubData } from "../types";
+import type { About, AppConfig, AppRelease, Behaviour, FoundGame, GameView, HubData, LaunchWay } from "../types";
 import type { Lang, VideoLang } from "../i18n/native";
 import { artFromUrl } from "./art";
 import { baseArt, gameFromScan, makeGames, makeHub, makeScan, ownArt, ownIcon } from "./data";
@@ -106,6 +106,7 @@ const APP_COMMANDS = [
   "cache_image",
   "add_game",
   "update_game",
+  "set_launch_way",
   "remove_game",
   "reorder_games",
   "relocate_game",
@@ -171,7 +172,7 @@ const CACHE_AGE_SEC = 30 * HOUR;
 /** Возраст хаба из комплекта в сценарии `stale`: старше недели, когда панель прячет коды и баннеры. */
 const BUNDLED_AGE_SEC = 8 * DAY;
 /** Версия приложения на стенде (`get_about`). */
-const STAND_VERSION = "0.1.2";
+const STAND_VERSION = "0.1.3";
 /** Вышедшая версия при `update=on`: новее работающей, ссылка — на страницу релиза. */
 const NEXT_RELEASE: AppRelease = {
   version: "0.2.0",
@@ -311,6 +312,13 @@ export function createHandlers(scenario: Scenario, settings: StandSettings = {})
       if (typeof u.icon === "string") game.iconPath = u.icon === "" ? null : ownIcon(game.title);
       if (typeof u.contentId === "string") game.contentId = u.contentId === "" ? null : u.contentId;
       if (typeof u.args === "string") game.args = u.args;
+      return null;
+    },
+    // Как в Rust: выбор запоминается, а действует, только если способ игре доступен.
+    set_launch_way: ({ gameId, way }) => {
+      const game = find(gameId);
+      if (!game) return Promise.reject({ code: "gameNotFound" });
+      if (game.ways.includes(way as LaunchWay)) game.way = way as LaunchWay;
       return null;
     },
     remove_game: ({ gameId }) => {
