@@ -94,6 +94,9 @@ export const api = {
   imageCacheSize: () => invoke<number>("image_cache_size"),
   clearImageCache: () => invoke<number>("clear_image_cache"),
   getAbout: () => invoke<About>("get_about"),
+  /** Скачать и поставить вышедшую версию. Удачная установка не отвечает:
+   *  приложение закрывается, установщик запускает новую версию. */
+  installUpdate: () => invoke<void>("install_update"),
   openLogFolder: () => invoke<void>("open_log_folder"),
   /** Записать в журнал приложения, из-за чего упал интерфейс (Rust режет и чистит текст). */
   reportUiError: (message: string) => invoke<void>("report_ui_error", { message }),

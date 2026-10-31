@@ -6,7 +6,7 @@
 // попадает: его тянет только `src/preview/main.tsx`, а сборка берёт `index.html`.
 
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
-import type { About, AppConfig, Behaviour, FoundGame, GameView } from "../types";
+import type { About, AppConfig, AppRelease, Behaviour, FoundGame, GameView, HubData } from "../types";
 import type { Lang, VideoLang } from "../i18n/native";
 import { artFromUrl } from "./art";
 import { baseArt, gameFromScan, makeGames, makeHub, makeScan, ownArt, ownIcon } from "./data";
@@ -47,6 +47,10 @@ export interface PreviewParams {
   motion: boolean;
   /** Активно ли окно (`WindowState`); в адресе — `active=on` или `active=off`. */
   active: WindowState;
+  /** Знает ли хаб версию новее работающей — строка «Вышла версия» внизу
+   *  панели; в адресе — `update=on`. По умолчанию её нет: снимки для README
+   *  её не показывают. */
+  update: boolean;
   /** Показывать ли плашку с переключателями; `controls=off` убирает её для снимков. */
   controls: boolean;
 }
@@ -56,6 +60,7 @@ export const DEFAULT_PARAMS: PreviewParams = {
   lang: "ru",
   motion: true,
   active: "auto",
+  update: false,
   controls: true,
 };
 
@@ -71,6 +76,7 @@ export function readParams(search: string): PreviewParams {
     lang: pick<Lang>("lang", ["ru", "en"], DEFAULT_PARAMS.lang),
     motion: pick("motion", ["on", "off"], "on") === "on",
     active: pick("active", WINDOW_STATES, DEFAULT_PARAMS.active),
+    update: q.get("update") === "on",
     controls: q.get("controls") !== "off",
   };
 }
@@ -83,6 +89,7 @@ export function toSearch(p: PreviewParams): string {
     motion: p.motion ? "on" : "off",
   });
   if (p.active !== "auto") q.set("active", p.active);
+  if (p.update) q.set("update", "on");
   if (!p.controls) q.set("controls", "off");
   return `?${q.toString()}`;
 }
@@ -125,6 +132,7 @@ const APP_COMMANDS = [
   "get_about",
   "open_log_folder",
   "report_ui_error",
+  "install_update",
 ] as const;
 
 type AppCommand = (typeof APP_COMMANDS)[number];
@@ -162,6 +170,17 @@ const LAUNCH_MS = 1500;
 const CACHE_AGE_SEC = 30 * HOUR;
 /** Возраст хаба из комплекта в сценарии `stale`: старше недели, когда панель прячет коды и баннеры. */
 const BUNDLED_AGE_SEC = 8 * DAY;
+/** Версия приложения на стенде (`get_about`). */
+const STAND_VERSION = "0.1.1";
+/** Вышедшая версия при `update=on`: новее работающей, ссылка — на страницу релиза. */
+const NEXT_RELEASE: AppRelease = {
+  version: "0.2.0",
+  url: "https://github.com/Ertezy/Kitsudock/releases/tag/v0.2.0",
+};
+/** Сколько на стенде «качается» обновление: достаточно, чтобы разглядеть загрузку. */
+const UPDATE_MS = 3000;
+/** Ставить на стенде нечего: после загрузки — отказ, и видно строку отказа. */
+const NO_INSTALL = "the stand cannot install updates";
 /** Без сети картинку не скачать: настоящая `cache_image` тоже отказывает строкой. */
 const NO_PICTURE = "image download failed: the stand has no network";
 
@@ -180,6 +199,8 @@ export interface StandSettings {
   motion?: boolean;
   /** Активно ли окно (`WindowState`); по умолчанию `auto` — как у браузера. */
   active?: WindowState;
+  /** Знает ли хаб версию новее работающей (`PreviewParams.update`). */
+  update?: boolean;
 }
 
 /** Ответы стенда на команды моста. Отдельной функцией ради теста: ей не нужно окно. */
@@ -219,11 +240,12 @@ export function createHandlers(scenario: Scenario, settings: StandSettings = {})
     // Как в Rust (`hub::load`): без сети хаб не отказывает, а отдаётся из кеша,
     // а если кеша нет — из комплекта; откуда именно, видно по `_source`.
     get_hub: () => {
+      const withRelease = (hub: HubData): HubData => (settings.update ? { ...hub, app: { ...NEXT_RELEASE } } : hub);
       const make = () => {
         const now = Math.floor(Date.now() / 1000);
-        if (scenario === "offline") return makeHub(now, "cache", CACHE_AGE_SEC);
-        if (scenario === "stale") return makeHub(now, "bundled", BUNDLED_AGE_SEC);
-        return makeHub(now);
+        if (scenario === "offline") return withRelease(makeHub(now, "cache", CACHE_AGE_SEC));
+        if (scenario === "stale") return withRelease(makeHub(now, "bundled", BUNDLED_AGE_SEC));
+        return withRelease(makeHub(now));
       };
       return scenario === "loading" ? after(LOADING_MS, make) : make();
     },
@@ -369,11 +391,15 @@ export function createHandlers(scenario: Scenario, settings: StandSettings = {})
       return removed;
     },
     get_about: (): About => ({
-      version: "0.1.1",
+      version: STAND_VERSION,
       logPath: "C:\\Users\\you\\AppData\\Roaming\\Kitsudock\\logs",
     }),
     open_log_folder: () => null,
     report_ui_error: () => null,
+    // Как в Rust, отказ — кодом с подробностью. Удачи на стенде нет: настоящая
+    // удачная установка закрыла бы приложение.
+    install_update: () =>
+      new Promise((_, reject) => setTimeout(() => reject({ code: "updateFailed", detail: NO_INSTALL }), UPDATE_MS)),
   };
 }
 

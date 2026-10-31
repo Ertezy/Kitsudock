@@ -8,8 +8,9 @@ import { codesFor, emptyArt, emptyReason, linkable, panelIsEmpty, sourceLabel, v
 import { entryEnded, hubChanged, isEntryAnimation, panelMounted, skeletonShown } from "../lib/panelEntry";
 import { hubFreshness } from "../lib/time";
 import { api } from "../lib/api";
-import { availableUpdate } from "../lib/update";
+import { availableUpdate, startUpdate, updateFailed, updateRow, type UpdateAttempt } from "../lib/update";
 import { useLang, useT } from "../i18n";
+import { errorText } from "../i18n/errors";
 import { useVideoLanguage } from "../lib/videoLanguage";
 import type { HubData } from "../types";
 
@@ -46,6 +47,8 @@ export default function SidePanel({ hub, selectedContentId, selectedTitle, games
   // предлагать себя. Полминуты достаточно: самая мелкая величина, которую мы
   // показываем, — минуты.
   const [nowSec, setNowSec] = useState(() => Math.floor(Date.now() / 1000));
+  const [updateAttempt, setUpdateAttempt] = useState<UpdateAttempt | null>(null);
+  const updateAttemptRef = useRef<UpdateAttempt | null>(null);
 
   useEffect(() => {
     const id = window.setInterval(
@@ -128,8 +131,24 @@ export default function SidePanel({ hub, selectedContentId, selectedTitle, games
   // Без него невозможно отличить «сеть отвалилась, показываю прошлогодний
   // комплект» от «всё свежее», а это первое, что спросят при разборе жалобы.
   const origin = sourceLabel(hub?._source, t);
-  // Вышла версия новее этой — строка внизу панели.
+  // Вышла версия новее этой — строка внизу панели: «Обновить», загрузка или
+  // отказ (`lib/update.ts`, `updateRow`).
   const update = availableUpdate(hub, appVersion);
+  const updateLine = updateRow(update, updateAttempt);
+  const installUpdate = () => {
+    // Два щелчка подряд успевают раньше перерисовки, поэтому решает
+    // попытка из ref, а не из состояния отрисовки.
+    const attempt = startUpdate(update, updateAttemptRef.current);
+    if (attempt === null) return;
+    const settle = (next: UpdateAttempt) => {
+      updateAttemptRef.current = next;
+      setUpdateAttempt(next);
+    };
+    settle(attempt);
+    // Удачная установка не отвечает: установщик закрывает приложение и сам
+    // запускает новую версию. Ответ бывает только отказом.
+    api.installUpdate().catch((e: unknown) => settle(updateFailed(attempt, errorText(t, e))));
+  };
 
   return (
     <aside className="panel" ref={panelRef} data-entry={entry.kind ?? undefined}>
@@ -169,13 +188,29 @@ export default function SidePanel({ hub, selectedContentId, selectedTitle, games
             <circle cx="12" cy="12" r="2.3" fill="none" stroke="currentColor" strokeWidth="2" />
           </svg>
         </button>
-        {update && (
-          <div className="panel-update">
-            {t.panel.updateAvailable(update.version)}
-            {" · "}
-            <button type="button" className="link-button" onClick={() => void api.openSafeUrl(update.url)}>
-              {t.panel.download}
-            </button>
+        {/* Одна строка во всех трёх видах: смена вида не сдвигает панель.
+            Пока идёт загрузка, кнопки нет вовсе — нажать второй раз нечего. */}
+        {updateLine && (
+          <div className="panel-update" aria-live="polite">
+            {updateLine.stage === "offer" && (
+              <>
+                {t.panel.updateAvailable(updateLine.version)}
+                {" · "}
+                <button type="button" className="link-button" onClick={installUpdate}>
+                  {t.panel.update}
+                </button>
+              </>
+            )}
+            {updateLine.stage === "installing" && t.panel.updating}
+            {updateLine.stage === "failed" && (
+              <>
+                <span title={updateLine.reason}>{t.panel.updateFailed}</span>
+                {" · "}
+                <button type="button" className="link-button" onClick={() => void api.openSafeUrl(updateLine.url)}>
+                  {t.panel.download}
+                </button>
+              </>
+            )}
           </div>
         )}
         {hub && (

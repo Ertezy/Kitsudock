@@ -54,3 +54,46 @@ export function availableUpdate(hub: HubData | null, current: string | null): Ap
   if (!app || current === null) return null;
   return isNewer(app.version, current) && isReleaseUrl(app.url) ? app : null;
 }
+
+/**
+ * Нажатие «Обновить»: для какой версии и чем пока кончилось. Удачи здесь нет:
+ * удачная установка закрывает приложение, и ответа страница не дожидается.
+ */
+export interface UpdateAttempt {
+  version: string;
+  stage: "installing" | "failed";
+  /** Причина отказа словами — для всплывающей подсказки. */
+  reason?: string;
+}
+
+/** Что показывает строка «Вышла версия» внизу боковой панели. */
+export type UpdateRow =
+  | { stage: "offer"; version: string }
+  | { stage: "installing" }
+  | { stage: "failed"; url: string; reason?: string };
+
+/**
+ * Строка внизу панели. Идущая установка видна всегда, даже если файл данных
+ * тем временем сменился: она уже идёт, и предлагать вторую нельзя. Отказ
+ * относится только к своей версии: вышла версия новее — снова предлагается
+ * обновиться.
+ */
+export function updateRow(update: AppRelease | null, attempt: UpdateAttempt | null): UpdateRow | null {
+  if (attempt?.stage === "installing") return { stage: "installing" };
+  if (update === null) return null;
+  if (attempt?.stage === "failed" && attempt.version === update.version) {
+    return { stage: "failed", url: update.url, reason: attempt.reason };
+  }
+  return { stage: "offer", version: update.version };
+}
+
+/** Нажатие «Обновить»: новая попытка или null, если сейчас нажимать нечего. */
+export function startUpdate(update: AppRelease | null, attempt: UpdateAttempt | null): UpdateAttempt | null {
+  const row = updateRow(update, attempt);
+  return row?.stage === "offer" ? { version: row.version, stage: "installing" } : null;
+}
+
+/** Установка отказала. */
+export function updateFailed(attempt: UpdateAttempt, reason: string): UpdateAttempt {
+  return { version: attempt.version, stage: "failed", reason };
+}

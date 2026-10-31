@@ -40,6 +40,11 @@ export const en = {
     settingsAndGames: "Settings and games",
     disclaimer: "Not affiliated with the game developers. Content belongs to its rights holders.",
     updateAvailable: (v: string) => `Version ${v} is out`,
+    // «Update» ставит новую версию само; «Download» только открывает страницу
+    // релиза — она остаётся на случай, если обновиться кнопкой не вышло.
+    update: "Update",
+    updating: "Downloading the update…",
+    updateFailed: "Couldn't update",
     download: "Download",
     codes: "Codes",
     noExpiry: "no expiry",

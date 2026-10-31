@@ -60,8 +60,10 @@ describe("адрес стенда", () => {
       for (const lang of ["ru", "en"] as const) {
         for (const motion of [true, false]) {
           for (const active of WINDOW_STATES) {
-            const params = { scenario, lang, motion, active, controls: true };
-            expect(readParams(toSearch(params))).toEqual(params);
+            for (const update of [false, true]) {
+              const params = { scenario, lang, motion, active, update, controls: true };
+              expect(readParams(toSearch(params))).toEqual(params);
+            }
           }
         }
       }
@@ -108,6 +110,15 @@ describe("адрес стенда", () => {
     expect(seen).toEqual(["focus"]);
     expect(doc.hasFocus()).toBe(true);
     expect(doc.visibilityState).toBe("visible");
+  });
+
+  it("строка новой версии: по умолчанию её нет, update=on её показывает", async () => {
+    const { readParams, toSearch, DEFAULT_PARAMS } = await import("./backend");
+    expect(DEFAULT_PARAMS.update).toBe(false);
+    expect(readParams("?update=on").update).toBe(true);
+    expect(readParams("?update=maybe").update).toBe(false);
+    expect(toSearch(readParams("?update=on"))).toContain("update=on");
+    expect(toSearch(readParams(""))).not.toContain("update");
   });
 
   it("знает все пять состояний данных", async () => {
@@ -222,6 +233,32 @@ describe("ответы стенда на состояния данных", () =>
 
 describe("ответы стенда повторяют команды Rust", () => {
   afterEach(() => vi.useRealTimers());
+
+  it("update=on: хаб знает версию новее работающей, а «Обновить» качает и не может поставить", async () => {
+    vi.useFakeTimers();
+    const { createHandlers } = await import("./backend");
+    const { availableUpdate } = await import("../lib/update");
+    const handlers = createHandlers("normal", { update: true }) as Record<string, (args: Record<string, unknown>) => unknown>;
+    const hub = (await handlers.get_hub({})) as HubData;
+    const about = (await handlers.get_about({})) as { version: string };
+    expect(availableUpdate(hub, about.version)).not.toBeNull();
+
+    // Загрузку видно пару секунд, потом отказ — как у Rust, кодом.
+    let settled = false;
+    const result = Promise.resolve(handlers.install_update({})).finally(() => {
+      settled = true;
+    });
+    result.catch(() => {});
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(settled).toBe(false);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expect(result).rejects.toEqual({ code: "updateFailed", detail: expect.any(String) });
+  });
+
+  it("без update=on о новой версии хаб молчит", async () => {
+    const call = await stand("normal");
+    expect(((await call("get_hub")) as HubData).app).toBeUndefined();
+  });
 
   it("launch_game отвечает идентификатором игры", async () => {
     vi.useFakeTimers();
