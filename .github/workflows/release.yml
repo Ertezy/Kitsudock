@@ -69,25 +69,37 @@ jobs:
         working-directory: src-tauri
         run: cargo test --locked the_bundled_snapshot
 
-      # Автообновления у приложения нет, поэтому файл для него не выкладывается.
+      # Кнопка «Обновить» в приложении берёт latest.json последнего
+      # опубликованного релиза и ставит установщик, только если его подпись
+      # сходится с открытым ключом, вшитым в приложение. Поэтому установщик
+      # подписывается ключом обновлений из секретов (это не подпись кода
+      # Windows; без ключа сборка падает),
+      # и в релиз ложатся его подпись Kitsudock-setup.exe.sig и latest.json с
+      # версией, подписью и адресом установщика.
       # Имя установщика постоянное, без номера версии: тогда ссылка
       # releases/latest/download/Kitsudock-setup.exe в README всегда скачивает
-      # последнюю версию одним кликом.
+      # последнюю версию одним кликом. Подпись называется по тому же шаблону, и
+      # по имени «установщик + .sig» действие находит, к какому файлу она.
+      # Адрес в latest.json действие пишет как адрес файла в API GitHub
+      # (api.github.com/…/releases/assets/<номер>): он верен и пока релиз
+      # черновик, а приложение по нему получает сам установщик.
       - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Kitsudock ${{ github.ref_name }}
           releaseDraft: true
           prerelease: false
-          uploadUpdaterJson: false
+          uploadUpdaterJson: true
           releaseAssetNamePattern: Kitsudock-setup[ext]
           releaseBody: |
             Free Windows launcher for Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Wuthering Waves and Arknights: Endfield.
 
-            **Install:** download [Kitsudock-setup.exe](https://github.com/Ertezy/Kitsudock/releases/download/${{ github.ref_name }}/Kitsudock-setup.exe) and run it. Windows 10 or 11, 64-bit; no administrator rights needed. The installer isn't code-signed yet, so Windows SmartScreen may say "Windows protected your PC" — click **More info → Run anyway**. To update, run the new installer over the old version. More in the [README](https://github.com/Ertezy/Kitsudock#readme).
+            **Install:** download [Kitsudock-setup.exe](https://github.com/Ertezy/Kitsudock/releases/download/${{ github.ref_name }}/Kitsudock-setup.exe) and run it. Windows 10 or 11, 64-bit; no administrator rights needed. The installer isn't code-signed yet, so Windows SmartScreen may say "Windows protected your PC" — click **More info → Run anyway**. To update, click **Update** at the bottom of the side panel, or run the new installer over the old version. More in the [README](https://github.com/Ertezy/Kitsudock#readme).
 
-            **Установка:** скачайте [Kitsudock-setup.exe](https://github.com/Ertezy/Kitsudock/releases/download/${{ github.ref_name }}/Kitsudock-setup.exe) и запустите. Windows 10 или 11, 64-бит; права администратора не нужны. Установщик пока не подписан, поэтому SmartScreen может написать «Система Windows защитила ваш компьютер» — нажмите **Подробнее → Выполнить в любом случае**. Чтобы обновиться, запустите новый установщик поверх старой версии. Подробнее — в [README на русском](https://github.com/Ertezy/Kitsudock/blob/main/README.ru.md).
+            **Установка:** скачайте [Kitsudock-setup.exe](https://github.com/Ertezy/Kitsudock/releases/download/${{ github.ref_name }}/Kitsudock-setup.exe) и запустите. Windows 10 или 11, 64-бит; права администратора не нужны. Установщик пока не подписан, поэтому SmartScreen может написать «Система Windows защитила ваш компьютер» — нажмите **Подробнее → Выполнить в любом случае**. Чтобы обновиться, нажмите **Обновить** внизу боковой панели или запустите новый установщик поверх старой версии. Подробнее — в [README на русском](https://github.com/Ertezy/Kitsudock/blob/main/README.ru.md).
 
             [Code signing policy](https://github.com/Ertezy/Kitsudock#code-signing-policy)
