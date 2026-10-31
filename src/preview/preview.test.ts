@@ -61,8 +61,10 @@ describe("адрес стенда", () => {
         for (const motion of [true, false]) {
           for (const active of WINDOW_STATES) {
             for (const update of [false, true]) {
-              const params = { scenario, lang, motion, active, update, controls: true };
-              expect(readParams(toSearch(params))).toEqual(params);
+              for (const collapsed of [[], ["codes", "socials"]] as const) {
+                const params = { scenario, lang, motion, active, update, collapsed: [...collapsed], controls: true };
+                expect(readParams(toSearch(params))).toEqual(params);
+              }
             }
           }
         }
@@ -119,6 +121,18 @@ describe("адрес стенда", () => {
     expect(readParams("?update=maybe").update).toBe(false);
     expect(toSearch(readParams("?update=on"))).toContain("update=on");
     expect(toSearch(readParams(""))).not.toContain("update");
+  });
+
+  it("свёрнутое: по умолчанию ничего, collapsed=… сворачивает с первого кадра", async () => {
+    const { readParams, toSearch, DEFAULT_PARAMS, createHandlers } = await import("./backend");
+    expect(DEFAULT_PARAMS.collapsed).toEqual([]);
+    expect(readParams("?collapsed=socials,codes,bogus,codes").collapsed).toEqual(["codes", "socials"]);
+    expect(toSearch(readParams("?collapsed=codes,socials"))).toContain("collapsed=codes%2Csocials");
+    expect(toSearch(readParams(""))).not.toContain("collapsed");
+    const stand = createHandlers("normal", { collapsed: ["banners"] });
+    expect(stand.get_collapsed({})).toEqual({ codes: false, banners: true, videos: false, socials: false });
+    stand.set_collapsed({ fold: "videos", collapsed: true });
+    expect(stand.get_collapsed({})).toEqual({ codes: false, banners: true, videos: true, socials: false });
   });
 
   it("знает все пять состояний данных", async () => {

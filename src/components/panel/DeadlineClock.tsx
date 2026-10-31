@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { clockHandDelay } from "../../lib/clockHand";
 import { useMotionOn } from "../../lib/motion";
 import { clockArc } from "../../lib/time";
 import { useWindowActive } from "../../lib/windowActive";
+import { FoldedContext } from "./PanelSection";
 
 /** Радиус кольца в поле рисунка 20×20 и длина окружности по нему. */
 const R = 8;
@@ -34,9 +35,11 @@ export default function DeadlineClock({ share, hot }: Props) {
   // стояла: тумблер «Анимация» снова включён, окно снова активно. Стоявшая в
   // неактивном окне стрелка отстаёт от часов компьютера, и новая, вставшая по
   // ним, шла бы не в ногу с ней. Поэтому, когда окно возвращается, все стрелки
-  // встают по часам заново и один раз перескакивают на общее место.
+  // встают по часам заново и один раз перескакивают на общее место. Так же —
+  // когда разворачивается раздел: в свёрнутом стрелка стоит (стили).
   const active = useWindowActive();
   const motion = useMotionOn();
+  const folded = useContext(FoldedContext);
   return (
     <span className={hot ? "clock is-hot" : "clock"} aria-hidden="true">
       <svg className="clock-face" viewBox="0 0 20 20">
@@ -45,7 +48,7 @@ export default function DeadlineClock({ share, hot }: Props) {
             четверть назад ставит начало дуги на двенадцать. */}
         <circle className="clock-arc" cx="10" cy="10" r={R} strokeDasharray={`${arc} ${LENGTH}`} transform="rotate(-90 10 10)" />
       </svg>
-      <ClockHand key={`${active}:${motion}`} hot={hot} />
+      <ClockHand key={`${active}:${motion}:${folded}`} hot={hot} />
     </span>
   );
 }

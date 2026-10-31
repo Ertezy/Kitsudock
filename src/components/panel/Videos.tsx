@@ -1,5 +1,6 @@
 import { api } from "../../lib/api";
 import CachedImage from "./CachedImage";
+import PanelSection from "./PanelSection";
 import { plainSpaces } from "../../lib/panel";
 import { timeAgo } from "../../lib/time";
 import { useLang, useT } from "../../i18n";
@@ -31,11 +32,7 @@ export default function Videos({ videos, nowSec }: Props) {
   if (shown.length === 0) return null;
 
   return (
-    <section className="panel-section">
-      <div className="panel-label">
-        <span>{t.panel.videos}</span>
-      </div>
-
+    <PanelSection part="videos" title={t.panel.videos}>
       {shown.map((v) => (
         <div
           key={v.url}
@@ -64,6 +61,6 @@ export default function Videos({ videos, nowSec }: Props) {
           <div className="video-meta">{timeAgo(v.publishedAt, nowSec, lang)}</div>
         </div>
       ))}
-    </section>
+    </PanelSection>
   );
 }

@@ -68,6 +68,9 @@ export const ru: Dictionary = {
     soonIn: (time: string) => `Скоро · через ${time}`,
     videos: "Видео",
     premiere: "премьера",
+    // Кнопка в заголовке раздела панели.
+    collapse: { codes: "Свернуть промокоды", banners: "Свернуть баннеры", videos: "Свернуть видео" },
+    expand: { codes: "Развернуть промокоды", banners: "Развернуть баннеры", videos: "Развернуть видео" },
   },
   // Строки главного экрана, дока игр и общих обёрток (было в App.tsx,
   // PlayButton.tsx, GameDock.tsx, lib/launch.ts, lib/background.ts, lib/api.ts).

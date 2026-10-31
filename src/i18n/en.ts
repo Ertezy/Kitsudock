@@ -65,6 +65,9 @@ export const en = {
     soonIn: (time: string) => `Soon · in ${time}`,
     videos: "Videos",
     premiere: "premiere",
+    // Кнопка в заголовке раздела панели.
+    collapse: { codes: "Collapse codes", banners: "Collapse banners", videos: "Collapse videos" },
+    expand: { codes: "Expand codes", banners: "Expand banners", videos: "Expand videos" },
   },
   // Главный экран, док игр и общие обёртки страницы.
   main: {
