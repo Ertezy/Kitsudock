@@ -204,6 +204,7 @@ pub fn run() {
             commands::mark_seeded,
             commands::needs_first_run,
             commands::update_game,
+            commands::set_launch_way,
             commands::remove_game,
             commands::reorder_games,
             commands::relocate_game,

@@ -198,6 +198,7 @@ mod tests {
             icon: None,
             video: None,
             content_unlinked: false,
+            launch_way: None,
         }
     }
 
