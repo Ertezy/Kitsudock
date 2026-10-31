@@ -100,12 +100,14 @@ unsigned (see [Install](#install)).*
   Reorder them by drag in Settings → Games.
 - **Play** launches through the store the game was installed from, or directly — like
   double-clicking the game's `.exe`. Kitsudock does not modify game files or
-  interact with a running game. If a game can start more than one way, the tab under
-  **Play** switches between directly, its own launcher (HoYoPlay, the Kuro launcher,
+  interact with a running game. If a game can start more than one way, the line above
+  **Play** ("Launches directly ▴") switches between directly, its own launcher (HoYoPlay, the Kuro launcher,
   GRYPHLINK — if the game was installed through it) and the store; the choice is
   remembered per game.
 - **Side panel** for the selected game: promo codes with expiry, current and upcoming
-  banners (the carousel slides on its own), and the latest official videos.
+  banners (the carousel slides on its own), and the latest official videos. Each
+  section folds by its heading, and the official socials column hides behind a tab at
+  the edge; what is folded stays folded for every game and after a restart.
 - **Languages:** interface in English or Russian; videos in English or Japanese.
 - **Backgrounds:** the official HoYoPlay background for Genshin Impact, Honkai: Star
   Rail and Zenless Zone Zero (a video when animation is on), store artwork, your own

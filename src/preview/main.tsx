@@ -14,6 +14,7 @@ installPreviewBackend(params.scenario, {
   motion: params.motion,
   active: params.active,
   update: params.update,
+  collapsed: params.collapsed,
 });
 
 if (params.controls) {

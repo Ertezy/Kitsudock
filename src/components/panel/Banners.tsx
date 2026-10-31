@@ -3,6 +3,8 @@ import CachedImage from "./CachedImage";
 import { bannerHasClock, bannerKeys, plainSpaces, shownBanners } from "../../lib/panel";
 import { bannerShareLeft, burnsToday, progress, timeLeft } from "../../lib/time";
 import DeadlineClock from "./DeadlineClock";
+import PanelSection from "./PanelSection";
+import { useCollapsed } from "../../lib/collapse";
 import { useMotionOn } from "../../lib/motion";
 import { useWindowActive } from "../../lib/windowActive";
 import { useLang, useT, type Lang } from "../../i18n";
@@ -37,6 +39,7 @@ export default function Banners({ banners, nowSec }: Props) {
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const windowIsActive = useWindowActive();
+  const collapsed = useCollapsed("banners");
 
   // Сброс навешен на СОДЕРЖИМОЕ списка, а не на ссылку на массив.
   //
@@ -48,8 +51,9 @@ export default function Banners({ banners, nowSec }: Props) {
   useEffect(() => setIndex(0), [shownKey]);
 
   // Окно спрятано в трей или свёрнуто — карусель стоит; не в фокусе — тоже.
+  // Свёрнутый раздел тоже не листается: развернули — тот же баннер, что был.
   const count = shown.length;
-  const paused = hovered || focused || !windowIsActive || !motion;
+  const paused = hovered || focused || !windowIsActive || !motion || collapsed;
 
   useEffect(() => {
     if (paused || count < 2) return;
@@ -66,11 +70,7 @@ export default function Banners({ banners, nowSec }: Props) {
   };
 
   return (
-    <section className="panel-section">
-      <div className="panel-label">
-        <span>{t.panel.banners}</span>
-      </div>
-
+    <PanelSection part="banners" title={t.panel.banners}>
       <div
         className="carousel"
         onMouseEnter={() => setHovered(true)}
@@ -122,7 +122,7 @@ export default function Banners({ banners, nowSec }: Props) {
           </div>
         )}
       </div>
-    </section>
+    </PanelSection>
   );
 }
 

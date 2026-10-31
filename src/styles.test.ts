@@ -587,13 +587,23 @@ function fontProblems(decls: Decl[]): string[] {
 const ANIMATED = new Set(["transform", "opacity"]);
 
 /**
+ * Свёрнутый раздел боковой панели уходит в ноль плавно, и место за ним плавно
+ * достаётся соседям. Через `transform` этого не сделать: сжатие картинкой
+ * оставляет место за разделом прежним, и соседи прыгают в конце. Поэтому у
+ * обёртки раздела — и только у неё — переход строки сетки `0fr ↔ 1fr`: это
+ * высота содержимого без замеров и без `max-height` наугад. Длительность —
+ * та же шкала `--move`, и тумблер «Анимация» сворачивает раздел мгновенно.
+ */
+const FOLD_ROWS: Record<string, string[]> = { ".panel-fold": ["grid-template-rows"] };
+
+/**
  * Свойства сверх `transform` и `opacity` в переходах — у конкретных элементов,
  * с причиной. Подпись PLAY: спрятанная надпись ещё и `visibility: hidden`,
  * чтобы её не слышал экранный диктор. Переход `visibility` кадров не рисует —
  * значение меняется скачком в начале или в конце перехода прозрачности;
  * такое отступление от правила допустимо.
  */
-const ALSO_ANIMATED: Record<string, string[]> = { ".play-label > span": ["visibility"] };
+const ALSO_ANIMATED: Record<string, string[]> = { ".play-label > span": ["visibility"], ...FOLD_ROWS };
 
 /** Слова части перехода, которые не свойство: время, кривая, поведение. */
 const NOT_PROPERTY = /^(ease|ease-in|ease-out|ease-in-out|linear|step-start|step-end|normal|allow-discrete)$/i;
@@ -1286,6 +1296,28 @@ describe("сторож ловит нарушения", () => {
       ".x { transition: transform var(--move) var(--ease-spring), opacity calc(var(--move) * 2) var(--ease-out) var(--move-fast); transition-property: transform, opacity; } " +
       ':root[data-motion="off"] .x { transition: none; }';
     expect(transitionProblems(css(good))).toEqual([]);
+  });
+
+  it("высоту анимирует только обёртка свёрнутого раздела, и только строкой сетки", () => {
+    const fold = ".panel-fold { transition: grid-template-rows var(--move) var(--ease-out); }";
+    expect(transitionProblems(css(fold))).toEqual([]);
+    expect(transitionProblems(css(".panel-fold { transition-property: grid-template-rows, opacity; }"))).toEqual([]);
+    const bad = [
+      // Другое свойство раскладки у той же обёртки.
+      ".panel-fold { transition: height var(--move) var(--ease-out); }",
+      ".panel-fold { transition: grid-template-columns var(--move) var(--ease-out); }",
+      ".panel-fold { transition: grid-template-rows var(--move) var(--ease-out), max-height var(--move) var(--ease-out); }",
+      // То же свойство у другого селектора — и у потомка, и у соседа по списку.
+      ".panel-section { transition: grid-template-rows var(--move) var(--ease-out); }",
+      ".panel-fold-inner { transition: grid-template-rows var(--move) var(--ease-out); }",
+      ".panel .panel-fold { transition: grid-template-rows var(--move) var(--ease-out); }",
+      ".panel-fold.is-collapsed { transition: grid-template-rows var(--move) var(--ease-out); }",
+      ".x, .panel-fold { transition: grid-template-rows var(--move) var(--ease-out); }",
+      ".x { transition: all var(--move) var(--ease-out); }",
+    ];
+    for (const b of bad) expect(transitionProblems(css(b)), b).toHaveLength(1);
+    // Кадры анимаций исключения не получают: там по-прежнему только transform и opacity.
+    expect(keyframeProblems(css("@keyframes open { from { grid-template-rows: 0fr; } }"))).toHaveLength(1);
   });
 
   it("кадры анимаций двигают только transform и opacity", () => {

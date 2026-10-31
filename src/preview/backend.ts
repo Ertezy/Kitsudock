@@ -8,6 +8,7 @@
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks";
 import type { About, AppConfig, AppRelease, Behaviour, FoundGame, GameView, HubData, LaunchWay } from "../types";
 import type { Lang, VideoLang } from "../i18n/native";
+import type { CollapsePart, Collapsed } from "../lib/collapse";
 import { artFromUrl } from "./art";
 import { baseArt, gameFromScan, makeGames, makeHub, makeScan, ownArt, ownIcon } from "./data";
 
@@ -51,9 +52,16 @@ export interface PreviewParams {
    *  панели; в адресе — `update=on`. По умолчанию её нет: снимки для README
    *  её не показывают. */
   update: boolean;
+  /** Что свёрнуто при открытии — как после перезапуска приложения со
+   *  свёрнутым; в адресе — `collapsed=codes,socials`. Дальше сворачивается
+   *  щелчками в самом приложении. */
+  collapsed: CollapsePart[];
   /** Показывать ли плашку с переключателями; `controls=off` убирает её для снимков. */
   controls: boolean;
 }
+
+/** Всё, что сворачивается, в порядке экрана. */
+const COLLAPSE_PARTS: readonly CollapsePart[] = ["codes", "banners", "videos", "socials"];
 
 export const DEFAULT_PARAMS: PreviewParams = {
   scenario: "normal",
@@ -61,6 +69,7 @@ export const DEFAULT_PARAMS: PreviewParams = {
   motion: true,
   active: "auto",
   update: false,
+  collapsed: [],
   controls: true,
 };
 
@@ -77,6 +86,7 @@ export function readParams(search: string): PreviewParams {
     motion: pick("motion", ["on", "off"], "on") === "on",
     active: pick("active", WINDOW_STATES, DEFAULT_PARAMS.active),
     update: q.get("update") === "on",
+    collapsed: COLLAPSE_PARTS.filter((part) => (q.get("collapsed") ?? "").split(",").includes(part)),
     controls: q.get("controls") !== "off",
   };
 }
@@ -90,6 +100,7 @@ export function toSearch(p: PreviewParams): string {
   });
   if (p.active !== "auto") q.set("active", p.active);
   if (p.update) q.set("update", "on");
+  if (p.collapsed.length) q.set("collapsed", p.collapsed.join(","));
   if (!p.controls) q.set("controls", "off");
   return `?${q.toString()}`;
 }
@@ -124,6 +135,8 @@ const APP_COMMANDS = [
   "set_language",
   "get_video_language",
   "set_video_language",
+  "get_collapsed",
+  "set_collapsed",
   "get_autostart",
   "set_autostart",
   "check_video",
@@ -172,7 +185,7 @@ const CACHE_AGE_SEC = 30 * HOUR;
 /** Возраст хаба из комплекта в сценарии `stale`: старше недели, когда панель прячет коды и баннеры. */
 const BUNDLED_AGE_SEC = 8 * DAY;
 /** Версия приложения на стенде (`get_about`). */
-const STAND_VERSION = "0.1.3";
+const STAND_VERSION = "0.1.4";
 /** Вышедшая версия при `update=on`: новее работающей, ссылка — на страницу релиза. */
 const NEXT_RELEASE: AppRelease = {
   version: "0.2.0",
@@ -202,6 +215,8 @@ export interface StandSettings {
   active?: WindowState;
   /** Знает ли хаб версию новее работающей (`PreviewParams.update`). */
   update?: boolean;
+  /** Что свёрнуто при открытии (`PreviewParams.collapsed`). */
+  collapsed?: readonly CollapsePart[];
 }
 
 /** Ответы стенда на команды моста. Отдельной функцией ради теста: ей не нужно окно. */
@@ -215,6 +230,7 @@ export function createHandlers(scenario: Scenario, settings: StandSettings = {})
     lastPlayed: (firstRun ? null : "genshin") as string | null,
     language: settings.lang ?? DEFAULT_PARAMS.lang,
     videoLanguage: "en" as VideoLang,
+    collapsed: Object.fromEntries(COLLAPSE_PARTS.map((part) => [part, settings.collapsed?.includes(part) ?? false])) as Collapsed,
     animation: settings.motion ?? DEFAULT_PARAMS.motion,
     storeArt: true,
     behaviour: { closeToTray: true, trayOnLaunch: false } as Behaviour,
@@ -374,6 +390,13 @@ export function createHandlers(scenario: Scenario, settings: StandSettings = {})
     get_video_language: () => state.videoLanguage,
     set_video_language: ({ language }) => {
       state.videoLanguage = language as VideoLang;
+      return null;
+    },
+    get_collapsed: () => clone(state.collapsed),
+    // Как в Rust: одно поле за раз; незнакомое имя — отказ, как у разбора `Fold`.
+    set_collapsed: ({ fold, collapsed }) => {
+      if (!COLLAPSE_PARTS.includes(fold as CollapsePart)) return Promise.reject(`unknown fold: ${String(fold)}`);
+      state.collapsed[fold as CollapsePart] = Boolean(collapsed);
       return null;
     },
     get_autostart: () => state.autostart,

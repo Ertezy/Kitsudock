@@ -4,6 +4,7 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import type { About, AppConfig, Behaviour, FoundGame, GameView, HubData, LaunchWay } from "../types";
 import { currentT, type Lang, type VideoLang } from "../i18n";
+import type { CollapsePart } from "./collapse";
 
 /**
  * Типизированные обёртки над мостом Tauri.
@@ -87,6 +88,10 @@ export const api = {
   setLanguage: (language: Lang) => invoke<void>("set_language", { language }),
   getVideoLanguage: () => invoke<VideoLang>("get_video_language"),
   setVideoLanguage: (language: VideoLang) => invoke<void>("set_video_language", { language }),
+  /** Что свёрнуто на главном экране; разбирает `asCollapsed` (`lib/collapse.ts`). */
+  getCollapsed: () => invoke<unknown>("get_collapsed"),
+  /** Одно поле, а не весь блок: два нажатия вплотную не затирают друг друга. */
+  setCollapsed: (fold: CollapsePart, collapsed: boolean) => invoke<void>("set_collapsed", { fold, collapsed }),
   getAutostart: () => invoke<boolean>("get_autostart"),
   setAutostart: (enabled: boolean) => invoke<void>("set_autostart", { enabled }),
 

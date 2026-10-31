@@ -38,7 +38,7 @@ export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, 
   const [fixing, setFixing] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const [waitedEnough, setWaitedEnough] = useState(false);
-  // Открытая панель способов поднимает всё над язычком на свою высоту.
+  // Открытая панель способов поднимает ошибку над подписью на свою высоту.
   const [waysShift, setWaysShift] = useState<number | null>(null);
   const [wayFailure, setWayFailure] = useState<string | null>(null);
   const motion = useMotionOn();
@@ -133,28 +133,35 @@ export default function PlayButton({ gameId, note, onLaunch, onFixed, disabled, 
       )}
       {/* Выбор способа не сохранился — без выходов «найти заново»: файл тут ни при чём. */}
       {wayFailure && <div className="play-error">{wayFailure}</div>}
-      <div className="play-note">{note}</div>
+      {/* Подпись и кнопка — колонка шириной с кнопку: подпись своей ширины в
+          неё не вносит, а панель способов над подписью встаёт ровно по кнопке.
+          Есть из чего выбирать — подпись сама переключатель; кнопка у всех игр
+          стоит на одном месте. */}
       <div className="play-core">
-        <div className="play-lift">
-          <button
-            className={launching ? "play launching" : "play"}
-            disabled={launching || fixing || disabled}
-            aria-busy={launching || undefined}
-            onClick={() => void click()}
-          >
-            {/* Блик «запускается…» — только пока идёт запуск: появляется вместе с
-                состоянием и начинает проход с начала, а не с середины. */}
-            {launching && <span className="play-sheen" aria-hidden="true" />}
-            {/* Обе надписи всегда в разметке, видна одна: кнопка шириной с
-                длинную и не прыгает, когда «Играть» сменяется на «Запускаю…».
-                Спрятанную стили убирают и от экранного диктора. */}
-            <span className="play-label">
-              <span className={launching ? "is-off" : undefined}>{t.main.play}</span>
-              <span className={launching ? undefined : "is-off"}>{t.main.launching}</span>
-            </span>
-          </button>
+        <div className="play-note-row">
+          {choices.length > 1 ? (
+            <LaunchWays choices={choices} note={note} onChoose={(way) => void chooseWay(way)} onShift={setWaysShift} />
+          ) : (
+            <div className="play-note">{note}</div>
+          )}
         </div>
-        {choices.length > 1 && <LaunchWays choices={choices} onChoose={(way) => void chooseWay(way)} onShift={setWaysShift} />}
+        <button
+          className={launching ? "play launching" : "play"}
+          disabled={launching || fixing || disabled}
+          aria-busy={launching || undefined}
+          onClick={() => void click()}
+        >
+          {/* Блик «запускается…» — только пока идёт запуск: появляется вместе с
+              состоянием и начинает проход с начала, а не с середины. */}
+          {launching && <span className="play-sheen" aria-hidden="true" />}
+          {/* Обе надписи всегда в разметке, видна одна: кнопка шириной с
+              длинную и не прыгает, когда «Играть» сменяется на «Запускаю…».
+              Спрятанную стили убирают и от экранного диктора. */}
+          <span className="play-label">
+            <span className={launching ? "is-off" : undefined}>{t.main.play}</span>
+            <span className={launching ? undefined : "is-off"}>{t.main.launching}</span>
+          </span>
+        </button>
       </div>
     </div>
   );

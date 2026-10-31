@@ -189,6 +189,41 @@ pub enum VideoLanguage {
     Ja,
 }
 
+/// Свёрнутое на главном экране: разделы боковой панели и столбик соцсетей.
+/// Общее для всех игр. Нет блока или поля — развёрнуто.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Collapsed {
+    pub codes: bool,
+    pub banners: bool,
+    pub videos: bool,
+    /// Столбик соцсетей уехал за край сцены.
+    pub socials: bool,
+}
+
+/// Что сворачивается — по одному: два нажатия вплотную не должны затирать
+/// друг друга, поэтому страница шлёт одно поле, а не весь блок.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Fold {
+    Codes,
+    Banners,
+    Videos,
+    Socials,
+}
+
+impl Collapsed {
+    pub fn set(&mut self, fold: Fold, collapsed: bool) {
+        let field = match fold {
+            Fold::Codes => &mut self.codes,
+            Fold::Banners => &mut self.banners,
+            Fold::Videos => &mut self.videos,
+            Fold::Socials => &mut self.socials,
+        };
+        *field = collapsed;
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
@@ -222,6 +257,9 @@ pub struct AppConfig {
     /// Язык видео в панели. Нет поля или незнакомое значение — английский.
     #[serde(default)]
     pub video_language: VideoLanguage,
+    /// Свёрнутые разделы панели и спрятанный столбик соцсетей.
+    #[serde(default)]
+    pub collapsed: Collapsed,
     #[serde(default)]
     pub games: Vec<Game>,
 }
@@ -243,6 +281,7 @@ impl Default for AppConfig {
             animation: true,
             language: Language::En,
             video_language: VideoLanguage::En,
+            collapsed: Collapsed::default(),
             games: Vec::new(),
         }
     }
@@ -329,6 +368,7 @@ pub fn migrate_v1(raw: &serde_json::Value) -> Option<AppConfig> {
         animation: true,
         language: Language::En,
         video_language: VideoLanguage::En,
+        collapsed: Collapsed::default(),
         games,
     })
 }
@@ -378,6 +418,7 @@ pub fn migrate_v2(raw: &serde_json::Value) -> Option<AppConfig> {
         animation: true,
         language: Language::En,
         video_language: VideoLanguage::En,
+        collapsed: Collapsed::default(),
         games,
     })
 }
@@ -528,6 +569,11 @@ fn assemble_current(raw: &serde_json::Value, version: u32, games: Vec<Game>) -> 
             .unwrap_or_default(),
         video_language: raw
             .get("videoLanguage")
+            .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default(),
+        // Недостающее поле блока — развёрнуто; блок чужого вида — развёрнуто всё.
+        collapsed: raw
+            .get("collapsed")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
             .unwrap_or_default(),
         // Блок `look` от прежней настройки цвета намеренно не читается. У тех,
@@ -790,6 +836,7 @@ mod tests {
             animation: true,
             language: Language::En,
             video_language: VideoLanguage::En,
+            collapsed: Collapsed::default(),
             games: vec![
                 Game::manual("b".into(), "Второй".into()),
                 Game::manual("a".into(), "Первый".into()),
@@ -928,6 +975,7 @@ mod tests {
             animation: true,
             language: Language::En,
             video_language: VideoLanguage::En,
+            collapsed: Collapsed::default(),
             games: vec![],
         };
         let text = serde_json::to_string(&cfg).unwrap();
@@ -1314,6 +1362,77 @@ mod tests {
         let ways: Vec<_> = cfg.games.iter().map(|g| g.launch_way).collect();
         assert_eq!(ways, [None, None, Some(LaunchWay::Direct)]);
         let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn a_config_saved_before_folding_loads_with_everything_open() {
+        // Поле необязательное, и версия конфига ради него не поднимается.
+        let raw = serde_json::json!({ "version": 3, "games": [] });
+        let path = temp_config("folds-old");
+        fs::write(&path, raw.to_string()).unwrap();
+        assert_eq!(load_from(&path).collapsed, Collapsed::default());
+        assert!(!Collapsed::default().codes && !Collapsed::default().socials);
+
+        let migrated = migrate_v2(&serde_json::from_str(V2_SAMPLE).unwrap()).unwrap();
+        assert_eq!(migrated.collapsed, Collapsed::default());
+        let v1 = serde_json::json!({ "version": 1, "games": {} });
+        assert_eq!(migrate_v1(&v1).unwrap().collapsed, Collapsed::default());
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn a_partial_or_odd_fold_block_does_not_cost_the_rest() {
+        let partial = serde_json::json!({ "version": 3, "games": [], "collapsed": { "banners": true } });
+        let cfg = assemble_current(&partial, 3, Vec::new());
+        assert_eq!(cfg.collapsed, Collapsed { banners: true, ..Collapsed::default() });
+
+        // Чужой тип — всё развёрнуто, а остальной конфиг читается как был.
+        let odd = serde_json::json!({ "version": 3, "games": [], "animation": false, "collapsed": "all" });
+        let cfg = assemble_current(&odd, 3, Vec::new());
+        assert_eq!(cfg.collapsed, Collapsed::default());
+        assert!(!cfg.animation);
+    }
+
+    #[test]
+    fn folding_goes_through_update_and_survives_a_reload() {
+        let path = temp_config("folds-update");
+        update_at(&path, |cfg| {
+            cfg.collapsed.set(Fold::Codes, true);
+            Ok::<_, String>(())
+        })
+        .unwrap();
+        update_at(&path, |cfg| {
+            cfg.collapsed.set(Fold::Socials, true);
+            Ok::<_, String>(())
+        })
+        .unwrap();
+        let text = fs::read_to_string(&path).unwrap();
+        assert!(text.contains("\"collapsed\""), "поле должно писаться: {text}");
+        let cfg = load_from(&path);
+        assert_eq!(cfg.collapsed, Collapsed { codes: true, socials: true, ..Collapsed::default() });
+
+        update_at(&path, |cfg| {
+            cfg.collapsed.set(Fold::Codes, false);
+            Ok::<_, String>(())
+        })
+        .unwrap();
+        assert_eq!(load_from(&path).collapsed, Collapsed { socials: true, ..Collapsed::default() });
+        let _ = fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn fold_names_are_short_words() {
+        let fold: Fold = serde_json::from_str("\"videos\"").unwrap();
+        assert_eq!(fold, Fold::Videos);
+        assert!(serde_json::from_str::<Fold>("\"everything\"").is_err());
+        let mut folds = Collapsed::default();
+        for f in [Fold::Codes, Fold::Banners, Fold::Videos, Fold::Socials] {
+            folds.set(f, true);
+        }
+        assert_eq!(
+            serde_json::to_value(folds).unwrap(),
+            serde_json::json!({ "codes": true, "banners": true, "videos": true, "socials": true })
+        );
     }
 
     #[test]

@@ -280,6 +280,10 @@ body::after {
      краем, а не под ним. */
   margin-inline: calc(-1 * var(--focus-room));
   padding-inline: var(--focus-room);
+  /* Сверху — тот же запас: заголовок первого раздела теперь кнопка, и край
+     прокрутки срезал бы его рамку фокуса. */
+  margin-top: calc(-1 * var(--focus-room));
+  padding-top: var(--focus-room);
   scroll-padding-block: var(--focus-room) calc(var(--focus-room) + var(--panel-fade));
   /* Мягкий край внизу: то, что уходит под край прокрутки, растворяется, а не
      срезается посередине строки (на стенде «stale» срезанная дата под
@@ -309,7 +313,119 @@ body::after {
   /* Подписи секций — содержимое, а не действие: самый светлый розовый. */
   color: var(--label);
   opacity: 0.65;
-  margin-bottom: 8px;
+}
+
+/* Заголовок раздела — кнопка во всю строку (`panel/PanelSection.tsx`): слева
+   название, справа счётчик и шеврон. Выглядит той же подписью, а нажимаемой её
+   выдают шеврон, подсветка под курсором и лёгкое вдавливание. Высота строки —
+   прежняя: заглушки разделов рассчитаны на неё. */
+.panel-toggle {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--move-fast) var(--ease-spring);
+}
+
+/* Подсветка чуть шире строки: текст не прилипает к её краю. */
+.panel-toggle::before {
+  content: "";
+  position: absolute;
+  inset: -3px -4px;
+  z-index: var(--z-below);
+  border-radius: var(--r-sm);
+  background: var(--hover);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.panel-toggle:hover::before {
+  opacity: 1;
+}
+
+.panel-toggle:active {
+  transform: scale(0.98);
+}
+
+.panel-toggle-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Шеврон из двух сторон квадрата: развёрнутый смотрит вниз, свёрнутый — вбок. */
+.panel-chevron {
+  width: 6px;
+  height: 6px;
+  margin: 0 2px 2px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--move-slow) var(--ease-out);
+}
+
+.panel-toggle[aria-expanded="false"] .panel-chevron {
+  margin-bottom: 0;
+  transform: rotate(-45deg);
+}
+
+/* Сворачивание раздела. Высота уходит в ноль строкой сетки обёртки: `1fr` —
+   ровно высота содержимого, `0fr` — ноль, и переход между ними плавный без
+   замеров. Освободившееся место так же плавно достаётся разделам ниже.
+   Анимировать раскладку можно только здесь — исключение названо в
+   `src/styles.test.ts`; длительность из той же шкалы, и тумблер «Анимация»
+   сворачивает раздел мгновенно. */
+.panel-fold {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows var(--move-slow) var(--ease-out);
+}
+
+.panel-fold.is-collapsed {
+  grid-template-rows: 0fr;
+}
+
+/* Содержимое обрезается по высоте строки, но с запасом под рамку фокуса
+   карточек во всю ширину: иначе край срезал бы её и в развёрнутом разделе. */
+.panel-fold-inner {
+  min-height: 0;
+  overflow: clip;
+  overflow-clip-margin: var(--focus-room);
+  transition: opacity var(--move-slow) var(--ease-out);
+}
+
+.panel-fold.is-collapsed > .panel-fold-inner {
+  opacity: 0;
+}
+
+/* Зазор между заголовком и содержимым — внутри обёртки: у свёрнутого раздела
+   он уходит вместе с содержимым. */
+.panel-fold-inner::before {
+  content: "";
+  display: block;
+  height: 8px;
+}
+
+/* В свёрнутом разделе бесконечное движение стоит: стрелки часиков и мерцание
+   догружающихся картинок. Развернули — часики встают по часам заново
+   (`DeadlineClock`). */
+.panel-fold.is-collapsed .clock-hand,
+.panel-fold.is-collapsed .img-tone::before {
+  animation-play-state: paused;
 }
 
 /* Вход разделов (`lib/panelEntry.ts`): по очереди поднимаются и проявляются.
@@ -697,9 +813,8 @@ body::after {
    `visibility`, а не прозрачностью: невидимую кнопку нельзя ни нажать, ни
    выбрать с клавиатуры. Ошибка запуска и выходы из неё не ждут никогда: это
    ответ на действие человека. */
-.play-area.is-waiting > .play-note,
-.play-area.is-waiting .play,
-.play-area.is-waiting .ways {
+.play-area.is-waiting .play-note,
+.play-area.is-waiting .play {
   visibility: hidden;
   animation: none;
 }
@@ -949,97 +1064,82 @@ body::after {
   cursor: default;
 }
 
-/* Переключатель способа запуска (`LaunchWays`). Кнопка PLAY и язычок под ней
-   стоят в одной колонке: язычок растягивается на её ширину, а своей ширины в
-   колонку не вносит (`width: 0` с `min-width: 100%`), иначе длинное название
-   способа расширило бы и кнопку. Язычок занимает место под кнопкой, а не
-   поверх дока: колонка встаёт на тот же отступ от низа сцены, и всё над
-   язычком поднимается на его высоту. */
+/* Подпись и кнопка PLAY — колонка шириной с кнопку. Подпись своей ширины в
+   колонку не вносит (`width: 0` с `min-width: 100%`) и стоит по правому краю,
+   а длинная выходит влево за колонку: иначе длинное название способа
+   расширило бы кнопку. Кнопка — внизу колонки, на одном месте у всех игр:
+   переключатель способа запуска — сама подпись, под кнопкой ничего нет. */
 .play-core {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  gap: 10px;
 }
 
-/* Панель выезжает из язычка в место, где стояла кнопка, а кнопка, подпись и
-   ошибка над ней поднимаются на высоту панели (`--ways-shift` считает
-   `LaunchWays` по раскладке): ничто не ложится поверх подписи, и колонка не
-   растёт вниз, к доку. Поднимаются обёртка кнопки и соседи над ней, а не сама
-   кнопка: у кнопки свой `transform` — вдавливание при нажатии. Обёртка лежит
-   над панелью: пока панель уезжает, она не проступает поверх кнопки. */
-.play-lift,
-.play-area > .play-note,
+.play-note-row {
+  display: flex;
+  justify-content: flex-end;
+  width: 0;
+  min-width: 100%;
+}
+
+.play-note-row .play-note {
+  flex: none;
+  white-space: nowrap;
+}
+
+/* Открытая панель способов встаёт над подписью, а ошибка над ней поднимается
+   на высоту панели (`--ways-shift` считает `LaunchWays` по раскладке): ничто
+   не ложится поверх ошибки, а подпись и кнопка не двигаются. */
 .play-area > .play-error,
 .play-area > .play-fix {
   transition: transform var(--move) var(--ease-out);
 }
 
-.play-lift {
-  position: relative;
-  z-index: var(--z-ui);
-}
-
-.play-area.ways-open .play-lift,
-.play-area.ways-open > .play-note,
 .play-area.ways-open > .play-error,
 .play-area.ways-open > .play-fix {
   transform: translateY(calc(var(--ways-shift) * -1));
 }
 
+/* Переключатель способа запуска (`LaunchWays`) — та же строка, что подпись
+   у игры с одним способом, с маленькой стрелкой. Стрелка смотрит вверх, туда,
+   куда выедет панель, и переворачивается, пока панель открыта. Нажимаемой
+   подпись выдают стрелка, подсветка под курсором и вдавливание. Строка от
+   этого не становится второй кнопкой: ни цвета действия, ни своей рамки. */
 .ways {
   position: relative;
-  width: 0;
-  min-width: 100%;
-  margin-top: 6px;
-  animation: play-rise var(--move-slow) var(--ease-out) var(--move) backwards;
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
 }
 
-/* Язычок: узкая таблетка на тёмной плашке, как подпись над кнопкой, — на
-   светлом арте прозрачной она терялась бы. Название способа и стрелка; стрелка
-   смотрит вверх, туда, куда выедет панель, и переворачивается, пока панель
-   открыта. */
-.ways-tab {
+.ways-switch {
   position: relative;
   isolation: isolate;
   display: flex;
   align-items: center;
-  justify-content: center;
   gap: 6px;
-  width: 100%;
-  padding: 4px 12px;
   border: 0;
-  border-radius: var(--r-pill);
-  background: var(--plate);
-  backdrop-filter: blur(12px);
-  box-shadow: var(--glass-edge);
-  color: var(--ink);
-  font: inherit;
-  font-size: var(--text-sm);
-  font-weight: 500;
+  font-family: inherit;
+  line-height: inherit;
   cursor: pointer;
   transition: transform var(--move-fast) var(--ease-spring);
 }
 
-.ways-tab-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .ways-arrow {
   flex: none;
+  font-size: var(--text-sm);
   color: var(--ink-dim);
   transition: transform var(--move) var(--ease-out);
 }
 
-.ways-tab[aria-expanded="true"] .ways-arrow {
+.ways-switch[aria-expanded="true"] .ways-arrow {
   transform: rotate(180deg);
 }
 
 /* Подсветка под курсором — тонкий светлый слой и кромка, как у выходов из
    ошибки запуска: плашка не светлеет, и текст на белом арте остаётся читаемым. */
-.ways-tab::before,
+.ways-switch::before,
 .ways-item::before {
   content: "";
   position: absolute;
@@ -1052,7 +1152,7 @@ body::after {
   transition: opacity var(--move) var(--ease-out);
 }
 
-.ways-tab::before {
+.ways-switch::before {
   border-radius: var(--r-pill);
 }
 
@@ -1060,23 +1160,23 @@ body::after {
   border-radius: var(--r-md);
 }
 
-.ways-tab:hover::before,
+.ways-switch:hover::before,
 .ways-item:hover::before {
   opacity: 1;
 }
 
-.ways-tab:active {
+.ways-switch:active {
   transform: scale(0.97);
 }
 
-.ways-tab:focus-visible,
+.ways-switch:focus-visible,
 .ways-item:focus-visible {
   box-shadow: var(--glass-edge), var(--focus-halo);
 }
 
-/* Панель шириной с кнопку. Закрытая — прозрачная, чуть ниже своего места, мышь
-   и клавиатура её не замечают (`inert` ставит `LaunchWays`). Низ панели — на
-   месте низа кнопки, то есть над язычком с тем же зазором. */
+/* Панель шириной с кнопку, над подписью. Закрытая — прозрачная, чуть ниже
+   своего места, мышь и клавиатура её не замечают (`inert` ставит
+   `LaunchWays`); открываясь, выезжает от подписи вверх. */
 .ways-panel {
   position: absolute;
   left: 0;
@@ -1153,12 +1253,12 @@ body::after {
   color: var(--ink-dim);
 }
 
-/* Тумблер «Анимация» выключен — панель появляется и уходит без движения, кнопка
-   встаёт на место сразу, стрелка переворачивается скачком. Начатые переходы
-   обрываются, как у дока. */
-:root[data-motion="off"] :is(.play-lift, .ways-panel, .ways-arrow, .ways-tab, .ways-item),
-:root[data-motion="off"] .play-area > :is(.play-note, .play-error, .play-fix),
-:root[data-motion="off"] :is(.ways-tab, .ways-item)::before {
+/* Тумблер «Анимация» выключен — панель появляется и уходит без движения,
+   ошибка над ней встаёт на место сразу, стрелка переворачивается скачком.
+   Начатые переходы обрываются, как у дока. */
+:root[data-motion="off"] :is(.ways-panel, .ways-arrow, .ways-switch, .ways-item),
+:root[data-motion="off"] .play-area > :is(.play-error, .play-fix),
+:root[data-motion="off"] :is(.ways-switch, .ways-item)::before {
   transition: none;
 }
 :root[data-motion="off"] .ways-panel {
@@ -1187,11 +1287,30 @@ body::after {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
   pointer-events: none;
   /* Столбик своей игры проявляется вместе с подписью над PLAY: при смене игры
      он пересоздаётся (`key` в `App`). */
   animation: socials-in var(--move-slow) var(--ease-out) calc(var(--move) * 0.5) backwards;
+  /* Спрятанный уезжает за правый край и тает (`SocialLinks`). */
+  transition:
+    transform var(--move-slow) var(--ease-out),
+    opacity var(--move-slow) var(--ease-out);
+}
+
+.socials-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Спрятанный при запуске или при смене игры стоит за краем сразу: вход ведёт
+   его из прозрачности в прозрачность и не виден. Вход здесь не снимается —
+   иначе, вернувшись, он сыграл бы заново поверх выезда из-за края. */
+.socials.is-hidden {
+  opacity: 0;
+  transform: translateX(calc(100% + var(--socials-edge)));
 }
 
 @keyframes socials-in {
@@ -1262,6 +1381,120 @@ body::after {
 .social svg {
   width: 16px;
   height: 16px;
+}
+
+/* «Скрыть соцсети» — низкая таблетка под столбиком, шириной с кнопку сети, с
+   шевроном к краю: туда столбик и уедет. Язычок у края — узкий полукруглый
+   выступ с шевроном от края, только пока столбик спрятан. Оба на той же
+   тёмной плашке, что кнопки сетей, и с той же подсветкой под курсором. */
+.socials-hide,
+.socials-tab {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--plate);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--glass-edge);
+  color: var(--ink-dim);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.socials-hide {
+  flex: none;
+  width: var(--social-size);
+  height: 18px;
+  border-radius: var(--r-pill);
+  transition: transform var(--move) var(--ease-spring);
+}
+
+/* Язычок у самого края, посередине полосы столбика: с кнопкой PLAY, подписью
+   над ней и её панелью он не встречается — те отступают от края на 48px, а
+   язычок уже 16px. Стоит за краем, пока столбик на месте. */
+.socials-tab {
+  position: absolute;
+  top: 16px;
+  bottom: 150px;
+  right: 0;
+  z-index: var(--z-ui);
+  width: 16px;
+  height: 48px;
+  margin-block: auto;
+  border-right: 0;
+  border-radius: var(--r-md) 0 0 var(--r-md);
+  opacity: 0;
+  transform: translateX(100%);
+  pointer-events: none;
+  transition:
+    transform var(--move-slow) var(--ease-out),
+    opacity var(--move-slow) var(--ease-out);
+}
+
+.socials-tab.is-shown {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.socials-hide::before,
+.socials-tab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-pill);
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.socials-tab::before {
+  border-radius: var(--r-md) 0 0 var(--r-md);
+}
+
+.socials-hide:hover::before,
+.socials-tab:hover::before {
+  opacity: 1;
+}
+
+.socials-hide:active {
+  transform: scale(0.92);
+  transition-duration: var(--move-fast);
+}
+
+.socials-tab:active {
+  transform: translateX(2px);
+  transition-duration: var(--move-fast);
+}
+
+.socials-hide:focus-visible,
+.socials-tab:focus-visible {
+  box-shadow: var(--glass-edge), var(--focus-halo);
+}
+
+/* Шеврон из двух сторон квадрата: у кнопки смотрит к краю, у язычка — от него. */
+.socials-chevron {
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateX(-1px) rotate(-45deg);
+}
+
+.socials-tab .socials-chevron {
+  transform: translateX(1px) rotate(135deg);
+}
+
+/* Тумблер «Анимация» выключен — столбик и язычок меняются местами сразу. */
+:root[data-motion="off"] :is(.socials, .socials-hide, .socials-tab),
+:root[data-motion="off"] :is(.socials-hide, .socials-tab)::before {
+  transition: none;
 }
 
 /* Док внизу главного экрана. Виден всегда: подсказка «наведите» ушла вместе
@@ -2240,7 +2473,8 @@ body::after {
 }
 :root[data-motion="off"] :is(.code-copy-icon, .carousel-dots .dot, .video-thumb, .img-tone),
 :root[data-motion="off"] :is(.code-card, .code-buttons button, .carousel-arrow, .video-card, .link-button),
-:root[data-motion="off"] :is(.video-card, .code-card, .code-buttons button)::before {
+:root[data-motion="off"] :is(.panel-toggle, .panel-chevron, .panel-fold, .panel-fold-inner),
+:root[data-motion="off"] :is(.video-card, .code-card, .code-buttons button, .panel-toggle)::before {
   transition: none;
 }
 :root[data-motion="off"] .video-card:hover .video-thumb,

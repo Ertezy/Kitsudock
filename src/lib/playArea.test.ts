@@ -41,10 +41,10 @@ describe("стили ожидания", () => {
     .map((m) => m[1].trim())
     .filter((s) => s.includes("is-waiting"));
 
-  it("ждут только подпись, кнопка и язычок способа запуска под ней", () => {
+  it("ждут только подпись (она же переключатель способа запуска) и кнопка", () => {
     expect(gated.length).toBeGreaterThan(0);
     const targets = gated.flatMap((s) => s.split(",").map((part) => part.trim()));
-    expect(targets.sort()).toEqual([".play-area.is-waiting .play", ".play-area.is-waiting .ways", ".play-area.is-waiting > .play-note"]);
+    expect(targets.sort()).toEqual([".play-area.is-waiting .play", ".play-area.is-waiting .play-note"]);
   });
 
   it("ошибка запуска и выходы из неё не ждут: это ответ на действие", () => {

@@ -4,6 +4,7 @@ import { copyAnnouncement, copyFeedbackOver, feedbackMs, isCopied, isCopyFailed,
 import { activeCodes, codeHasClock, plainSpaces } from "../../lib/panel";
 import { burnsToday, codeShareLeft, codeTimer } from "../../lib/time";
 import DeadlineClock from "./DeadlineClock";
+import PanelSection from "./PanelSection";
 import { useLang, useT } from "../../i18n";
 import type { Code, HubGame } from "../../types";
 
@@ -74,12 +75,7 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
   };
 
   return (
-    <section className="panel-section">
-      <div className="panel-label">
-        <span>{t.panel.codes}</span>
-        <span>{active.length}</span>
-      </div>
-
+    <PanelSection part="codes" title={t.panel.codes} count={active.length}>
       <div className="codes-box">
         {active.map((c) => {
           const game = gameOf(c.gameId);
@@ -177,6 +173,6 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
           ? copyAnnouncement(copied.failed ? t.panel.codeCopyFailed(copied.code) : t.panel.codeCopied(copied.code), copied.id)
           : ""}
       </span>
-    </section>
+    </PanelSection>
   );
 }

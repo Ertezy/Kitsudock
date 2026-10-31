@@ -65,6 +65,9 @@ export const en = {
     soonIn: (time: string) => `Soon · in ${time}`,
     videos: "Videos",
     premiere: "premiere",
+    // Кнопка в заголовке раздела панели.
+    collapse: { codes: "Collapse codes", banners: "Collapse banners", videos: "Collapse videos" },
+    expand: { codes: "Expand codes", banners: "Expand banners", videos: "Expand videos" },
   },
   // Главный экран, док игр и общие обёртки страницы.
   main: {
@@ -76,7 +79,7 @@ export const en = {
         gryphlink: "Launches via GRYPHLINK",
       },
       fileMissing: "game file not found",
-      // Переключатель способа под кнопкой «Играть».
+      // Переключатель способа — подпись над кнопкой «Играть» и панель над ней.
       way: {
         direct: "Directly",
         store: { steam: "Via Steam", epic: "Via Epic Games" },
@@ -121,6 +124,9 @@ export const en = {
     // и название сети — подсказка и имя кнопки.
     socials: {
       group: "Official game socials",
+      // Кнопка внизу столбика и язычок у края, который его возвращает.
+      hide: "Hide socials",
+      show: "Show socials",
       names: {
         hoyolab: "HoYoLAB",
         site: "Official site",

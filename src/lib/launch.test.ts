@@ -56,7 +56,7 @@ describe("способы запуска на выбор", () => {
     expect(own.map((c) => c.hint)).toEqual([null, null]);
   });
 
-  it("подпись способа для язычка", () => {
+  it("название способа для строки панели", () => {
     const g = game({ ways: ["direct", "launcher", "store"], launcher: "gryphlink" });
     expect(wayLabel(en, g, "direct")).toBe("Directly");
     expect(wayLabel(en, g, "launcher")).toBe("Via GRYPHLINK");

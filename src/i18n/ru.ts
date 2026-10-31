@@ -68,6 +68,9 @@ export const ru: Dictionary = {
     soonIn: (time: string) => `Скоро · через ${time}`,
     videos: "Видео",
     premiere: "премьера",
+    // Кнопка в заголовке раздела панели.
+    collapse: { codes: "Свернуть промокоды", banners: "Свернуть баннеры", videos: "Свернуть видео" },
+    expand: { codes: "Развернуть промокоды", banners: "Развернуть баннеры", videos: "Развернуть видео" },
   },
   // Строки главного экрана, дока игр и общих обёрток (было в App.tsx,
   // PlayButton.tsx, GameDock.tsx, lib/launch.ts, lib/background.ts, lib/api.ts).
@@ -80,7 +83,7 @@ export const ru: Dictionary = {
         gryphlink: "Запустится через GRYPHLINK",
       },
       fileMissing: "файл не найден",
-      // Переключатель способа под кнопкой «Играть».
+      // Переключатель способа — подпись над кнопкой «Играть» и панель над ней.
       way: {
         direct: "Напрямую",
         store: { steam: "Через Steam", epic: "Через Epic Games" },
@@ -123,6 +126,9 @@ export const ru: Dictionary = {
     refuseNonHttps: (url: string) => `Ссылка не https, поэтому не откроется: ${url}`,
     socials: {
       group: "Официальные соцсети игры",
+      // Кнопка внизу столбика и язычок у края, который его возвращает.
+      hide: "Скрыть соцсети",
+      show: "Показать соцсети",
       names: {
         hoyolab: "HoYoLAB",
         site: "Сайт игры",
