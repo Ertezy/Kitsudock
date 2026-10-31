@@ -30,7 +30,8 @@ describe("текст ошибки", () => {
       "gameNotFound", "fileMissing", "exePathMissing", "argsUnclosedQuote", "exeStartFailed",
       "steamOpenFailed", "epicOpenFailed", "emptyTitle", "hubUrlNotHttps", "videoPickFailed",
       "videoWrongFormat", "videoFileMissing", "videoTooLarge",
-      "cacheReadFailed", "logFolderMissing", "openFolderFailed", "configSaveFailed", "autostartFailed", "internal",
+      "cacheReadFailed", "logFolderMissing", "openFolderFailed", "configSaveFailed", "autostartFailed",
+      "updateNotFound", "updateFailed", "internal",
     ];
     for (const code of codes) {
       const english = errorText(en, { code, detail: "d" });
@@ -81,6 +82,11 @@ describe("текст ошибки", () => {
     expect(ruText("openFolderFailed", "x")).toBe("Не удалось открыть папку: x");
     expect(ruText("configSaveFailed", "запись C:\\config.json.tmp: x")).toBe("Не удалось сохранить настройки: запись C:\\config.json.tmp: x");
     expect(ruText("configSaveFailed")).toBe("Не удалось сохранить настройки");
+    // Файл данных уже знает о новой версии, а релиз на GitHub ещё не отдаёт
+    // её для установки.
+    expect(ruText("updateNotFound")).toBe("На GitHub пока нет новой версии для установки.");
+    expect(ruText("updateFailed", "x")).toBe("Не удалось обновить: x");
+    expect(ruText("updateFailed")).toBe("Не удалось обновить");
   });
 
   it("английский — подробность на месте", () => {
@@ -89,5 +95,7 @@ describe("текст ошибки", () => {
     );
     expect(errorText(en, { code: "gameNotFound" })).toBe("Game not found");
     expect(errorText(en, { code: "configSaveFailed", detail: "x" })).toBe("Couldn't save the settings: x");
+    expect(errorText(en, { code: "updateNotFound" })).toBe("GitHub doesn't offer a newer version to install yet.");
+    expect(errorText(en, { code: "updateFailed", detail: "x" })).toBe("Couldn't update: x");
   });
 });

@@ -138,6 +138,8 @@ export const en = {
     openFolderFailed: (d?: string) => (d ? `Couldn't open the folder: ${d}` : "Couldn't open the folder"),
     configSaveFailed: (d?: string) => (d ? `Couldn't save the settings: ${d}` : "Couldn't save the settings"),
     autostartFailed: (d?: string) => (d ? `Couldn't change autostart: ${d}` : "Couldn't change autostart"),
+    updateNotFound: (_d?: string) => "GitHub doesn't offer a newer version to install yet.",
+    updateFailed: (d?: string) => (d ? `Couldn't update: ${d}` : "Couldn't update"),
   },
   // Экран на месте окна, если отрисовка упала (src/components/ErrorBoundary.tsx).
   crash: {

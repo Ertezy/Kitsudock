@@ -24,6 +24,9 @@ pub mod code {
     pub const OPEN_FOLDER_FAILED: &str = "openFolderFailed";
     pub const CONFIG_SAVE_FAILED: &str = "configSaveFailed";
     pub const AUTOSTART_FAILED: &str = "autostartFailed";
+    // Кнопка «Обновить»: новой версии к установке нет или она не встала.
+    pub const UPDATE_NOT_FOUND: &str = "updateNotFound";
+    pub const UPDATE_FAILED: &str = "updateFailed";
     pub const INTERNAL: &str = "internal";
 }
 

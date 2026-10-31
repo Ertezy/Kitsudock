@@ -151,6 +151,8 @@ export const ru: Dictionary = {
     // подробность.
     configSaveFailed: (d?: string) => (d ? `Не удалось сохранить настройки: ${d}` : "Не удалось сохранить настройки"),
     autostartFailed: (d?: string) => (d ? `Не удалось изменить автозапуск: ${d}` : "Не удалось изменить автозапуск"),
+    updateNotFound: (_d?: string) => "На GitHub пока нет новой версии для установки.",
+    updateFailed: (d?: string) => (d ? `Не удалось обновить: ${d}` : "Не удалось обновить"),
   },
   // Экран на месте окна, если отрисовка упала (src/components/ErrorBoundary.tsx).
   crash: {
