@@ -83,7 +83,7 @@ export const ru: Dictionary = {
         gryphlink: "Запустится через GRYPHLINK",
       },
       fileMissing: "файл не найден",
-      // Переключатель способа под кнопкой «Играть».
+      // Переключатель способа — подпись над кнопкой «Играть» и панель над ней.
       way: {
         direct: "Напрямую",
         store: { steam: "Через Steam", epic: "Через Epic Games" },

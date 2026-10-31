@@ -79,7 +79,7 @@ export const en = {
         gryphlink: "Launches via GRYPHLINK",
       },
       fileMissing: "game file not found",
-      // Переключатель способа под кнопкой «Играть».
+      // Переключатель способа — подпись над кнопкой «Играть» и панель над ней.
       way: {
         direct: "Directly",
         store: { steam: "Via Steam", epic: "Via Epic Games" },

@@ -15,7 +15,7 @@ export function launchNote(t: Dictionary, game: WayGame): string {
   return game.missing ? `${note} · ${t.main.launch.fileMissing}` : note;
 }
 
-/** Название способа — для язычка и строки списка. */
+/** Название способа — для строки в панели способов. */
 export function wayLabel(t: Dictionary, game: WayGame, way: LaunchWay): string {
   const words = t.main.launch.way;
   if (way === "launcher" && game.launcher) return words.launcher[game.launcher];

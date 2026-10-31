@@ -6,18 +6,22 @@ import type { LaunchWay } from "../types";
 interface Props {
   /** Строки переключателя (`wayChoices`), их всегда больше одной. */
   choices: WayChoice[];
+  /** Подпись над кнопкой (`launchNote`): она и есть переключатель. */
+  note: string;
   onChoose: (way: LaunchWay) => void;
-  /** Панель открылась (на сколько пикселей подняться всему над язычком) или
+  /** Панель открылась (на сколько пикселей подняться ошибке над подписью) или
    *  закрылась (`null`). */
   onShift: (px: number | null) => void;
 }
 
 /**
- * Язычок под кнопкой «Играть» с текущим способом запуска и панель над ним со
- * всеми способами. Выбор закрывает панель; Esc и щелчок мимо — тоже. Фокус
- * после закрытия с клавиатуры возвращается на язычок.
+ * Подпись над кнопкой «Играть» («Запустится напрямую ▴»), которая открывает
+ * панель со всеми способами запуска: панель выезжает над подписью, шириной с
+ * кнопку. Кнопка при этом стоит на месте. Выбор закрывает панель; Esc, щелчок
+ * мимо и уход фокуса — тоже. Фокус после закрытия с клавиатуры возвращается на
+ * подпись.
  */
-export default function LaunchWays({ choices, onChoose, onShift }: Props) {
+export default function LaunchWays({ choices, note, onChoose, onShift }: Props) {
   const t = useT();
   const id = useId();
   const [open, setOpen] = useState(false);
@@ -40,8 +44,8 @@ export default function LaunchWays({ choices, onChoose, onShift }: Props) {
   };
 
   const openPanel = () => {
-    // Низ панели стоит на месте низа кнопки, а `offsetTop` не учитывает
-    // `transform`: минус он и есть высота панели вместе с зазором до кнопки.
+    // Низ панели стоит над подписью, а `offsetTop` не учитывает `transform`:
+    // минус он и есть высота панели вместе с зазором до подписи.
     onShift(panel.current ? -panel.current.offsetTop : 0);
     setOpen(true);
   };
@@ -89,7 +93,7 @@ export default function LaunchWays({ choices, onChoose, onShift }: Props) {
       className="ways"
       ref={root}
       onKeyDown={onKeyDown}
-      // Фокус ушёл за пределы язычка и панели (Tab дальше) — панель закрывается.
+      // Фокус ушёл за пределы подписи и панели (Tab дальше) — панель закрывается.
       onBlur={(e) => {
         if (open && !root.current?.contains(e.relatedTarget as Node | null)) close(false);
       }}
@@ -125,17 +129,18 @@ export default function LaunchWays({ choices, onChoose, onShift }: Props) {
           </button>
         ))}
       </div>
+      {/* Имя кнопки — то, что видно, с пояснением, что она выбирает. */}
       <button
         ref={tab}
         type="button"
-        className="ways-tab"
+        className="play-note ways-switch"
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={id}
-        aria-label={t.main.launch.way.tab(current.label)}
+        aria-label={t.main.launch.way.tab(note)}
         onClick={() => (open ? close(false) : openPanel())}
       >
-        <span className="ways-tab-label">{current.label}</span>
+        <span>{note}</span>
         <span className="ways-arrow" aria-hidden="true">
           ▴
         </span>
