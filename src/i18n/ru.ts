@@ -126,6 +126,9 @@ export const ru: Dictionary = {
     refuseNonHttps: (url: string) => `Ссылка не https, поэтому не откроется: ${url}`,
     socials: {
       group: "Официальные соцсети игры",
+      // Кнопка внизу столбика и язычок у края, который его возвращает.
+      hide: "Скрыть соцсети",
+      show: "Показать соцсети",
       names: {
         hoyolab: "HoYoLAB",
         site: "Сайт игры",

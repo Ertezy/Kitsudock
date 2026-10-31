@@ -1,4 +1,6 @@
+import { useLayoutEffect, useRef } from "react";
 import { api } from "../lib/api";
+import { collapse, useCollapsed } from "../lib/collapse";
 import { socialsFor } from "../lib/socials";
 import { useLang, useT } from "../i18n";
 import type { HubGame, SocialKind } from "../types";
@@ -62,28 +64,81 @@ function SocialIcon({ kind }: { kind: SocialKind }) {
  * Столбик официальных соцсетей выбранной игры у правого края сцены. Список —
  * на языке интерфейса (`lib/socials.ts`); нет ни одного — нет и столбика.
  * Ссылка открывается в браузере тем же путём, что ролики и страница релиза.
+ *
+ * Кнопка внизу столбика уводит его за правый край; остаётся узкий язычок у
+ * края, который возвращает столбик. Спрятанное общее для всех игр и
+ * переживает перезапуск (`lib/collapse.ts`). Фокус переходит с нажатой кнопки
+ * на ту, что встала вместо неё: нажатая становится недоступной.
  */
 export default function SocialLinks({ socials }: { socials: HubGame["socials"] }) {
   const t = useT();
   const list = socialsFor(socials, useLang());
+  const hidden = useCollapsed("socials");
+  const column = useRef<HTMLDivElement>(null);
+  const tab = useRef<HTMLButtonElement>(null);
+  const hide = useRef<HTMLButtonElement>(null);
+  // Нажали кнопку — фокус переедет, когда встанет её замена.
+  const refocus = useRef(false);
+
+  // Спрятанный столбик и ненужный язычок не ловят ни Tab, ни диктора. До
+  // отрисовки кадра: спрятанный при запуске столбик ни на миг не доступен.
+  useLayoutEffect(() => {
+    if (column.current) column.current.inert = hidden;
+    if (tab.current) tab.current.inert = !hidden;
+    if (refocus.current) {
+      refocus.current = false;
+      (hidden ? tab : hide).current?.focus({ preventScroll: true });
+    }
+  }, [hidden, list.length]);
+
   if (list.length === 0) return null;
+
+  const toggle = (next: boolean) => {
+    refocus.current = true;
+    collapse("socials", next, api.setCollapsed);
+  };
+
   return (
-    <div className="socials" role="group" aria-label={t.main.socials.group}>
-      {list.map((s) => {
-        const name = t.main.socials.names[s.kind];
-        return (
-          <button
-            key={s.url}
-            type="button"
-            className="social"
-            title={name}
-            aria-label={name}
-            onClick={() => void api.openSafeUrl(s.url).catch(() => undefined)}
-          >
-            <SocialIcon kind={s.kind} />
-          </button>
-        );
-      })}
-    </div>
+    <>
+      <div className={hidden ? "socials is-hidden" : "socials"} ref={column}>
+        <div className="socials-list" role="group" aria-label={t.main.socials.group}>
+          {list.map((s) => {
+            const name = t.main.socials.names[s.kind];
+            return (
+              <button
+                key={s.url}
+                type="button"
+                className="social"
+                title={name}
+                aria-label={name}
+                onClick={() => void api.openSafeUrl(s.url).catch(() => undefined)}
+              >
+                <SocialIcon kind={s.kind} />
+              </button>
+            );
+          })}
+        </div>
+        <button
+          ref={hide}
+          type="button"
+          className="socials-hide"
+          title={t.main.socials.hide}
+          aria-label={t.main.socials.hide}
+          onClick={() => toggle(true)}
+        >
+          <span className="socials-chevron" aria-hidden="true" />
+        </button>
+      </div>
+      <button
+        ref={tab}
+        type="button"
+        className={hidden ? "socials-tab is-shown" : "socials-tab"}
+        title={t.main.socials.show}
+        aria-label={t.main.socials.show}
+        onClick={() => toggle(false)}
+      >
+        <span className="socials-chevron" aria-hidden="true" />
+      </button>
+    </>
   );
 }

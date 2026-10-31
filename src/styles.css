@@ -1303,11 +1303,30 @@ body::after {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
   pointer-events: none;
   /* Столбик своей игры проявляется вместе с подписью над PLAY: при смене игры
      он пересоздаётся (`key` в `App`). */
   animation: socials-in var(--move-slow) var(--ease-out) calc(var(--move) * 0.5) backwards;
+  /* Спрятанный уезжает за правый край и тает (`SocialLinks`). */
+  transition:
+    transform var(--move-slow) var(--ease-out),
+    opacity var(--move-slow) var(--ease-out);
+}
+
+.socials-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Спрятанный при запуске или при смене игры стоит за краем сразу: вход ведёт
+   его из прозрачности в прозрачность и не виден. Вход здесь не снимается —
+   иначе, вернувшись, он сыграл бы заново поверх выезда из-за края. */
+.socials.is-hidden {
+  opacity: 0;
+  transform: translateX(calc(100% + var(--socials-edge)));
 }
 
 @keyframes socials-in {
@@ -1378,6 +1397,120 @@ body::after {
 .social svg {
   width: 16px;
   height: 16px;
+}
+
+/* «Скрыть соцсети» — низкая таблетка под столбиком, шириной с кнопку сети, с
+   шевроном к краю: туда столбик и уедет. Язычок у края — узкий полукруглый
+   выступ с шевроном от края, только пока столбик спрятан. Оба на той же
+   тёмной плашке, что кнопки сетей, и с той же подсветкой под курсором. */
+.socials-hide,
+.socials-tab {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid var(--line);
+  background: var(--plate);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--glass-edge);
+  color: var(--ink-dim);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.socials-hide {
+  flex: none;
+  width: var(--social-size);
+  height: 18px;
+  border-radius: var(--r-pill);
+  transition: transform var(--move) var(--ease-spring);
+}
+
+/* Язычок у самого края, посередине полосы столбика: с кнопкой PLAY, подписью
+   над ней и её панелью он не встречается — те отступают от края на 48px, а
+   язычок уже 16px. Стоит за краем, пока столбик на месте. */
+.socials-tab {
+  position: absolute;
+  top: 16px;
+  bottom: 150px;
+  right: 0;
+  z-index: var(--z-ui);
+  width: 16px;
+  height: 48px;
+  margin-block: auto;
+  border-right: 0;
+  border-radius: var(--r-md) 0 0 var(--r-md);
+  opacity: 0;
+  transform: translateX(100%);
+  pointer-events: none;
+  transition:
+    transform var(--move-slow) var(--ease-out),
+    opacity var(--move-slow) var(--ease-out);
+}
+
+.socials-tab.is-shown {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.socials-hide::before,
+.socials-tab::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-pill);
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.socials-tab::before {
+  border-radius: var(--r-md) 0 0 var(--r-md);
+}
+
+.socials-hide:hover::before,
+.socials-tab:hover::before {
+  opacity: 1;
+}
+
+.socials-hide:active {
+  transform: scale(0.92);
+  transition-duration: var(--move-fast);
+}
+
+.socials-tab:active {
+  transform: translateX(2px);
+  transition-duration: var(--move-fast);
+}
+
+.socials-hide:focus-visible,
+.socials-tab:focus-visible {
+  box-shadow: var(--glass-edge), var(--focus-halo);
+}
+
+/* Шеврон из двух сторон квадрата: у кнопки смотрит к краю, у язычка — от него. */
+.socials-chevron {
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: translateX(-1px) rotate(-45deg);
+}
+
+.socials-tab .socials-chevron {
+  transform: translateX(1px) rotate(135deg);
+}
+
+/* Тумблер «Анимация» выключен — столбик и язычок меняются местами сразу. */
+:root[data-motion="off"] :is(.socials, .socials-hide, .socials-tab),
+:root[data-motion="off"] :is(.socials-hide, .socials-tab)::before {
+  transition: none;
 }
 
 /* Док внизу главного экрана. Виден всегда: подсказка «наведите» ушла вместе

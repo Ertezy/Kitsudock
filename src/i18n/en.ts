@@ -124,6 +124,9 @@ export const en = {
     // и название сети — подсказка и имя кнопки.
     socials: {
       group: "Official game socials",
+      // Кнопка внизу столбика и язычок у края, который его возвращает.
+      hide: "Hide socials",
+      show: "Show socials",
       names: {
         hoyolab: "HoYoLAB",
         site: "Official site",
