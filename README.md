@@ -28,9 +28,13 @@ notes is on the [Releases](https://github.com/Ertezy/Kitsudock/releases) page.
 
 ## Update
 
-Download the installer again from the same link and run it over the old version. Games,
-order and settings are kept. When a new version is out, a line at the bottom of the side
-panel says so, with a Download link.
+When a new version is out, a line at the bottom of the side panel says so. Click **Update**
+in it: Kitsudock downloads the new installer, installs it and starts again. Games, order and
+settings are kept. Versions before the button show a **Download** link there instead; if the
+update fails, the line says so and offers **Download** too.
+
+Updating by hand still works: download the installer again from the same link and run it
+over the old version.
 
 Coming from Gacha Hub (the project's old name)? Install Kitsudock first — your games and
 settings are carried over on its first start — then uninstall Gacha Hub — after Kitsudock's
@@ -51,7 +55,8 @@ like any website.
 Data comes from GitHub Pages or your chosen address. Pictures and videos come from
 game wikis, YouTube, HoYoPlay, Steam and Epic servers; store artwork may also come
 from local caches. Media sources depend on the data file and installed launchers.
-Video and code redemption links open in your browser.
+Video and code redemption links open in your browser. When you click **Update**, the app
+requests `latest.json` and the installer from this repository's GitHub releases.
 
 ## Is it safe?
 
@@ -63,6 +68,8 @@ Video and code redemption links open in your browser.
   prompt. The game or store launcher may ask you to sign in.
 - **Network access:** the downloads and external links are described in
   [Privacy](#privacy); logs are not sent automatically.
+- **Updates:** only when you click **Update**. The update is installed only if its
+  signature matches the key built into the app; otherwise nothing is installed.
 - **Source and builds:** the source is available under the [MIT license](LICENSE).
   Installers are built by the [release workflow](.github/workflows/release.yml) in
   GitHub Actions from this repository.
