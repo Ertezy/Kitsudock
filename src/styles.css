@@ -104,7 +104,8 @@
    * Остальные скорости — доли и кратные базовой: быстрая (отклик кнопки)
    * ≈0.12 с, базовая (наведение) 0.18 с, медленная (появление панели) ≈0.32 с,
    * сценическая (смена фона игры) ≈0.6 с, фоновая (дрейф арта) ≈40 с, оборот
-   * стрелки часиков сроков ≈8 с, а в последние сутки срока ≈2 с.
+   * стрелки часиков сроков — четыре прыжка по ≈1.2 с, а в последние сутки
+   * срока — по ≈0.7 с.
    *
    * Чтобы сломать это, надо специально написать длительность числом мимо
    * переменных; `src/styles.test.ts` такое не пропускает. */
@@ -113,13 +114,16 @@
   --move-slow: calc(var(--move) * 1.78);
   --move-scene: calc(var(--move) * 3.33);
   --move-ambient: calc(var(--move) * 222);
-  --move-clock: calc(var(--move) * 44);
-  --move-clock-hot: calc(var(--move) * 11);
+  --move-clock: calc(var(--move) * 26.67);
+  --move-clock-hot: calc(var(--move) * 15.56);
   /* Две кривые: плавное торможение для появлений и всего, что меняет цвет или
      прозрачность; лёгкая пружина с микроперелётом — для нажатий и наведения
-     там, где меняется положение или размер. */
+     там, где меняется положение или размер. Третья — только для прыжка стрелки
+     часиков сроков: упругая пружина, которая перелетает примерно на треть
+     четверти, качается назад и встаёт (затухающее колебание, 41 точка). */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-clock: linear(0, 0.216, 0.511, 0.814, 1.071, 1.249, 1.337, 1.345, 1.291, 1.201, 1.1, 1.007, 0.938, 0.897, 0.884, 0.895, 0.921, 0.954, 0.986, 1.013, 1.03, 1.038, 1.037, 1.03, 1.02, 1.009, 0.999, 0.992, 0.988, 0.987, 0.989, 0.992, 0.996, 0.999, 1.002, 1.004, 1.004, 1.004, 1.003, 1.002, 1);
 
   /* Глубина: три уровня подъёма. Тени подкрашены в тон фона, не чёрные. Кромка —
      тонкий светлый блик по верхнему краю стекла. */
@@ -944,6 +948,105 @@ body::after {
   cursor: default;
 }
 
+/* Столбик официальных соцсетей выбранной игры — у правого края сцены, сверху
+   вниз, как у официальных лаунчеров. Он стоит в полосе шириной в кнопку у
+   самого края: кнопка PLAY и её ошибка отступают от края на 48px и в эту полосу
+   не заходят. Снизу полоса кончается над доком: его ряд вместе с запасом под
+   увеличенную иконку и подпись поднимается от низа сцены примерно на 138px и
+   ловит мышь во всю ширину. Кнопки стоят посередине полосы; десять кнопок
+   умещаются в ней и на самом маленьком окне (940×600). Сама полоса мышь не
+   ловит — только кнопки. */
+.stage {
+  --social-size: 32px;
+  --socials-edge: 10px;
+}
+
+.socials {
+  position: absolute;
+  top: 16px;
+  right: var(--socials-edge);
+  bottom: 150px;
+  z-index: var(--z-ui);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  pointer-events: none;
+  /* Столбик своей игры проявляется вместе с подписью над PLAY: при смене игры
+     он пересоздаётся (`key` в `App`). */
+  animation: socials-in var(--move-slow) var(--ease-out) calc(var(--move) * 0.5) backwards;
+}
+
+@keyframes socials-in {
+  from {
+    opacity: 0;
+    transform: translateX(8px);
+  }
+}
+
+/* Общий баннер ошибки не заходит на столбик. */
+.stage:has(.socials) .banner {
+  right: calc(var(--socials-edge) + var(--social-size) + 16px);
+}
+
+/* Кнопка — круглая, на тёмной плашке со стеклом, как подпись над PLAY: значок
+   мелкий, и на светлом арте полупрозрачного стекла дока ему не хватило бы.
+   Значок — цветом текста. Под курсором — тонкий светлый слой и светлая кромка,
+   как у выходов из ошибки запуска; нажатие вдавливает кнопку с пружинкой. */
+.social {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: var(--social-size);
+  height: var(--social-size);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--plate);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--glass-edge);
+  color: var(--ink);
+  cursor: pointer;
+  pointer-events: auto;
+  transition: transform var(--move) var(--ease-spring);
+}
+
+.social::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-pill);
+  background: var(--hover);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.social:hover::before {
+  opacity: 1;
+}
+
+.social:active {
+  transform: scale(0.92);
+  transition-duration: var(--move-fast);
+}
+
+/* Кнопка лежит на арте: зазор под общей рамкой фокуса закрывает тёмная
+   подложка, как у кнопки PLAY. */
+.social:focus-visible {
+  box-shadow: var(--glass-edge), var(--focus-halo);
+}
+
+.social svg {
+  width: 16px;
+  height: 16px;
+}
+
 /* Док внизу главного экрана. Виден всегда: подсказка «наведите» ушла вместе
    со всплывающей полкой.
 
@@ -1377,9 +1480,11 @@ body::after {
    идущего баннера. Кольцо — доля оставшегося срока, по часовой от двенадцати:
    тусклая дорожка и поверх неё дуга. Дуга — цвет содержимого, а в последние
    сутки — цвет срока горящей карточки (`.code-timer.soon`). Стрелка цветом
-   текста спокойно бежит по кругу, в последние сутки быстрее; движется она одним
-   поворотом, и не сама линия, а её отдельный слой поверх кольца — кольцо не
-   перерисовывается.
+   текста стоит на четверти и рывком прыгает на следующую: перелетает, пару раз
+   качается и встаёт (`--ease-clock`). Прыжок раз в 1.2 с, в последние сутки —
+   раз в 0.7 с, и прыжок там короче, чтобы стрелка успевала постоять. Движется
+   она одним поворотом, и не сама линия, а её отдельный слой поверх кольца —
+   кольцо не перерисовывается.
    Размер — полтора кегля строки срока. Строку часики не раздвигают: лишняя
    высота уходит в отрицательные поля по вертикали, и карточка той же высоты,
    что без них. Контраст дуги к карточкам и к дорожке —
@@ -1409,14 +1514,32 @@ body::after {
   stroke: var(--ink);
   stroke-width: 2;
   stroke-linecap: round;
-  animation: clock-hand var(--move-clock) linear infinite;
+  animation: clock-hand var(--move-clock) var(--ease-clock) infinite;
 }
-.clock.is-hot .clock-hand { animation-duration: var(--move-clock-hot); }
+.clock.is-hot .clock-hand {
+  animation-name: clock-hand-hot;
+  animation-duration: var(--move-clock-hot);
+}
 
+/* Четыре четверти оборота. Каждая: стрелка стоит, потом прыгает пружиной и
+   встаёт ровно к началу следующей четверти. Пружина — кривая всей анимации
+   (`--ease-clock` у `.clock-hand`): она действует на каждый отрезок между
+   кадрами, а на стоянке ей нечего менять — поворот там один и тот же. Кривую
+   у самого кадра переменной не задать: там браузер её не подставляет.
+   Прыжок — 14.6% оборота (≈0.7 с), у горячей — 20% (≈0.56 с). */
 @keyframes clock-hand {
-  to {
-    transform: rotate(1turn);
-  }
+  0%, 10.4% { transform: rotate(0turn); }
+  25%, 35.4% { transform: rotate(0.25turn); }
+  50%, 60.4% { transform: rotate(0.5turn); }
+  75%, 85.4% { transform: rotate(0.75turn); }
+  to { transform: rotate(1turn); }
+}
+@keyframes clock-hand-hot {
+  0%, 5% { transform: rotate(0turn); }
+  25%, 30% { transform: rotate(0.25turn); }
+  50%, 55% { transform: rotate(0.5turn); }
+  75%, 80% { transform: rotate(0.75turn); }
+  to { transform: rotate(1turn); }
 }
 
 .code-side { display: flex; flex-direction: column; align-items: center; gap: 6px; }

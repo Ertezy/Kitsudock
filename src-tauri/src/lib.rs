@@ -19,6 +19,7 @@ mod pe;
 mod stores;
 mod storeart;
 mod tray;
+mod update;
 mod vdf;
 
 use std::sync::{Arc, Mutex};
@@ -30,6 +31,12 @@ use tauri_plugin_window_state::StateFlags;
 /// трея и окно ещё не созданы, когда мог прийти первый запрос показать окно.
 /// Пока `handle` нет, запрос откладывается в `pending` и выполняется, как
 /// только `setup()` отдаст сюда `AppHandle`.
+/// Что плагин окна хранит между запусками: размер и положение. Видимость и
+/// «развёрнуто» решает код приложения (см. построитель в `run`).
+fn window_state_flags() -> StateFlags {
+    StateFlags::SIZE | StateFlags::POSITION
+}
+
 #[derive(Default)]
 struct ShowSlot {
     handle: Option<tauri::AppHandle>,
@@ -94,10 +101,23 @@ pub fn run() {
         // активировал его при входе в систему.
         .plugin(
             tauri_plugin_window_state::Builder::default()
-                .with_state_flags(StateFlags::SIZE | StateFlags::POSITION)
+                .with_state_flags(window_state_flags())
                 .build(),
         )
         .plugin(tauri_plugin_clipboard_manager::init())
+        // Обновление только по кнопке (`update::install`): плагин сам ничего
+        // не проверяет и не качает.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        // После обновления установщик запускает приложение с аргументами этого
+        // процесса, а их плагин обновлений берёт из `Env`. Свой `Env` без
+        // флага автозапуска (`update::restart_args`): Tauri заданный здесь не
+        // заменяет своим. Флаг читается из `std::env::args` выше и в `setup`
+        // не нужен.
+        .manage({
+            let mut env = tauri::Env::default();
+            env.args_os = update::restart_args(env.args_os);
+            env
+        })
         .plugin(
             tauri_plugin_log::Builder::new()
                 // В файл и в терминал сразу: файл нужен людям, терминал — нам
@@ -205,7 +225,8 @@ pub fn run() {
             commands::clear_image_cache,
             commands::get_about,
             commands::open_log_folder,
-            commands::report_ui_error
+            commands::report_ui_error,
+            commands::install_update
         ])
         .run(tauri::generate_context!())
         .expect("ошибка при запуске приложения");

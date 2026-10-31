@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { availableUpdate, isNewer, isReleaseUrl } from "./update";
+import { availableUpdate, isNewer, isReleaseUrl, startUpdate, updateFailed, updateRow, type UpdateAttempt } from "./update";
 import type { HubData } from "../types";
 
 const hub = (app?: { version: string; url: string }): HubData => ({
@@ -131,5 +131,53 @@ describe("isReleaseUrl", () => {
     ]) {
       expect(isReleaseUrl(PREFIX + tail), JSON.stringify(tail)).toBe(false);
     }
+  });
+});
+
+describe("строка «Вышла версия»", () => {
+  const NEXT = { version: "0.2.0", url: "https://github.com/Ertezy/Kitsudock/releases/tag/v0.2.0" };
+  const LATER = { version: "0.3.0", url: "https://github.com/Ertezy/Kitsudock/releases/tag/v0.3.0" };
+  const installing: UpdateAttempt = { version: "0.2.0", stage: "installing" };
+
+  it("без вышедшей версии строки нет", () => {
+    expect(updateRow(null, null)).toBeNull();
+    expect(updateRow(null, updateFailed(installing, "x"))).toBeNull();
+  });
+
+  it("пока не нажимали — предлагает обновиться до этой версии", () => {
+    expect(updateRow(NEXT, null)).toEqual({ stage: "offer", version: "0.2.0" });
+  });
+
+  it("нажатие начинает загрузку этой версии, и строка говорит, что качает", () => {
+    const attempt = startUpdate(NEXT, null);
+    expect(attempt).toEqual(installing);
+    expect(updateRow(NEXT, attempt)).toEqual({ stage: "installing" });
+  });
+
+  it("пока качается, второе нажатие ничего не начинает", () => {
+    expect(startUpdate(NEXT, installing)).toBeNull();
+    // Файл данных обновился посреди загрузки и знает версию новее: загрузка
+    // всё равно идёт, строка не предлагает начать вторую.
+    expect(updateRow(LATER, installing)).toEqual({ stage: "installing" });
+    expect(startUpdate(LATER, installing)).toBeNull();
+    // Даже если о новой версии больше не сказано: установка уже идёт.
+    expect(updateRow(null, installing)).toEqual({ stage: "installing" });
+  });
+
+  it("отказ — «не удалось» со ссылкой на страницу релиза и причиной для подсказки", () => {
+    const failed = updateFailed(installing, "Не удалось обновить: сеть");
+    expect(updateRow(NEXT, failed)).toEqual({ stage: "failed", url: NEXT.url, reason: "Не удалось обновить: сеть" });
+    // Кнопки «Обновить» больше нет — только «Скачать».
+    expect(startUpdate(NEXT, failed)).toBeNull();
+  });
+
+  it("вышла версия новее той, что не встала, — снова предлагает обновиться", () => {
+    const failed = updateFailed(installing, "x");
+    expect(updateRow(LATER, failed)).toEqual({ stage: "offer", version: "0.3.0" });
+    expect(startUpdate(LATER, failed)).toEqual({ version: "0.3.0", stage: "installing" });
+  });
+
+  it("без вышедшей версии нажимать нечего", () => {
+    expect(startUpdate(null, null)).toBeNull();
   });
 });

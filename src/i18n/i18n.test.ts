@@ -49,6 +49,22 @@ describe("словари", () => {
     expect(en.panel.listFailedHint).toBe("Open Settings and come back to load the list again.");
   });
 
+  it("строка «Вышла версия» говорит, что происходит на самом деле", () => {
+    // «Обновить» ставит новую версию сама, «Скачать» только открывает
+    // страницу релиза. Пока идёт работа, главное, что видно, — загрузка:
+    // установщик показывает свою полосу хода уже после неё.
+    expect(ru.panel.updateAvailable("0.2.0")).toBe("Вышла версия 0.2.0");
+    expect(en.panel.updateAvailable("0.2.0")).toBe("Version 0.2.0 is out");
+    expect(ru.panel.update).toBe("Обновить");
+    expect(en.panel.update).toBe("Update");
+    expect(ru.panel.updating).toBe("Скачиваю обновление…");
+    expect(en.panel.updating).toBe("Downloading the update…");
+    expect(ru.panel.updateFailed).toBe("Не удалось обновить");
+    expect(en.panel.updateFailed).toBe("Couldn't update");
+    expect(ru.panel.download).toBe("Скачать");
+    expect(en.panel.download).toBe("Download");
+  });
+
   it("dictionary и currentT отдают словарь нужного языка", () => {
     expect(dictionary("en")).toBe(en);
     expect(dictionary("ru")).toBe(ru);

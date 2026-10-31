@@ -46,6 +46,9 @@ export const ru: Dictionary = {
     settingsAndGames: "Настройки и игры",
     disclaimer: "Не связано с разработчиками игр. Материалы принадлежат правообладателям.",
     updateAvailable: (v: string) => `Вышла версия ${v}`,
+    update: "Обновить",
+    updating: "Скачиваю обновление…",
+    updateFailed: "Не удалось обновить",
     download: "Скачать",
     codes: "Промокоды",
     noExpiry: "бессрочный",
@@ -101,6 +104,22 @@ export const ru: Dictionary = {
       video: "Видео",
     },
     refuseNonHttps: (url: string) => `Ссылка не https, поэтому не откроется: ${url}`,
+    socials: {
+      group: "Официальные соцсети игры",
+      names: {
+        hoyolab: "HoYoLAB",
+        site: "Сайт игры",
+        youtube: "YouTube",
+        x: "X",
+        discord: "Discord",
+        reddit: "Reddit",
+        facebook: "Facebook",
+        instagram: "Instagram",
+        tiktok: "TikTok",
+        telegram: "Telegram",
+        vk: "VK",
+      },
+    },
   },
   // Тексты ошибок Rust: что случилось и, где можно, что сделать; переменная
   // часть — подробность. Каждая фраза — отдельное предложение с заглавной буквы:
@@ -135,6 +154,8 @@ export const ru: Dictionary = {
     // подробность.
     configSaveFailed: (d?: string) => (d ? `Не удалось сохранить настройки: ${d}` : "Не удалось сохранить настройки"),
     autostartFailed: (d?: string) => (d ? `Не удалось изменить автозапуск: ${d}` : "Не удалось изменить автозапуск"),
+    updateNotFound: (_d?: string) => "На GitHub пока нет новой версии для установки.",
+    updateFailed: (d?: string) => (d ? `Не удалось обновить: ${d}` : "Не удалось обновить"),
   },
   // Экран на месте окна, если отрисовка упала (src/components/ErrorBoundary.tsx).
   crash: {

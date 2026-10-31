@@ -124,14 +124,12 @@ const TIME = /(?<![\w-])[-+]?\d*\.?\d+m?s(?![\w-])/i;
 /** Кривая числом или словом, тоже любым регистром. */
 const CURVE = /cubic-bezier\(|steps\(|linear\(|(?<![\w-])(ease|ease-in|ease-out|ease-in-out|linear|step-start|step-end)(?![\w-])/i;
 /**
- * Своя кривая — у двух фоновых движений, которые не появление и не нажатие, и
- * только в их собственной анимации. Дрейф арта плавно разворачивается у краёв
- * (`ease-in-out`). Стрелка часиков сроков бежит ровно (`linear`): с любой
- * кривой из шкалы она на каждом обороте то разгонялась бы, то замирала —
- * читалось бы как тиканье рывками, а не спокойный бег.
- * Больше ни у кого, и в шкалу `--ease-…` эти кривые не входят.
+ * Своя кривая — у фонового дрейфа арта, который не появление и не нажатие, и
+ * только в его собственной анимации: он плавно разворачивается у краёв
+ * (`ease-in-out`). Больше ни у кого, и в шкалу `--ease-…` эта кривая не входит.
+ * Пружина стрелки часиков сроков — переменная шкалы `--ease-clock`.
  */
-const OWN_CURVE: Record<string, string> = { "art-drift": "ease-in-out", "clock-hand": "linear" };
+const OWN_CURVE: Record<string, string> = { "art-drift": "ease-in-out" };
 
 /**
  * Значение без имён переменных, но с их запасными значениями: `var(--move, 0.2s)`
@@ -164,7 +162,7 @@ function durationProblems(decls: Decl[]): string[] {
   return bad;
 }
 
-/** Кривые только из шкалы; `ease-in-out` — только у дрейфа арта, `linear` — только у стрелки часиков. */
+/** Кривые только из шкалы; `ease-in-out` — только у дрейфа арта. */
 function curveProblems(decls: Decl[]): string[] {
   const bad: string[] = [];
   for (const d of decls) {
@@ -848,23 +846,51 @@ describe("часики сроков", () => {
   const value = (selector: string, prop: string) =>
     decls.filter((d) => members(d.selector).includes(selector) && d.prop === prop).map((d) => d.value);
 
-  it("оборот стрелки — около 8 с, в последние сутки — около 2 с, от переменной движения", () => {
-    expect(seconds("--move-clock")).toBeGreaterThanOrEqual(7);
-    expect(seconds("--move-clock")).toBeLessThanOrEqual(9);
-    expect(seconds("--move-clock-hot")).toBeGreaterThanOrEqual(1.5);
-    expect(seconds("--move-clock-hot")).toBeLessThanOrEqual(2.5);
+  it("оборот — четыре рывка: по 1.2 с, в последние сутки — по 0.7 с, от переменной движения", () => {
+    expect(seconds("--move-clock") / 4).toBeCloseTo(1.2, 2);
+    expect(seconds("--move-clock-hot") / 4).toBeCloseTo(0.7, 2);
   });
 
-  it("стрелка бежит ровно и бесконечно, в последние сутки — быстрее", () => {
-    expect(value(".clock-hand", "animation")).toEqual(["clock-hand var(--move-clock) linear infinite"]);
+  it("стрелка прыгает бесконечно, в последние сутки — чаще и своими кадрами", () => {
+    expect(value(".clock-hand", "animation")).toEqual(["clock-hand var(--move-clock) var(--ease-clock) infinite"]);
+    expect(value(".clock.is-hot .clock-hand", "animation-name")).toEqual(["clock-hand-hot"]);
     expect(value(".clock.is-hot .clock-hand", "animation-duration")).toEqual(["var(--move-clock-hot)"]);
   });
 
-  it("стрелка только поворачивается", () => {
-    const frames = /@keyframes clock-hand\s*\{([\s\S]*?\})\s*\}/.exec(stripComments(rawCss));
-    expect(frames, "нет @keyframes clock-hand").not.toBeNull();
-    const props = parse(`x { ${frames![1]} }`).map((d) => `${d.prop}: ${d.value}`);
-    expect(props).toEqual(["transform: rotate(1turn)"]);
+  /**
+   * Кадры стрелки: стоит на четверти, потом пружиной прыгает на следующую.
+   * Возвращает длительность каждого прыжка в секундах.
+   */
+  const jumps = (name: string, turn: string) => {
+    const frames = new RegExp(`@keyframes ${name}\\s*\\{([\\s\\S]*?\\})\\s*\\}`).exec(stripComments(rawCss));
+    expect(frames, `нет @keyframes ${name}`).not.toBeNull();
+    const blocks = [...frames![1].matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => ({
+      at: m[1].split(",").map((s) => (s.trim() === "to" ? 100 : s.trim() === "from" ? 0 : Number.parseFloat(s))),
+      decls: parse(`x { ${m[2]} }`).map((d) => `${d.prop}: ${d.value}`),
+    }));
+    const rests = blocks.slice(0, -1);
+    expect(rests.map((b) => b.decls)).toEqual([0, 0.25, 0.5, 0.75].map((q) => [`transform: rotate(${q}turn)`]));
+    expect(blocks[blocks.length - 1].decls).toEqual(["transform: rotate(1turn)"]);
+    // Каждая четверть: стоит с начала своей четверти и прыгает так, чтобы встать к началу следующей.
+    rests.forEach((b, i) => expect(b.at[0]).toBe(i * 25));
+    return rests.map((b) => ((b.at[0] + 25 - b.at[1]) / 100) * seconds(turn));
+  };
+
+  it("прыжок пружиной: обычный ≈0.7 с, в последние сутки ≈0.56 с", () => {
+    for (const s of jumps("clock-hand", "--move-clock")) expect(s).toBeCloseTo(0.7, 1);
+    for (const s of jumps("clock-hand-hot", "--move-clock-hot")) expect(s).toBeCloseTo(0.56, 1);
+  });
+
+  it("пружина стрелки перелетает и пару раз качается, прежде чем встать", () => {
+    const m = /^linear\(([^)]*)\)$/.exec(root.get("--ease-clock") ?? "");
+    expect(m, "--ease-clock должна быть linear(…)").not.toBeNull();
+    const p = m![1].split(",").map(Number);
+    expect(p[0]).toBe(0);
+    expect(p[p.length - 1]).toBe(1);
+    // Перелёт за четверть и обратный недолёт — та самая упругость.
+    expect(Math.max(...p)).toBeGreaterThan(1.2);
+    const peak = p.indexOf(Math.max(...p));
+    expect(Math.min(...p.slice(peak))).toBeLessThan(0.95);
   });
 
   it("тумблер «Анимация» выключен — стрелка стоит на двенадцати, кольцо остаётся", () => {
@@ -951,13 +977,13 @@ describe("сторож ловит нарушения", () => {
     expect(curveProblems(css(".x { transition: opacity var(--move) var(--ease-out); }"))).toEqual([]);
   });
 
-  it("linear разрешён только стрелке часиков: она бежит ровно, а не толчками", () => {
-    expect(curveProblems(css(".x { animation: clock-hand var(--move-clock) linear infinite; }"))).toEqual([]);
-    expect(curveProblems(css(".x { animation: clock-hand var(--move-clock) ease-in-out infinite; }"))).toHaveLength(1);
+  it("linear не разрешён никому, и стрелке часиков тоже: её пружина — переменная шкалы", () => {
+    expect(curveProblems(css(".x { animation: clock-hand var(--move-clock) linear infinite; }"))).toHaveLength(1);
+    expect(curveProblems(css(".x { animation: clock-hand var(--move-clock) infinite; }"))).toEqual([]);
     // Своя кривая — только в своей анимации, а не у соседней в том же списке.
-    expect(curveProblems(css(".x { animation: clock-hand var(--move-clock) linear infinite, spin var(--move) linear infinite; }"))).toHaveLength(1);
+    expect(curveProblems(css(".x { animation: art-drift var(--move-ambient) ease-in-out infinite alternate, spin var(--move) ease-in-out infinite; }"))).toHaveLength(1);
     expect(curveProblems(css(".x { animation: spin var(--move) linear infinite; }"))).toHaveLength(1);
-    expect(curveProblems(css(".x { animation: clock-hands var(--move-clock) linear infinite; }"))).toHaveLength(1);
+    expect(curveProblems(css(".x { animation: art-drifts var(--move-ambient) ease-in-out infinite; }"))).toHaveLength(1);
     expect(curveProblems(css(".x { transition: transform var(--move) linear; }"))).toHaveLength(1);
     expect(curveProblems(css(".x { animation-timing-function: linear; }"))).toHaveLength(1);
   });
@@ -1134,7 +1160,7 @@ describe("сторож ловит нарушения", () => {
     expect(durationProblems(css(".x { transition: opacity var(--move) var(--ease-out) 1S; }"))).toHaveLength(1);
     expect(durationProblems(css(".x { animation-delay: calc(var(--move) + 300Ms); }"))).toHaveLength(1);
     expect(curveProblems(css(".x { transition: opacity var(--move) EASE-IN; }"))).toHaveLength(1);
-    expect(curveProblems(css(".x { animation: clock-hand var(--move-clock) LINEAR infinite; }"))).toEqual([]);
+    expect(curveProblems(css(".x { animation: art-drift var(--move-ambient) EASE-IN-OUT infinite alternate; }"))).toEqual([]);
     expect(pauseProblems(css(".x { animation: spin var(--move) var(--ease-out) INFINITE; }"))).toHaveLength(1);
   });
 
@@ -1266,6 +1292,10 @@ describe("сторож ловит нарушения", () => {
     expect(keyframeProblems(css("@keyframes grow { from { width: 0; } to { width: 100px; } }"))).toHaveLength(2);
     expect(keyframeProblems(css("@keyframes glow { 50% { box-shadow: 0 0 8px var(--accent); } }"))).toHaveLength(1);
     expect(keyframeProblems(css("@keyframes ok { 70%, to { transform: translateX(225%); opacity: 0; } }"))).toEqual([]);
+  });
+
+  it("кривая у кадра не проходит: переменную шкалы браузер там не подставляет и молча берёт ease", () => {
+    expect(keyframeProblems(css("@keyframes bad { 0% { transform: rotate(0turn); animation-timing-function: var(--ease-clock); } }"))).toHaveLength(1);
   });
 
   it("убранная рамка фокуса без замены не проходит", () => {

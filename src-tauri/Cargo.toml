@@ -1,6 +1,6 @@
 [package]
 name = "kitsudock"
-version = "0.1.1"
+version = "0.1.2"
 description = "Free Windows launcher for gacha games with promo codes, banners and videos"
 authors = ["Ertezy"]
 license = "MIT"
@@ -33,6 +33,9 @@ ureq = { version = "2", features = ["json"] }
 tauri-plugin-clipboard-manager = "2.3.2"
 tauri-plugin-log = "2.9.1"
 log = "0.4.34"
+# Обновление по кнопке «Обновить» (src/update.rs): latest.json, проверка
+# подписи, запуск установщика.
+tauri-plugin-updater = "2"
 
 [dev-dependencies]
 # Нужен только тесту уборки кеша: выставить файлу метку доступа в прошлое.

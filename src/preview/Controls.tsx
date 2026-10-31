@@ -126,6 +126,17 @@ export default function Controls({ params }: { params: PreviewParams }) {
         value={params.active}
         onPick={(active) => go({ active })}
       />
+      {/* Строка «Вышла версия» внизу панели. «Обновить» на стенде пару секунд
+          качает и отказывает: видно все три её вида. */}
+      <Row<"on" | "off">
+        name="update"
+        options={[
+          { value: "off", text: "off" },
+          { value: "on", text: "on" },
+        ]}
+        value={params.update ? "on" : "off"}
+        onPick={(update) => go({ update: update === "on" })}
+      />
       <button type="button" style={{ ...pill(false), padding: "5px 8px" }} onClick={openSettings}>
         Settings
       </button>

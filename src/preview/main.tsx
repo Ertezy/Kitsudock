@@ -9,7 +9,12 @@ import { installPreviewBackend, readParams } from "./backend";
 const params = readParams(window.location.search);
 
 // Мост подменяется до загрузки настоящего входа: тот сразу спрашивает язык.
-installPreviewBackend(params.scenario, { lang: params.lang, motion: params.motion, active: params.active });
+installPreviewBackend(params.scenario, {
+  lang: params.lang,
+  motion: params.motion,
+  active: params.active,
+  update: params.update,
+});
 
 if (params.controls) {
   const host = document.createElement("div");

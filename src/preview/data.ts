@@ -3,7 +3,7 @@
 // свои нарисованные заглушки (`art.ts`), а не арт игр. Времена считаются от
 // «сейчас», чтобы таймеры на стенде выглядели одинаково при каждом открытии.
 
-import type { Banner, Code, FoundGame, GameView, HubData, HubGame, SourceKind, Video } from "../types";
+import type { Banner, Code, FoundGame, GameView, HubData, HubGame, Social, SourceKind, Video } from "../types";
 import { backgroundArt, iconArt, imageUrl } from "./art";
 
 const H = 3600;
@@ -112,12 +112,74 @@ export function makeScan(): Omit<FoundGame, "alreadyAdded">[] {
 
 const REDEEM = "https://redeem.preview.test/gift?code={code}";
 
+// Соцсети стенда: хосты — из контракта данных (их проверяет Rust), пути и
+// короткие ссылки выдуманы.
+const s = (kind: Social["kind"], url: string): Social => ({ kind, url });
+
+const GENSHIN_SOCIALS: HubGame["socials"] = {
+  ru: [
+    s("hoyolab", "https://hoyo.link/pReViEw01"),
+    s("vk", "https://vk.com/preview_lanterns"),
+    s("telegram", "https://t.me/preview_lanterns"),
+    s("discord", "https://discord.gg/preview-lanterns"),
+    s("youtube", "https://www.youtube.com/@PreviewLanterns"),
+  ],
+  en: [
+    s("hoyolab", "https://www.hoyolab.com/circles/0"),
+    s("youtube", "https://www.youtube.com/@PreviewLanterns"),
+    s("x", "https://x.com/PreviewLanterns"),
+    s("discord", "https://discord.gg/preview-lanterns"),
+    s("reddit", "https://www.reddit.com/r/PreviewLanterns/"),
+    s("site", "https://genshin.hoyoverse.com/en/preview"),
+  ],
+};
+
+// Полный список в десять кнопок — столбик наибольшей высоты.
+const HSR_SOCIALS: HubGame["socials"] = {
+  ru: [
+    s("site", "https://hsr.hoyoverse.com/ru-ru/preview"),
+    s("youtube", "https://hoyo.link/pReViEw02"),
+    s("instagram", "https://www.instagram.com/preview_rails/"),
+    s("tiktok", "https://www.tiktok.com/@preview_rails"),
+    s("discord", "https://discord.gg/preview-rails"),
+    s("hoyolab", "https://www.hoyolab.com/circles/1"),
+    s("vk", "https://vk.com/preview_rails"),
+    s("telegram", "https://t.me/preview_rails"),
+    s("x", "https://x.com/PreviewRails"),
+    s("facebook", "https://www.facebook.com/PreviewRails"),
+  ],
+  en: [
+    s("x", "https://x.com/PreviewRails"),
+    s("youtube", "https://www.youtube.com/@PreviewRails"),
+    s("instagram", "https://www.instagram.com/preview_rails/"),
+    s("facebook", "https://www.facebook.com/PreviewRails"),
+    s("tiktok", "https://www.tiktok.com/@preview_rails"),
+    s("discord", "https://discord.gg/preview-rails"),
+    s("hoyolab", "https://www.hoyolab.com/circles/1"),
+    s("reddit", "https://www.reddit.com/r/PreviewRails/"),
+  ],
+};
+
+// Один список на оба языка — у игры, у сайта которой одна версия.
+const WUTHERING_SOCIALS: HubGame["socials"] = {
+  en: [
+    s("x", "https://twitter.com/PreviewTides"),
+    s("facebook", "https://www.facebook.com/PreviewTides"),
+    s("youtube", "https://www.youtube.com/@PreviewTides"),
+    s("discord", "https://discord.com/invite/previewtides"),
+    s("reddit", "https://www.reddit.com/r/PreviewTides/"),
+    s("instagram", "https://www.instagram.com/preview_tides/"),
+    s("tiktok", "https://www.tiktok.com/@preview_tides"),
+  ],
+};
+
 const HUB_GAMES: HubGame[] = [
-  { id: "genshin", title: "Genshin Impact", redeemUrl: REDEEM },
-  { id: "hsr", title: "Honkai: Star Rail", redeemUrl: REDEEM },
+  { id: "genshin", title: "Genshin Impact", redeemUrl: REDEEM, socials: GENSHIN_SOCIALS },
+  { id: "hsr", title: "Honkai: Star Rail", redeemUrl: REDEEM, socials: HSR_SOCIALS },
+  // Без соцсетей: столбика у этой игры нет совсем.
   { id: "zzz", title: "Zenless Zone Zero", redeemUrl: REDEEM },
   // Без веб-погашения: у карточки кода только кнопка копирования.
-  { id: "wuthering", title: "Wuthering Waves", redeemUrl: null },
+  { id: "wuthering", title: "Wuthering Waves", redeemUrl: null, socials: WUTHERING_SOCIALS },
   { id: "endfield", title: "Arknights: Endfield", redeemUrl: null },
 ];
 

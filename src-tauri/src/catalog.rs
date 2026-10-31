@@ -218,6 +218,7 @@ mod tests {
             redeem_url: None,
             matching: Default::default(),
             background: None,
+            socials: Default::default(),
         }];
         let g = game(
             "Honkai: Star Rail",
@@ -255,6 +256,7 @@ mod tests {
             redeem_url: None,
             matching: Default::default(),
             background: None,
+            socials: Default::default(),
         }];
         let mut games = vec![crate::config::Game {
             id: "hsr".into(),
@@ -447,6 +449,7 @@ mod tests {
                     folder_names: vec!["Wuthering Waves".into()],
                 },
                 background: None,
+                socials: Default::default(),
             },
             HubGame {
                 id: "zzz".into(),
@@ -458,6 +461,7 @@ mod tests {
                     folder_names: vec!["ZenlessZoneZero".into()],
                 },
                 background: None,
+                socials: Default::default(),
             },
         ]
     }

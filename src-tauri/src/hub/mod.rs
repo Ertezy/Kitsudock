@@ -51,7 +51,10 @@ pub fn effective_url(hub_url: Option<&str>) -> &str {
 /// 2026-10-02). Версия 0.1.0 записала в кеш новый файл хаба без этого поля вместе
 /// с его ETag, и ответ 304 оставил бы урезанную копию навсегда, поэтому кеш
 /// нужно один раз скачать заново.
-const CACHE_FORMAT: u32 = 3;
+///
+/// 4 — у `HubGame` появилось поле `socials` (официальные соцсети игры): та же
+/// история, кеш прежних сборок записан без него.
+const CACHE_FORMAT: u32 = 4;
 
 /// Метка версии последнего удачного ответа и адрес, для которого она получена.
 #[derive(Debug, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -595,6 +598,15 @@ mod tests {
         let json = format!(r#"{{"url":"{DEFAULT_HUB_URL}","etag":"\"old\""}}"#);
         let meta: CacheMeta = serde_json::from_str(&json).expect("это валидный JSON без format");
         assert_eq!(meta.format, 0);
+        assert_eq!(etag_for(Some(&meta), DEFAULT_HUB_URL), None);
+    }
+
+    #[test]
+    fn a_meta_from_the_build_before_socials_gives_no_etag() {
+        // Сборка без поля `socials` уже записала в кеш свежий файл без него:
+        // serde выбросил незнакомое поле. Ответ 304 на её метку оставил бы
+        // соцсети пустыми до следующей смены файла у сборщика.
+        let meta = CacheMeta { url: DEFAULT_HUB_URL.to_string(), etag: Some("\"old\"".to_string()), format: 3 };
         assert_eq!(etag_for(Some(&meta), DEFAULT_HUB_URL), None);
     }
 

@@ -3,6 +3,7 @@
 // Разделы: panel, main, settings, errors.
 
 import { plural } from "./format";
+import type { SocialKind } from "../types";
 
 export const en = {
   language: {
@@ -39,6 +40,11 @@ export const en = {
     settingsAndGames: "Settings and games",
     disclaimer: "Not affiliated with the game developers. Content belongs to its rights holders.",
     updateAvailable: (v: string) => `Version ${v} is out`,
+    // «Update» ставит новую версию само; «Download» только открывает страницу
+    // релиза — она остаётся на случай, если обновиться кнопкой не вышло.
+    update: "Update",
+    updating: "Downloading the update…",
+    updateFailed: "Couldn't update",
     download: "Download",
     codes: "Codes",
     noExpiry: "no expiry",
@@ -94,6 +100,24 @@ export const en = {
       video: "Video",
     },
     refuseNonHttps: (url: string) => `This link isn't https, so it won't open: ${url}`,
+    // Столбик официальных соцсетей у правого края: подпись группы для диктора
+    // и название сети — подсказка и имя кнопки.
+    socials: {
+      group: "Official game socials",
+      names: {
+        hoyolab: "HoYoLAB",
+        site: "Official site",
+        youtube: "YouTube",
+        x: "X",
+        discord: "Discord",
+        reddit: "Reddit",
+        facebook: "Facebook",
+        instagram: "Instagram",
+        tiktok: "TikTok",
+        telegram: "Telegram",
+        vk: "VK",
+      } satisfies Record<SocialKind, string>,
+    },
   },
   // Ошибки из Rust: код → фраза, подробность подставляется
   // (src/i18n/errors.ts). Имена полей — коды из src-tauri/src/error.rs.
@@ -119,6 +143,8 @@ export const en = {
     openFolderFailed: (d?: string) => (d ? `Couldn't open the folder: ${d}` : "Couldn't open the folder"),
     configSaveFailed: (d?: string) => (d ? `Couldn't save the settings: ${d}` : "Couldn't save the settings"),
     autostartFailed: (d?: string) => (d ? `Couldn't change autostart: ${d}` : "Couldn't change autostart"),
+    updateNotFound: (_d?: string) => "GitHub doesn't offer a newer version to install yet.",
+    updateFailed: (d?: string) => (d ? `Couldn't update: ${d}` : "Couldn't update"),
   },
   // Экран на месте окна, если отрисовка упала (src/components/ErrorBoundary.tsx).
   crash: {

@@ -72,18 +72,15 @@ fn is_dot_segment(segment: &str) -> bool {
     parts > 0
 }
 
-/// Ссылка на страницу релиза: строка начинается с `RELEASES_URL_PREFIX`, в
-/// пути нет сегментов «.» и «..», а во всей строке — обратной косой черты,
-/// пробелов и управляющих знаков. Правило то же, что у сборщика
-/// (`appUrlOk`) и у окна (`isReleaseUrl` в `src/lib/update.ts`); крейта `url`
-/// в приложении нет, поэтому разбор ручной.
+/// Общая часть проверки ссылок из файла: во всей строке нет обратной косой
+/// черты, пробелов и управляющих знаков, а в пути (`rest` — всё, что после
+/// хоста или после проверенного начала) нет сегментов «.» и «..». Правило то
+/// же, что у сборщика (`isPublicHttpsUrl`) и у окна (`isReleaseUrl` в
+/// `src/lib/update.ts`); крейта `url` в приложении нет, поэтому разбор ручной.
 ///
 /// JS-овское `\s` считает пробелом ещё и U+FEFF, а `char::is_whitespace` — нет,
 /// поэтому он перечислен отдельно: иначе две проверки разошлись бы.
-fn is_release_url(url: &str) -> bool {
-    let Some(tail) = url.strip_prefix(RELEASES_URL_PREFIX) else {
-        return false;
-    };
+fn is_plain_url(url: &str, rest: &str) -> bool {
     if url
         .chars()
         .any(|c| c == '\\' || c == '\u{feff}' || c.is_whitespace() || c.is_control())
@@ -91,8 +88,15 @@ fn is_release_url(url: &str) -> bool {
         return false;
     }
     // Путь кончается на «?» или «#»: «..» в запросе и якоре ничего не сворачивает.
-    let path = tail.split(['?', '#']).next().unwrap_or("");
+    let path = rest.split(['?', '#']).next().unwrap_or("");
     !path.split('/').any(is_dot_segment)
+}
+
+/// Ссылка на страницу релиза: строка начинается с `RELEASES_URL_PREFIX` и
+/// проходит `is_plain_url`. У сборщика — `appUrlOk`.
+fn is_release_url(url: &str) -> bool {
+    url.strip_prefix(RELEASES_URL_PREFIX)
+        .is_some_and(|tail| is_plain_url(url, tail))
 }
 
 /// Поле `app`, разобранное снисходительно: битое (не та форма, не три числа
@@ -188,6 +192,130 @@ where
     Ok(Some(bg))
 }
 
+/// Официальная соцсеть или сайт игры. Незнакомое слово в файле — запись
+/// отбрасывается. Тот же список — в окне (`SOCIAL_KINDS` в
+/// `src/lib/socials.ts`) и у сборщика.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SocialKind {
+    Hoyolab,
+    Site,
+    Youtube,
+    X,
+    Discord,
+    Reddit,
+    Facebook,
+    Instagram,
+    Tiktok,
+    Telegram,
+    Vk,
+}
+
+impl SocialKind {
+    /// Хосты, на которые может вести ссылка этого вида. Ссылка — кнопка,
+    /// которая открывает адрес в браузере от имени приложения, поэтому значок
+    /// сети не должен вести на чужой сайт.
+    fn hosts(self) -> &'static [&'static str] {
+        match self {
+            Self::Hoyolab => &["www.hoyolab.com", "hoyolab.com"],
+            Self::Site => &[
+                "genshin.hoyoverse.com",
+                "hsr.hoyoverse.com",
+                "zenless.hoyoverse.com",
+                "wutheringwaves.kurogames.com",
+                "endfield.gryphline.com",
+            ],
+            Self::Youtube => &["www.youtube.com", "youtube.com"],
+            Self::X => &["x.com", "twitter.com"],
+            Self::Discord => &["discord.gg", "discord.com"],
+            Self::Reddit => &["www.reddit.com"],
+            Self::Facebook => &["www.facebook.com"],
+            Self::Instagram => &["www.instagram.com"],
+            Self::Tiktok => &["www.tiktok.com"],
+            Self::Telegram => &["t.me"],
+            Self::Vk => &["vk.com", "m.vk.com"],
+        }
+    }
+}
+
+/// Короткие ссылки HoYoverse годятся для любого вида: сборщик узнал вид по
+/// адресу, куда ссылка ведёт, а хранит её как есть.
+const SOCIAL_SHORT_LINK_HOST: &str = "hoyo.link";
+/// Столько записей в списке на язык, не больше; лишние отбрасываются с конца.
+const MAX_SOCIALS: usize = 10;
+/// Самый длинный адрес соцсети — в знаках UTF-16, как `length` у сборщика.
+const MAX_SOCIAL_URL: usize = 512;
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Social {
+    pub kind: SocialKind,
+    pub url: String,
+}
+
+/// Соцсети игры по языкам интерфейса, в порядке показа. Пустой список в файл
+/// не пишется: «нет списка для языка — нет ключа».
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct GameSocials {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub ru: Vec<Social>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub en: Vec<Social>,
+}
+
+impl GameSocials {
+    fn is_empty(&self) -> bool {
+        self.ru.is_empty() && self.en.is_empty()
+    }
+}
+
+/// Простой https-адрес на хост своего вида или на `hoyo.link`: без логина и
+/// порта (хост сравнивается со списком целиком, так что «@» и «:» его не
+/// пройдут), не длиннее `MAX_SOCIAL_URL` и проходит `is_plain_url`. Хост
+/// сравнивается буквально: сборщик пишет его строчными.
+fn is_social_url(kind: SocialKind, url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("https://") else {
+        return false;
+    };
+    let host = rest.split(['/', '?', '#']).next().unwrap_or("");
+    url.encode_utf16().count() <= MAX_SOCIAL_URL
+        && (host == SOCIAL_SHORT_LINK_HOST || kind.hosts().contains(&host))
+        && is_plain_url(url, &rest[host.len()..])
+}
+
+/// Список соцсетей одного языка: битые записи и чужие адреса пропускаются
+/// поодиночке, повторы адреса — тоже, сверх `MAX_SOCIALS` — обрезаются.
+fn lenient_social_list(raw: Option<&serde_json::Value>) -> Vec<Social> {
+    let Some(items) = raw.and_then(serde_json::Value::as_array) else {
+        return Vec::new();
+    };
+    let mut list: Vec<Social> = Vec::new();
+    for item in items {
+        let Ok(social) = serde_json::from_value::<Social>(item.clone()) else {
+            continue;
+        };
+        if is_social_url(social.kind, &social.url) && !list.iter().any(|s| s.url == social.url) {
+            list.push(social);
+            if list.len() == MAX_SOCIALS {
+                break;
+            }
+        }
+    }
+    list
+}
+
+/// Поле `socials`, разобранное снисходительно: не объект — соцсетей нет,
+/// незнакомые ключи языков не читаются. Игра читается в любом случае.
+fn lenient_socials<'de, D>(d: D) -> Result<GameSocials, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let raw = serde_json::Value::deserialize(d)?;
+    Ok(GameSocials {
+        ru: lenient_social_list(raw.get("ru")),
+        en: lenient_social_list(raw.get("en")),
+    })
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HubData {
@@ -235,6 +363,9 @@ pub struct HubGame {
     /// Официальный фон игры; нет — фон берётся из магазина или градиент.
     #[serde(default, deserialize_with = "lenient_background", skip_serializing_if = "Option::is_none")]
     pub background: Option<GameBackground>,
+    /// Официальные соцсети игры; нет поля — столбика соцсетей нет.
+    #[serde(default, deserialize_with = "lenient_socials", skip_serializing_if = "GameSocials::is_empty")]
+    pub socials: GameSocials,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -723,15 +854,296 @@ mod tests {
         assert!(!text.contains("example.com"), "в файле остались заглушечные адреса");
     }
 
-    #[test]
-    fn the_bundled_snapshot_loses_nothing_to_the_address_and_date_checks() {
-        // Настоящий файл проходит новые проверки целиком: ни одно видео не
-        // отброшено, время не отвергнуто, `app` (если он есть) не пропал.
-        let text = include_str!("../../resources/hub.json");
+    /// Файл проходит проверки целиком: ни одно видео и ни одна соцсеть не
+    /// отброшены, время не отвергнуто, `app` (если он есть) не пропал.
+    fn assert_loses_nothing(text: &str) {
         let raw: serde_json::Value = serde_json::from_str(text).unwrap();
-        let d: HubData = serde_json::from_str(text).expect("файл из комплекта не разобрался");
+        let d: HubData = serde_json::from_str(text).expect("файл не разобрался");
         assert_eq!(d.updated_at, raw["updatedAt"].as_i64().unwrap());
         assert_eq!(d.videos.len(), raw["videos"].as_array().unwrap().len(), "видео отброшено");
         assert_eq!(d.app.is_some(), raw.get("app").is_some_and(|a| !a.is_null()), "app пропал");
+        let raw_games = raw["games"].as_array().unwrap();
+        assert_eq!(d.games.len(), raw_games.len(), "игра отброшена");
+        for (game, raw_game) in d.games.iter().zip(raw_games) {
+            for (lang, kept) in [("ru", &game.socials.ru), ("en", &game.socials.en)] {
+                let sent = raw_game["socials"][lang].as_array().map_or(0, Vec::len);
+                assert_eq!(kept.len(), sent, "{} {lang}: соцсеть отброшена", game.id);
+            }
+        }
+    }
+
+    #[test]
+    fn the_bundled_snapshot_loses_nothing_to_the_address_and_date_checks() {
+        assert_loses_nothing(include_str!("../../resources/hub.json"));
+    }
+
+    #[test]
+    fn a_fresh_file_with_socials_loses_nothing_either() {
+        // Снимок из комплекта собран до появления соцсетей; свежий файл
+        // сборщика их уже несёт и обязан пройти проверки так же целиком.
+        let mut raw: serde_json::Value = serde_json::from_str(include_str!("../../resources/hub.json")).unwrap();
+        let socials = serde_json::json!({
+            "ru": [
+                {"kind": "hoyolab", "url": "https://hoyo.link/aBcD1234"},
+                {"kind": "vk", "url": "https://hoyo.link/eev1BdAd"},
+                {"kind": "telegram", "url": "https://t.me/AKEndfieldRU"},
+                {"kind": "site", "url": "https://hsr.hoyoverse.com/ru-ru/"}
+            ],
+            "en": [
+                {"kind": "x", "url": "https://twitter.com/Wuthering_Waves"},
+                {"kind": "youtube", "url": "https://www.youtube.com/@WutheringWaves"},
+                {"kind": "discord", "url": "https://discord.com/invite/wutheringwaves"},
+                {"kind": "reddit", "url": "https://www.reddit.com/r/WutheringWaves/"},
+                {"kind": "facebook", "url": "https://www.facebook.com/WutheringWaves.Official"},
+                {"kind": "instagram", "url": "https://www.instagram.com/wuthering_waves/"},
+                {"kind": "tiktok", "url": "https://www.tiktok.com/@wutheringwaves_official"}
+            ]
+        });
+        for game in raw["games"].as_array_mut().unwrap() {
+            game["socials"] = socials.clone();
+        }
+        assert_loses_nothing(&raw.to_string());
+    }
+
+    fn socials_of(socials: serde_json::Value) -> GameSocials {
+        let text = serde_json::json!({"version": 2, "updatedAt": 7,
+            "games": [{"id": "zzz", "title": "Z", "socials": socials}]})
+        .to_string();
+        let d: HubData = serde_json::from_str(&text).unwrap_or_else(|e| panic!("{text}: {e}"));
+        assert_eq!(d.updated_at, 7, "остальной файл читается");
+        assert_eq!(d.games.len(), 1, "игра читается");
+        d.games[0].socials.clone()
+    }
+
+    fn en_urls(socials: serde_json::Value) -> Vec<String> {
+        socials_of(serde_json::json!({ "en": socials })).en.into_iter().map(|s| s.url).collect()
+    }
+
+    fn social(kind: &str, url: &str) -> serde_json::Value {
+        serde_json::json!({"kind": kind, "url": url})
+    }
+
+    #[test]
+    fn reads_the_official_socials_of_a_game_in_their_order() {
+        let s = socials_of(serde_json::json!({
+            "ru": [social("vk", "https://vk.com/zenlesszonezero"), social("telegram", "https://t.me/zzz_ru")],
+            "en": [social("x", "https://x.com/ZZZ_EN"), social("hoyolab", "https://www.hoyolab.com/circles/8")]
+        }));
+        assert_eq!(
+            s.ru,
+            vec![
+                Social { kind: SocialKind::Vk, url: "https://vk.com/zenlesszonezero".into() },
+                Social { kind: SocialKind::Telegram, url: "https://t.me/zzz_ru".into() },
+            ]
+        );
+        assert_eq!(
+            s.en,
+            vec![
+                Social { kind: SocialKind::X, url: "https://x.com/ZZZ_EN".into() },
+                Social { kind: SocialKind::Hoyolab, url: "https://www.hoyolab.com/circles/8".into() },
+            ]
+        );
+    }
+
+    #[test]
+    fn every_kind_takes_each_of_its_own_hosts() {
+        for (kind, hosts) in [
+            ("hoyolab", &["www.hoyolab.com", "hoyolab.com"][..]),
+            (
+                "site",
+                &[
+                    "genshin.hoyoverse.com",
+                    "hsr.hoyoverse.com",
+                    "zenless.hoyoverse.com",
+                    "wutheringwaves.kurogames.com",
+                    "endfield.gryphline.com",
+                ][..],
+            ),
+            ("youtube", &["www.youtube.com", "youtube.com"][..]),
+            ("x", &["x.com", "twitter.com"][..]),
+            ("discord", &["discord.gg", "discord.com"][..]),
+            ("reddit", &["www.reddit.com"][..]),
+            ("facebook", &["www.facebook.com"][..]),
+            ("instagram", &["www.instagram.com"][..]),
+            ("tiktok", &["www.tiktok.com"][..]),
+            ("telegram", &["t.me"][..]),
+            ("vk", &["vk.com", "m.vk.com"][..]),
+        ] {
+            for host in hosts {
+                for url in [format!("https://{host}"), format!("https://{host}/"), format!("https://{host}/a/b?c=d#e")] {
+                    assert_eq!(en_urls(serde_json::json!([social(kind, &url)])), vec![url.clone()], "{kind}: {url}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_hoyo_link_short_link_fits_any_kind() {
+        // Короткие ссылки HoYoverse: kind сборщик узнал по адресу, куда она ведёт.
+        let kinds = [
+            "hoyolab", "site", "youtube", "x", "discord", "reddit", "facebook", "instagram", "tiktok", "telegram", "vk",
+        ];
+        let list: Vec<_> = kinds.iter().enumerate().map(|(i, k)| social(k, &format!("https://hoyo.link/s{i}"))).collect();
+        let s = socials_of(serde_json::json!({ "en": list[..10], "ru": list[10..] }));
+        assert_eq!(s.en.len(), 10);
+        assert_eq!(s.ru, vec![Social { kind: SocialKind::Vk, url: "https://hoyo.link/s10".into() }]);
+    }
+
+    #[test]
+    fn a_social_of_an_unknown_kind_is_dropped_and_the_rest_are_kept() {
+        let urls = en_urls(serde_json::json!([
+            social("whatsapp", "https://hoyo.link/w"),
+            social("messenger", "https://hoyo.link/m"),
+            social("YouTube", "https://www.youtube.com/@a"),
+            social("", "https://hoyo.link/e"),
+            {"kind": 3, "url": "https://hoyo.link/n"},
+            {"url": "https://hoyo.link/no-kind"},
+            {"kind": "x"},
+            {"kind": "x", "url": 5},
+            42,
+            null,
+            social("discord", "https://discord.gg/ok"),
+        ]));
+        assert_eq!(urls, ["https://discord.gg/ok"]);
+    }
+
+    #[test]
+    fn a_social_on_a_host_that_does_not_fit_its_kind_is_dropped() {
+        for (kind, url) in [
+            ("youtube", "https://x.com/a"),
+            ("x", "https://www.youtube.com/@a"),
+            ("site", "https://www.hoyoverse.com/"),
+            ("site", "https://evil.test/"),
+            ("hoyolab", "https://m.hoyolab.com/"),
+            ("reddit", "https://reddit.com/r/a"),
+            ("facebook", "https://facebook.com/a"),
+            ("telegram", "https://telegram.me/a"),
+            ("vk", "https://www.vk.com/a"),
+            // Чужой хост, похожий на свой.
+            ("x", "https://x.com.evil.test/a"),
+            ("x", "https://evil.test/x.com"),
+            ("x", "https://evilx.com/a"),
+            ("x", "https://x.com./a"),
+            ("vk", "https://hoyo.link.evil.test/a"),
+            // Адрес, который разбор прочёл бы с другим хостом или портом.
+            ("x", "https://x.com@evil.test/a"),
+            ("x", "https://evil.test@x.com/a"),
+            ("x", "https://x.com:443/a"),
+            ("x", "https://x.com:/a"),
+            ("x", "https://X.COM/a"),
+        ] {
+            assert!(en_urls(serde_json::json!([social(kind, url)])).is_empty(), "{kind}: {url}");
+        }
+    }
+
+    #[test]
+    fn a_social_url_that_is_not_plain_https_is_dropped() {
+        for url in [
+            "http://x.com/a",
+            "HTTPS://x.com/a",
+            " https://x.com/a",
+            "https:///x.com/a",
+            "https://",
+            "x.com/a",
+            "javascript:alert(1)",
+            r"https://x.com\a",
+            r"https://evil.test\x.com/a",
+            "https://x.com/a b",
+            "https://x.com/a\t",
+            "https://x.com/a\n",
+            "https://x.com/\u{0}",
+            "https://x.com/a\u{7f}",
+            "https://x.com/a\u{a0}",
+            "https://x.com/a\u{2028}",
+            "https://x.com/a\u{feff}",
+            // Сегменты «.» и «..» разбор сворачивает: ссылка ушла бы не туда.
+            "https://x.com/../a",
+            "https://x.com/a/./b",
+            "https://x.com/a/..",
+            "https://x.com/%2e%2e/a",
+            "https://x.com/.%2E/a",
+            "https://x.com/a/..?x=1",
+        ] {
+            assert!(en_urls(serde_json::json!([social("x", url)])).is_empty(), "{url:?}");
+        }
+        // В запросе и якоре «..» ничего не сворачивает, точки внутри сегмента — тоже.
+        for url in ["https://x.com/a?back=../..", "https://x.com/a#../b", "https://x.com/a.b/...", "https://x.com/日本"] {
+            assert_eq!(en_urls(serde_json::json!([social("x", url)])), [url], "{url}");
+        }
+    }
+
+    #[test]
+    fn a_social_url_longer_than_512_characters_is_dropped() {
+        let head = "https://x.com/";
+        let fits = format!("{head}{}", "a".repeat(512 - head.len()));
+        let over = format!("{head}{}", "a".repeat(513 - head.len()));
+        assert_eq!(en_urls(serde_json::json!([social("x", &fits)])), vec![fits.clone()]);
+        assert!(en_urls(serde_json::json!([social("x", &over)])).is_empty());
+        // Предел — в знаках, как у сборщика, а не в байтах: кириллица в пути
+        // занимает два байта на знак.
+        let wide = format!("{head}{}", "ж".repeat(512 - head.len()));
+        assert_eq!(en_urls(serde_json::json!([social("x", &wide)])), vec![wide.clone()]);
+    }
+
+    #[test]
+    fn more_than_ten_socials_are_cut_to_the_first_ten() {
+        let list: Vec<_> = (0..13).map(|i| social("x", &format!("https://x.com/{i}"))).collect();
+        let urls = en_urls(serde_json::Value::Array(list));
+        let want: Vec<String> = (0..10).map(|i| format!("https://x.com/{i}")).collect();
+        assert_eq!(urls, want);
+    }
+
+    #[test]
+    fn a_repeated_social_url_is_kept_once_and_does_not_count_towards_ten() {
+        let mut list = vec![social("x", "https://x.com/0"), social("youtube", "https://hoyo.link/r")];
+        list.extend((0..10).map(|i| social("x", &format!("https://x.com/{i}"))));
+        list.push(social("vk", "https://hoyo.link/r"));
+        let urls = en_urls(serde_json::Value::Array(list));
+        let mut want = vec!["https://x.com/0".to_string(), "https://hoyo.link/r".to_string()];
+        want.extend((1..9).map(|i| format!("https://x.com/{i}")));
+        assert_eq!(urls, want);
+        // Повторы ищутся внутри одного списка: русский и английский живут порознь.
+        let s = socials_of(serde_json::json!({
+            "ru": [social("discord", "https://discord.gg/a")],
+            "en": [social("discord", "https://discord.gg/a")]
+        }));
+        assert_eq!((s.ru.len(), s.en.len()), (1, 1));
+    }
+
+    #[test]
+    fn a_broken_socials_field_is_empty_and_the_game_still_reads() {
+        for socials in [
+            serde_json::json!(42),
+            serde_json::json!(null),
+            serde_json::json!("vk"),
+            serde_json::json!([social("x", "https://x.com/a")]),
+            serde_json::json!({}),
+            serde_json::json!({"ru": 5, "en": {"kind": "x", "url": "https://x.com/a"}}),
+            serde_json::json!({"de": [social("x", "https://x.com/a")], "RU": [social("x", "https://x.com/a")]}),
+        ] {
+            assert_eq!(socials_of(socials.clone()), GameSocials::default(), "{socials}");
+        }
+    }
+
+    #[test]
+    fn an_old_file_without_socials_reads_with_none_and_writes_none_back() {
+        let d: HubData = serde_json::from_str(r#"{"version":2,"updatedAt":1,"games":[{"id":"zzz","title":"Z"}]}"#).unwrap();
+        assert_eq!(d.games[0].socials, GameSocials::default());
+        assert!(serde_json::to_value(&d).unwrap()["games"][0].get("socials").is_none());
+    }
+
+    #[test]
+    fn socials_survive_the_local_cache_round_trip_without_an_empty_language() {
+        let d: HubData = serde_json::from_str(
+            r#"{"version":2,"updatedAt":1,"games":[{"id":"hsr","socials":{"en":[{"kind":"site","url":"https://hsr.hoyoverse.com/en-us/"}]}}]}"#,
+        )
+        .unwrap();
+        let written = serde_json::to_value(&d).unwrap();
+        assert_eq!(
+            written["games"][0]["socials"],
+            serde_json::json!({"en": [{"kind": "site", "url": "https://hsr.hoyoverse.com/en-us/"}]})
+        );
+        let back: HubData = serde_json::from_value(written).unwrap();
+        assert_eq!(back.games[0].socials, d.games[0].socials);
     }
 }
