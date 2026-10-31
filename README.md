@@ -64,8 +64,8 @@ requests `latest.json` and the installer from this repository's GitHub releases.
   passwords, modify game files or inject code into game processes. It reads local installation
   information and can read a game's executable to extract its icon. Steam and Epic
   games launch through their launch links; other games launch by running their
-  `.exe`. Games requiring administrator rights use the standard Windows elevation
-  prompt. The game or store launcher may ask you to sign in.
+  `.exe`, and a game's own launcher, when chosen, is started the same way. Games
+  requiring administrator rights use the standard Windows elevation prompt. The game or store launcher may ask you to sign in.
 - **Network access:** the downloads and external links are described in
   [Privacy](#privacy); logs are not sent automatically.
 - **Updates:** only when you click **Update**. The update is installed only if its
@@ -100,7 +100,9 @@ unsigned (see [Install](#install)).*
   Reorder them by drag in Settings → Games.
 - **Play** launches through the store the game was installed from, or directly — like
   double-clicking the game's `.exe`. Kitsudock does not modify game files or
-  interact with a running game.
+  interact with a running game. If a game can start more than one way, the tab under
+  **Play** switches between directly, its own launcher (HoYoPlay, the Kuro launcher,
+  GRYPHLINK — when installed) and the store; the choice is remembered per game.
 - **Side panel** for the selected game: promo codes with expiry, current and upcoming
   banners (the carousel slides on its own), and the latest official videos.
 - **Languages:** interface in English or Russian; videos in English or Japanese.
