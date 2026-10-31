@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { timeLeft, timeAgo, burnsToday, progress, hubFreshness, codeShareLeft, bannerShareLeft, clockArc, CLOCK_MIN_ARC } from "./time";
+import { codeTimer, timeLeft, timeAgo, burnsToday, progress, hubFreshness, codeShareLeft, bannerShareLeft, clockArc, CLOCK_MIN_ARC } from "./time";
 
 const HOUR = 3600;
 const DAY = 86400;
@@ -53,6 +53,31 @@ describe("время по-английски", () => {
     expect(hubFreshness(now - 100, now, "en")).toBe("data is fresh");
     const aug28 = Date.UTC(2026, 7, 28, 12) / 1000;
     expect(hubFreshness(aug28, aug28 + 3 * 86400, "en")).toBe("data from Aug 28");
+  });
+});
+
+describe("codeTimer — строка срока кода", () => {
+  /** Местное время: вид «сегодня/завтра» считается по часам пользователя. */
+  const local = (day: number, hour: number, minute = 0) => new Date(2026, 9, day, hour, minute).getTime() / 1000;
+
+  it("бессрочный код", () => {
+    expect(codeTimer({ expiresAt: null }, NOW, "ru")).toBe("бессрочный");
+    expect(codeTimer({ expiresAt: null }, NOW, "en")).toBe("no expiry");
+  });
+  it("точный срок: часы и минуты в последние сутки, дни раньше", () => {
+    expect(codeTimer({ expiresAt: NOW + 3 * HOUR + 52 * 60 }, NOW, "ru")).toBe("сгорит через 3 ч 52 мин");
+    expect(codeTimer({ expiresAt: NOW + 9 * DAY }, NOW, "ru")).toBe("осталось 9 дней");
+    expect(codeTimer({ expiresAt: NOW + 3 * HOUR + 52 * 60 }, NOW, "en")).toBe("expires in 3 h 52 min");
+  });
+  it("срок одной датой: в последние сутки — день, а не выдуманные часы и минуты", () => {
+    const now = local(31, 10);
+    expect(codeTimer({ expiresAt: local(31, 18, 59), expiresDayOnly: true }, now, "ru")).toBe("сгорит сегодня");
+    expect(codeTimer({ expiresAt: local(31, 18, 59), expiresDayOnly: true }, now, "en")).toBe("expires today");
+    // Конец дня сервера по местным часам может прийтись уже на следующий день.
+    expect(codeTimer({ expiresAt: local(32, 1, 59), expiresDayOnly: true }, local(31, 20), "ru")).toBe("сгорит завтра");
+  });
+  it("срок одной датой, до него больше суток — дни, как у точного", () => {
+    expect(codeTimer({ expiresAt: NOW + 9 * DAY, expiresDayOnly: true }, NOW, "ru")).toBe("осталось 9 дней");
   });
 });
 

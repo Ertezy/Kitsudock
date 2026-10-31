@@ -80,6 +80,8 @@ export interface Code {
   rewards: string;
   /** unix-секунды; null — бессрочный. */
   expiresAt: number | null;
+  /** Срок у источника был одной датой: `expiresAt` — оценка конца дня. Нет поля — срок точный. */
+  expiresDayOnly?: boolean;
   region: string;
   source: string | null;
 }

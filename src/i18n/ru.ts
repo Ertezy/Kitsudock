@@ -53,6 +53,7 @@ export const ru: Dictionary = {
     codes: "Промокоды",
     noExpiry: "бессрочный",
     expiresIn: (t: string) => `сгорит через ${t}`,
+    expiresDay: (day: string) => `сгорит ${day}`,
     timeRemaining: (t: string) => `осталось ${t}`,
     regionOnly: (region: string) => `только ${region}`,
     copyCode: "Копировать код",

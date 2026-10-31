@@ -49,6 +49,7 @@ export const en = {
     codes: "Codes",
     noExpiry: "no expiry",
     expiresIn: (t: string) => `expires in ${t}`,
+    expiresDay: (day: string) => `expires ${day}`,
     timeRemaining: (t: string) => `${t} left`,
     regionOnly: (region: string) => `${region} only`,
     copyCode: "Copy code",

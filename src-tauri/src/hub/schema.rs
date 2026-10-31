@@ -173,6 +173,15 @@ pub struct GameBackground {
     pub video: Option<String>,
 }
 
+/// Пометка `expiresDayOnly`: только `true` значит «да», любое другое значение —
+/// «нет». Кривое значение не должно уносить с собой весь код.
+fn lenient_true<'de, D>(d: D) -> Result<bool, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    Ok(serde_json::Value::deserialize(d)? == serde_json::Value::Bool(true))
+}
+
 /// Поле `background`, разобранное снисходительно: картинка не https — фона нет;
 /// видео не https — остаётся одна картинка. Игра читается в любом случае.
 fn lenient_background<'de, D>(d: D) -> Result<Option<GameBackground>, D::Error>
@@ -389,6 +398,10 @@ pub struct Code {
     /// `None` — срок неизвестен или код бессрочный. Показывается «бессрочный».
     #[serde(default)]
     pub expires_at: Option<i64>,
+    /// Срок на странице источника был одной датой, без часа: `expires_at` —
+    /// оценка конца дня, и окно показывает день, а не часы и минуты.
+    #[serde(default, deserialize_with = "lenient_true", skip_serializing_if = "std::ops::Not::not")]
+    pub expires_day_only: bool,
     /// "all" или регион сервера. Носим, но пока не фильтруем.
     #[serde(default = "region_all")]
     pub region: String,
@@ -493,6 +506,25 @@ mod tests {
         let json = r#"{"gameId":"zzz","code":"X","rewards":"","expiresAt":null,"region":"all"}"#;
         let c: Code = serde_json::from_str(json).unwrap();
         assert_eq!(c.expires_at, None);
+    }
+
+    #[test]
+    fn a_code_remembers_that_its_expiry_was_only_a_date() {
+        let json = r#"{"gameId":"hsr","code":"X","rewards":"","expiresAt":1793469599,"expiresDayOnly":true,"region":"all"}"#;
+        let c: Code = serde_json::from_str(json).unwrap();
+        assert!(c.expires_day_only);
+        // Пометка доходит до окна и до кеша под тем же именем.
+        assert_eq!(serde_json::to_value(&c).unwrap()["expiresDayOnly"], true);
+
+        // Нет поля или в нём не true — срок точный; кривое значение не роняет код.
+        for json in [
+            r#"{"gameId":"hsr","code":"X","rewards":"","expiresAt":1793469599,"region":"all"}"#,
+            r#"{"gameId":"hsr","code":"X","rewards":"","expiresAt":1793469599,"expiresDayOnly":"yes","region":"all"}"#,
+        ] {
+            let c: Code = serde_json::from_str(json).unwrap();
+            assert!(!c.expires_day_only, "{json}");
+            assert!(serde_json::to_value(&c).unwrap().get("expiresDayOnly").is_none());
+        }
     }
 
     #[test]

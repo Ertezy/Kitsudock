@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "../../lib/api";
 import { copyAnnouncement, copyFeedbackOver, feedbackMs, isCopied, isCopyFailed, type Copied } from "../../lib/copyFeedback";
 import { activeCodes, codeHasClock, plainSpaces } from "../../lib/panel";
-import { burnsToday, codeShareLeft, timeLeft } from "../../lib/time";
+import { burnsToday, codeShareLeft, codeTimer } from "../../lib/time";
 import DeadlineClock from "./DeadlineClock";
 import { useLang, useT } from "../../i18n";
 import type { Code, HubGame } from "../../types";
@@ -119,13 +119,7 @@ export default function PromoCodes({ codes, games, nowSec }: Props) {
                     та же строка, поэтому карточка не меняет высоту. */}
                 <div className={failed ? "code-timer is-failed" : soon ? "code-timer soon" : "code-timer"}>
                   {clockShare !== null && <DeadlineClock share={clockShare} hot={soon} />}
-                  {failed
-                    ? t.panel.copyFailed
-                    : c.expiresAt === null
-                      ? t.panel.noExpiry
-                      : soon
-                        ? t.panel.expiresIn(timeLeft(c.expiresAt, nowSec, lang))
-                        : t.panel.timeRemaining(timeLeft(c.expiresAt, nowSec, lang))}
+                  {failed ? t.panel.copyFailed : codeTimer(c, nowSec, lang)}
                 </div>
                 {c.rewards && <div className="code-meta">{plainSpaces(c.rewards)}</div>}
                 {c.region !== "all" && (

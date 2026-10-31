@@ -213,7 +213,8 @@ function codes(now: number): Code[] {
     c("genshin", "LANTERNFEST", "Gems ×40, Coins ×30000", now + 2 * D + 5 * H),
     c("genshin", "FOXFIRE100", "Coins ×50000, Ore ×5", null),
     c("genshin", "HOLLOWSEA", "Gems ×30, Tickets ×1", now + 9 * D, "NA"),
-    c("hsr", "QUIETORCHARD", "Gems ×50, Coins ×40000", now + 6 * H + 10 * 60),
+    // Срок у источника одной датой: строка называет день, а не часы.
+    { ...c("hsr", "QUIETORCHARD", "Gems ×50, Coins ×40000", now + 6 * H + 10 * 60), expiresDayOnly: true },
     c("hsr", "RAILSFROST", "Gems ×60, Coins ×30000, Fuel ×2", now + 4 * D),
     c("hsr", "STARDUSTFOX", "Coins ×60000", null),
     c("zzz", "NEONSTATIC", "Tickets ×40, Coins ×30000", now + 20 * H),

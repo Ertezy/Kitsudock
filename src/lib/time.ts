@@ -31,6 +31,33 @@ export function timeAgo(sinceSec: number, nowSec: number, lang: Lang): string {
   return relativeDays(lang, -Math.floor(diff / DAY));
 }
 
+/** Сколько полуночей по местным часам между двумя мгновениями: 0 — тот же день. */
+function calendarDaysBetween(fromSec: number, toSec: number): number {
+  const midnight = (sec: number) => {
+    const d = new Date(sec * 1000);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  };
+  return Math.round((midnight(toSec) - midnight(fromSec)) / (DAY * 1000));
+}
+
+/**
+ * Строка срока кода: «бессрочный», «сгорит через 3 ч 52 мин», «осталось 9 дней».
+ * Если источник дал только дату (`expiresDayOnly`), `expiresAt` — оценка конца
+ * дня, и в последние сутки строка называет день («сгорит сегодня»), а не часы и
+ * минуты, которых на самом деле никто не знает.
+ */
+export function codeTimer(
+  code: { expiresAt: number | null; expiresDayOnly?: boolean },
+  nowSec: number,
+  lang: Lang,
+): string {
+  const p = dictionary(lang).panel;
+  if (code.expiresAt === null) return p.noExpiry;
+  if (!burnsToday(code.expiresAt, nowSec)) return p.timeRemaining(timeLeft(code.expiresAt, nowSec, lang));
+  if (code.expiresDayOnly) return p.expiresDay(relativeDays(lang, calendarDaysBetween(nowSec, code.expiresAt)));
+  return p.expiresIn(timeLeft(code.expiresAt, nowSec, lang));
+}
+
 /** Сгорает ли код в ближайшие сутки. Уже истёкшие — нет. */
 export function burnsToday(untilSec: number, nowSec: number): boolean {
   const left = untilSec - nowSec;
