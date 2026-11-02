@@ -1,6 +1,6 @@
 # Kitsudock
 
-**English** · [Русский](README.ru.md)
+**English** · [Русский](README.ru.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 A free desktop launcher for gacha games on Windows: Genshin Impact, Honkai: Star Rail,
 Zenless Zone Zero, Wuthering Waves and Arknights: Endfield — one window instead of
@@ -108,7 +108,9 @@ unsigned (see [Install](#install)).*
   banners (the carousel slides on its own), and the latest official videos. Each
   section folds by its heading, and the official socials column hides behind a tab at
   the edge; what is folded stays folded for every game and after a restart.
-- **Languages:** interface in English or Russian; videos in English or Japanese.
+- **Languages:** interface in English, Russian, Simplified Chinese, Japanese or Korean —
+  on first start it follows the Windows language; videos in English or Japanese. Data
+  such as code rewards and banner names comes from English wikis and stays in English.
 - **Backgrounds:** the official HoYoPlay background for Genshin Impact, Honkai: Star
   Rail and Zenless Zone Zero (a video when animation is on), store artwork, your own
   image or your own video.
@@ -143,8 +145,9 @@ comes back.
   downloads the pictures and videos it references.
 - Settings → Appearance → Animation turns off interface movement, background video
   and automatic banner scrolling through one shared setting.
-- English and Russian interface text lives in separate dictionaries:
-  [src/i18n/en.ts](src/i18n/en.ts) and [src/i18n/ru.ts](src/i18n/ru.ts).
+- Interface text lives in one dictionary per language: [src/i18n/en.ts](src/i18n/en.ts),
+  [ru.ts](src/i18n/ru.ts), [zh.ts](src/i18n/zh.ts), [ja.ts](src/i18n/ja.ts) and
+  [ko.ts](src/i18n/ko.ts).
 
 ## Where the data comes from
 
