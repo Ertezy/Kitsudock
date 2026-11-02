@@ -389,8 +389,12 @@ body::after {
    Анимировать раскладку можно только здесь — исключение названо в
    `src/styles.test.ts`; длительность из той же шкалы, и тумблер «Анимация»
    сворачивает раздел мгновенно. */
+/* Колонка — ровно ширина панели: без `minmax(0, …)` сетка растягивает её по
+   самому широкому содержимому, и карусель баннеров с большой картинкой
+   раздувала раздел за край панели. */
 .panel-fold {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: 1fr;
   transition: grid-template-rows var(--move-slow) var(--ease-out);
 }
@@ -402,6 +406,7 @@ body::after {
 /* Содержимое обрезается по высоте строки, но с запасом под рамку фокуса
    карточек во всю ширину: иначе край срезал бы её и в развёрнутом разделе. */
 .panel-fold-inner {
+  min-width: 0;
   min-height: 0;
   overflow: clip;
   overflow-clip-margin: var(--focus-room);
