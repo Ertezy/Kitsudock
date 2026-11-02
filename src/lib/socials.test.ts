@@ -14,6 +14,8 @@ describe("соцсети выбранной игры", () => {
     const socials = { ru: [vk, tg], en: [x, yt] };
     expect(socialsFor(socials, "ru")).toEqual([vk, tg]);
     expect(socialsFor(socials, "en")).toEqual([x, yt]);
+    // Своих списков у китайского, японского и корейского нет — английский.
+    for (const lang of ["zh", "ja", "ko"] as const) expect(socialsFor(socials, lang)).toEqual([x, yt]);
   });
 
   it("нет списка для языка интерфейса — берётся другой", () => {
@@ -38,7 +40,7 @@ describe("соцсети выбранной игры", () => {
     expect(socialsFor({ ru: [odd], en: [x] }, "ru")).toEqual([x]);
   });
 
-  it("у каждой сети есть название на обоих языках: подсказка и имя кнопки для диктора", () => {
+  it("у каждой сети есть название на каждом языке: подсказка и имя кнопки для диктора", () => {
     for (const lang of LANGS) {
       const { group, names } = dictionary(lang).main.socials;
       expect(group).not.toBe("");

@@ -100,6 +100,9 @@ export default function Controls({ params }: { params: PreviewParams }) {
         options={[
           { value: "ru", text: "ru" },
           { value: "en", text: "en" },
+          { value: "zh", text: "zh" },
+          { value: "ja", text: "ja" },
+          { value: "ko", text: "ko" },
         ]}
         value={params.lang}
         onPick={(lang) => go({ lang })}

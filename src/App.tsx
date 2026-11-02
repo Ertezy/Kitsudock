@@ -12,7 +12,7 @@ import GameDock from "./components/GameDock";
 import SocialLinks from "./components/SocialLinks";
 import Settings from "./screens/Settings";
 import FirstRunView from "./screens/settings/FirstRunView";
-import { currentT, useT } from "./i18n";
+import { currentLang, currentT, setLanguage, systemLang, useT } from "./i18n";
 import { errorText } from "./i18n/errors";
 import type { GameView, HubData, LaunchResult, LaunchWay } from "./types";
 
@@ -176,6 +176,14 @@ export default function App() {
   useEffect(() => {
     void (async () => {
       if (await api.needsFirstRun()) {
+        // Свежая установка говорит на языке системы, если он у нас есть;
+        // сменить его можно тут же, на экране первого запуска. Не сохранилось —
+        // не беда: при следующем запуске язык определится так же.
+        const own = systemLang(navigator.language);
+        if (currentLang() === "en" && own !== "en") {
+          setLanguage(own);
+          api.setLanguage(own).catch(() => {});
+        }
         setScreen("firstRun");
         return;
       }

@@ -178,6 +178,9 @@ pub enum Language {
     #[default]
     En,
     Ru,
+    Zh,
+    Ja,
+    Ko,
 }
 
 /// Язык видео в панели. По умолчанию английский.
@@ -1168,6 +1171,10 @@ mod tests {
         let cfg = assemble_current(&raw, 3, Vec::new());
         assert_eq!(cfg.language, Language::Ru);
         assert_eq!(cfg.video_language, VideoLanguage::Ja);
+        for (tag, lang) in [("zh", Language::Zh), ("ja", Language::Ja), ("ko", Language::Ko)] {
+            let cfg = assemble_current(&serde_json::json!({ "version": 3, "games": [], "language": tag }), 3, Vec::new());
+            assert_eq!(cfg.language, lang);
+        }
     }
 
     #[test]

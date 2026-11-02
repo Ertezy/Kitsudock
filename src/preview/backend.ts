@@ -82,7 +82,7 @@ export function readParams(search: string): PreviewParams {
   };
   return {
     scenario: pick("scenario", SCENARIOS, DEFAULT_PARAMS.scenario),
-    lang: pick<Lang>("lang", ["ru", "en"], DEFAULT_PARAMS.lang),
+    lang: pick<Lang>("lang", ["ru", "en", "zh", "ja", "ko"], DEFAULT_PARAMS.lang),
     motion: pick("motion", ["on", "off"], "on") === "on",
     active: pick("active", WINDOW_STATES, DEFAULT_PARAMS.active),
     update: q.get("update") === "on",

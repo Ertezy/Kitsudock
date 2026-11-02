@@ -8,8 +8,9 @@ import { setMotion } from "../../lib/motion";
 import { setVideoLanguage, useVideoLanguage, videoLanguage } from "../../lib/videoLanguage";
 import { currentLang, currentT, dictionary, setLanguage, useLang, useT, type Lang, type VideoLang } from "../../i18n";
 import { errorText } from "../../i18n/errors";
-import { LANGS, LANG_NAMES, LANGUAGE_BLOCK_TITLE, VIDEO_LANGS, VIDEO_LANG_NAMES } from "../../i18n/native";
+import { LANGUAGE_BLOCK_TITLE, VIDEO_LANGS, VIDEO_LANG_NAMES } from "../../i18n/native";
 import Switch from "./Switch";
+import LanguagePicker from "./LanguagePicker";
 import Segmented from "./Segmented";
 import EmptyState from "../../components/EmptyState";
 import type { GameView } from "../../types";
@@ -143,8 +144,7 @@ export default function LookSection() {
             <span className="settings-row-title">{t.language.interface}</span>
           </div>
           <div className="settings-row-control">
-            <Segmented
-              options={LANGS.map((l) => ({ value: l, label: LANG_NAMES[l] }))}
+            <LanguagePicker
               value={lang}
               label={t.language.interface}
               disabled={busy}

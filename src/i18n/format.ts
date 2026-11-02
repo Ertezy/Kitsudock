@@ -2,7 +2,7 @@
 
 import type { Lang } from "./native";
 
-export const LOCALES: Record<Lang, string> = { en: "en-US", ru: "ru-RU" };
+export const LOCALES: Record<Lang, string> = { en: "en-US", ru: "ru-RU", zh: "zh-CN", ja: "ja-JP", ko: "ko-KR" };
 
 /** Формы слова по правилам языка: английскому хватает one/other, русскому
  *  нужны one/few/many (other — для дробей). */
@@ -33,7 +33,7 @@ export function relativeDays(lang: Lang, days: number): string {
 /** Вместо даты, которую нечем показать. */
 const NO_DATE = "—";
 
-/** «Aug 28» / «28 августа» — в часовом поясе пользователя. Время приходит из
+/** «Aug 28» / «28 августа» / «8月28日» — в часовом поясе пользователя. Время приходит из
  *  файла хаба, и дата вне диапазона `Date` (±8.64e12 с) — не повод ронять
  *  отрисовку: `Intl` бросает на ней RangeError, и окно остаётся пустым.
  *  Такая дата — прочерк. */

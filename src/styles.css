@@ -3306,7 +3306,142 @@ select.input {
   outline-offset: var(--focus-offset-tight);
 }
 
-/* Подпись над карточкой — «Language · Язык». */
+/* Выбор языка (`LanguagePicker`): кнопка в рамке, как ряд вариантов, под ней
+   список языков. Закрытый список прозрачный и чуть выше своего места; мышь и
+   клавиатура его не замечают (`inert`). Открываясь, он опускается к кнопке, а
+   строки проявляются одна за другой, сверху вниз. Строки — `.ways-item`, как у
+   панели способа запуска. */
+.lang-picker {
+  position: relative;
+}
+
+/* Строка настроек изолирована (под её подсветку), и открытый список поднимается
+   вместе со своей строкой — иначе следующая строка легла бы поверх него. */
+.lang-picker.is-open,
+.settings-row:has(.lang-picker.is-open) {
+  z-index: var(--z-panel);
+}
+
+.lang-switch {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 132px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: transform var(--move-fast) var(--ease-spring);
+}
+
+.lang-switch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-md);
+  background: var(--hover);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.lang-switch:hover:not(:disabled)::before,
+.lang-picker.is-open .lang-switch::before {
+  opacity: 1;
+}
+
+.lang-switch:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.lang-switch:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.lang-arrow {
+  font-size: var(--text-sm);
+  color: var(--ink-dim);
+  transition: transform var(--move) var(--ease-out);
+}
+
+.lang-switch[aria-expanded="true"] .lang-arrow {
+  transform: rotate(180deg);
+}
+
+.lang-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  /* Непрозрачно: стекло на фоне окна. Сквозь полупрозрачную подложку
+     проступали бы кнопки соседней строки. */
+  background: linear-gradient(var(--glass), var(--glass)), var(--bg);
+  box-shadow: var(--glass-edge), var(--shadow-2);
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+  transform-origin: top right;
+  pointer-events: none;
+  transition:
+    opacity var(--move) var(--ease-out),
+    transform var(--move) var(--ease-out);
+}
+
+.lang-panel.is-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.lang-panel .ways-item {
+  white-space: nowrap;
+}
+
+/* Проявляется содержимое строки, а не сама кнопка: у кнопки остаётся своё
+   вдавливание без задержки. Задержка — по номеру строки; закрывается список
+   целиком, без очереди. */
+.lang-panel .ways-item > * {
+  opacity: 0;
+  transform: translateY(-4px);
+  transition:
+    opacity var(--move) var(--ease-out),
+    transform var(--move) var(--ease-out);
+}
+
+.lang-panel.is-open .ways-item > * {
+  opacity: 1;
+  transform: none;
+}
+
+.lang-panel.is-open .ways-item:nth-child(2) > * {
+  transition-delay: calc(var(--move) * 0.15);
+}
+
+.lang-panel.is-open .ways-item:nth-child(3) > * {
+  transition-delay: calc(var(--move) * 0.3);
+}
+
+.lang-panel.is-open .ways-item:nth-child(4) > * {
+  transition-delay: calc(var(--move) * 0.45);
+}
+
+.lang-panel.is-open .ways-item:nth-child(5) > * {
+  transition-delay: calc(var(--move) * 0.6);
+}
+
+/* Подпись над карточкой — «Language · Язык · 语言 · 言語 · 언어». */
 .settings-card-caption {
   margin: 0 0 8px;
   font-size: var(--s-hint, var(--text-sm));
@@ -3315,7 +3450,7 @@ select.input {
   text-transform: uppercase;
 }
 
-/* Шапка экрана первого запуска: заголовок слева, EN / RU справа. */
+/* Шапка экрана первого запуска: заголовок слева, выбор языка справа. */
 .first-run-head {
   display: flex;
   align-items: center;
