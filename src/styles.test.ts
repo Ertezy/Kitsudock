@@ -845,6 +845,17 @@ describe("токены фокуса", () => {
   });
 });
 
+describe("сворачиваемый раздел панели", () => {
+  const of = (selector: string, prop: string) => decls.filter((d) => d.selector === selector && d.prop === prop).map((d) => d.value);
+
+  it("колонка обёртки не шире панели: содержимое не раздувает её до своего размера", () => {
+    // Без этого колонка сетки — по самому широкому содержимому: карусель баннеров
+    // с картинкой 1920 px раздувала раздел далеко за край панели.
+    expect(of(".panel-fold", "grid-template-columns")).toEqual(["minmax(0, 1fr)"]);
+    expect(of(".panel-fold-inner", "min-width")).toEqual(["0"]);
+  });
+});
+
 describe("часики сроков", () => {
   const root = new Map(decls.filter((d) => d.selector === ":root").map((d) => [d.prop, d.value]));
   /** Длительность токена в секундах: `calc(var(--move) * N)` при нынешней --move. */
