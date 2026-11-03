@@ -2161,7 +2161,9 @@ body::after {
 /* Остаток идущего баннера — с часиками слева (у `.clock`). */
 .banner-left { flex: none; display: flex; align-items: center; gap: 5px; }
 
-.carousel-dots { display: flex; justify-content: center; gap: 5px; margin-top: 8px; }
+/* Ряд точек выше самих точек: текущая вырастает в полтора раза и целиком
+   помещается в ряд, не выходя за край раздела. */
+.carousel-dots { display: flex; align-items: center; justify-content: center; gap: 5px; height: 10px; margin-top: 8px; }
 /* Текущая точка чуть крупнее соседних и дорастает до размера с пружинкой. */
 .carousel-dots .dot {
   width: 5px; height: 5px; border-radius: 50%; padding: 0;
