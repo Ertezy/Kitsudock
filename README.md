@@ -200,7 +200,7 @@ folder from Settings → About → Log → Show log.
 
 ## Icons
 
-`src-tauri/icons/` holds the app icon, drawn from one kitsune artwork:
+`src-tauri/icons/` holds the app icon, drawn from the author's own sketch of a cat in a circle:
 
 - `icon.ico` — 16–48 px show a close-up of the face, 64–256 px the whole badge; Windows
   picks the size for the taskbar and Explorer by display scaling;
