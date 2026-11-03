@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": 1793698142,
+  "updatedAt": 1793728132,
   "games": [
     {
       "id": "genshin",
@@ -603,40 +603,6 @@
   "banners": [
     {
       "gameId": "genshin",
-      "title": "Epitome Invocation",
-      "featured": [],
-      "rarity": 5,
-      "image": "https://static.wikia.nocookie.net/gensin-impact/images/b/bd/Epitome_Invocation_2026-10-13.png/revision/latest/scale-to-width-down/400?cb=20261008125625",
-      "startsAt": 1791910800,
-      "endsAt": 1793714399,
-      "url": "https://genshin-impact.fandom.com/wiki/Epitome_Invocation/2026-10-13"
-    },
-    {
-      "gameId": "genshin",
-      "title": "La Chanson Cerise",
-      "featured": [
-        "Escoffier"
-      ],
-      "rarity": 5,
-      "image": "https://static.wikia.nocookie.net/gensin-impact/images/5/57/La_Chanson_Cerise_2026-10-13.png/revision/latest/scale-to-width-down/400?cb=20261008125623",
-      "startsAt": 1791910800,
-      "endsAt": 1793714399,
-      "url": "https://genshin-impact.fandom.com/wiki/La_Chanson_Cerise/2026-10-13"
-    },
-    {
-      "gameId": "genshin",
-      "title": "Void Star's Advent",
-      "featured": [
-        "Skirk"
-      ],
-      "rarity": 5,
-      "image": "https://static.wikia.nocookie.net/gensin-impact/images/6/62/Void_Star%27s_Advent_2026-10-13.png/revision/latest/scale-to-width-down/400?cb=20261008125621",
-      "startsAt": 1791910800,
-      "endsAt": 1793714399,
-      "url": "https://genshin-impact.fandom.com/wiki/Void_Star's_Advent/2026-10-13"
-    },
-    {
-      "gameId": "genshin",
       "title": "Chanson of Many Waters",
       "featured": [
         "Furina"
@@ -848,6 +814,16 @@
     {
       "gameId": "genshin",
       "lang": "en",
+      "title": "Pleasure working with you. #GenshinImpact #Mitya",
+      "url": "https://www.youtube.com/shorts/lIefM1Mte-E",
+      "thumb": "https://i1.ytimg.com/vi/lIefM1Mte-E/hqdefault.jpg",
+      "publishedAt": 1793700038,
+      "duration": null,
+      "premiere": false
+    },
+    {
+      "gameId": "genshin",
+      "lang": "en",
       "title": "Mitya's Character Trailer (Extract 4) | Genshin Impact #GenshinImpact #Mitya",
       "url": "https://www.youtube.com/shorts/9mQ_t8qS6YI",
       "thumb": "https://i2.ytimg.com/vi/9mQ_t8qS6YI/hqdefault.jpg",
@@ -897,11 +873,11 @@
     },
     {
       "gameId": "genshin",
-      "lang": "en",
-      "title": "Character Trailer - \"Valeriy: Order in Practice\" | Genshin Impact #Valeriy #GenshinSnezhnaya",
-      "url": "https://www.youtube.com/watch?v=vtOodOYxzp0",
-      "thumb": "https://i3.ytimg.com/vi/vtOodOYxzp0/hqdefault.jpg",
-      "publishedAt": 1793592030,
+      "lang": "ja",
+      "title": "【原神】いい連携だったな。 #原神 #ミティヤ",
+      "url": "https://www.youtube.com/shorts/cVMLPhgwzNk",
+      "thumb": "https://i4.ytimg.com/vi/cVMLPhgwzNk/hqdefault.jpg",
+      "publishedAt": 1793700005,
       "duration": null,
       "premiere": false
     },
@@ -952,16 +928,6 @@
       "url": "https://www.youtube.com/watch?v=1Zff-uJ1sz4",
       "thumb": "https://i2.ytimg.com/vi/1Zff-uJ1sz4/hqdefault.jpg",
       "publishedAt": 1793678412,
-      "duration": null,
-      "premiere": false
-    },
-    {
-      "gameId": "genshin",
-      "lang": "ja",
-      "title": "【原神】キャラクタートレーラー バレリー（CV：古川慎）「秩序の理」",
-      "url": "https://www.youtube.com/watch?v=NK2K2-H-ww4",
-      "thumb": "https://i3.ytimg.com/vi/NK2K2-H-ww4/hqdefault.jpg",
-      "publishedAt": 1793592039,
       "duration": null,
       "premiere": false
     },
@@ -1328,6 +1294,16 @@
     {
       "gameId": "endfield",
       "lang": "en",
+      "title": "Arknights: Endfield Operator Artwork - Argent Flow",
+      "url": "https://www.youtube.com/shorts/h5aA0bhIAEs",
+      "thumb": "https://i1.ytimg.com/vi/h5aA0bhIAEs/hqdefault.jpg",
+      "publishedAt": 1793700020,
+      "duration": null,
+      "premiere": false
+    },
+    {
+      "gameId": "endfield",
+      "lang": "en",
       "title": "Arknights: Endfield Operator Combat Demo - Argent Flow",
       "url": "https://www.youtube.com/watch?v=XLmR0fjlER8",
       "thumb": "https://i1.ytimg.com/vi/XLmR0fjlER8/hqdefault.jpg",
@@ -1377,11 +1353,11 @@
     },
     {
       "gameId": "endfield",
-      "lang": "en",
-      "title": "EYE AM UNLEASHED",
-      "url": "https://www.youtube.com/shorts/n3tNjz0wts0",
-      "thumb": "https://i3.ytimg.com/vi/n3tNjz0wts0/hqdefault.jpg",
-      "publishedAt": 1793268035,
+      "lang": "ja",
+      "title": "「武具を纏えば、手心など加えるはずもない。」",
+      "url": "https://www.youtube.com/shorts/8P_K5MUWbP4",
+      "thumb": "https://i1.ytimg.com/vi/8P_K5MUWbP4/hqdefault.jpg",
+      "publishedAt": 1793700027,
       "duration": null,
       "premiere": false
     },
@@ -1432,16 +1408,6 @@
       "url": "https://www.youtube.com/shorts/Jn8wY0Jd8Ak",
       "thumb": "https://i3.ytimg.com/vi/Jn8wY0Jd8Ak/hqdefault.jpg",
       "publishedAt": 1793354420,
-      "duration": null,
-      "premiere": false
-    },
-    {
-      "gameId": "endfield",
-      "lang": "ja",
-      "title": "魔 眼 解 放",
-      "url": "https://www.youtube.com/shorts/CbxD3xfRHlY",
-      "thumb": "https://i4.ytimg.com/vi/CbxD3xfRHlY/hqdefault.jpg",
-      "publishedAt": 1793268007,
       "duration": null,
       "premiere": false
     }
