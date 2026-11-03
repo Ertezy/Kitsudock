@@ -2,6 +2,8 @@
 
 [English](README.md) · [Русский](README.ru.md) · **简体中文** · [日本語](README.ja.md) · [한국어](README.ko.md)
 
+<img width="800" alt="Kitsudock demo" src="https://github.com/user-attachments/assets/a4309a5a-8c96-40aa-a709-6fa5117bfcb4" />
+
 一款免费的 Windows 抽卡游戏启动器：支持原神、崩坏：星穹铁道、绝区零、鸣潮和明日方舟：终末地——
 用一个窗口代替好几个启动器。
 

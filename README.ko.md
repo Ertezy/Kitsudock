@@ -2,6 +2,8 @@
 
 [English](README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · **한국어**
 
+<img width="800" alt="Kitsudock demo" src="https://github.com/user-attachments/assets/a4309a5a-8c96-40aa-a709-6fa5117bfcb4" />
+
 Windows용 무료 가챠 게임 런처입니다. 원신, 붕괴: 스타레일, 젠레스 존 제로, 명조: 워더링 웨이브,
 명일방주: 엔드필드를 지원하며, 여러 런처 대신 창 하나로 끝납니다.
 

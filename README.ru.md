@@ -2,6 +2,8 @@
 
 [English](README.md) · **Русский** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
+<img width="800" alt="Kitsudock demo" src="https://github.com/user-attachments/assets/a4309a5a-8c96-40aa-a709-6fa5117bfcb4" />
+
 Бесплатный лаунчер гача-игр для Windows: Genshin Impact, Honkai: Star Rail,
 Zenless Zone Zero, Wuthering Waves и Arknights: Endfield — одно окно вместо нескольких
 лаунчеров.

@@ -2,6 +2,8 @@
 
 [English](README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md) · **日本語** · [한국어](README.ko.md)
 
+<img width="800" alt="Kitsudock demo" src="https://github.com/user-attachments/assets/a4309a5a-8c96-40aa-a709-6fa5117bfcb4" />
+
 Windows 向けの無料のガチャゲーム用ランチャーです。原神、崩壊：スターレイル、ゼンレスゾーンゼロ、
 鳴潮、アークナイツ：エンドフィールドに対応し、いくつものランチャーをひとつのウィンドウにまとめます。
 
