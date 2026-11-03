@@ -19,7 +19,7 @@
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
-use crate::config::{self, Collapsed, Fold, Game, Language, Launch, LaunchWay, VideoLanguage};
+use crate::config::{self, Collapsed, Fold, Game, Language, Launch, LaunchWay, Theme, VideoLanguage};
 use crate::error::{code, AppError};
 use crate::hub;
 use crate::launch;
@@ -565,6 +565,21 @@ pub async fn set_video_language(
 ) -> Result<(), AppError> {
     config::update(&app, |cfg| {
         cfg.video_language = language;
+        Ok(())
+    })
+}
+
+/// Тема и свои цвета. Страница спрашивает до первой отрисовки: светлая тема
+/// не должна загораться поверх тёмной на глазах.
+#[tauri::command]
+pub async fn get_theme(app: AppHandle) -> Theme {
+    config::load(&app).theme
+}
+
+#[tauri::command]
+pub async fn set_theme(app: AppHandle, theme: Theme) -> Result<(), AppError> {
+    config::update(&app, |cfg| {
+        cfg.theme = theme.cleaned();
         Ok(())
     })
 }

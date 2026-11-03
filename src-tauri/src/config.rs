@@ -227,6 +227,60 @@ impl Collapsed {
     }
 }
 
+/// Готовая тема. По умолчанию тёмная; «как в Windows» следует системе.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ThemeMode {
+    #[default]
+    Dark,
+    Light,
+    System,
+}
+
+/// Свои цвета поверх готовой темы, кодом `#rrggbb`. Нет поля — цвет темы.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ThemeColors {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub bg: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub panel: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub accent: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub content: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icons: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lines: Option<String>,
+}
+
+/// Тема интерфейса и свои цвета.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct Theme {
+    pub mode: ThemeMode,
+    pub colors: ThemeColors,
+}
+
+fn is_hex_color(v: &str) -> bool {
+    v.len() == 7 && v.starts_with('#') && v[1..].bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+impl Theme {
+    /// Код не цвета выбрасывается, остальное приводится к строчным: в стили
+    /// попадает только `#rrggbb`.
+    pub fn cleaned(mut self) -> Self {
+        let c = &mut self.colors;
+        for field in [&mut c.bg, &mut c.panel, &mut c.text, &mut c.accent, &mut c.content, &mut c.icons, &mut c.lines] {
+            *field = field.take().filter(|v| is_hex_color(v)).map(|v| v.to_ascii_lowercase());
+        }
+        self
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppConfig {
@@ -263,6 +317,9 @@ pub struct AppConfig {
     /// Свёрнутые разделы панели и спрятанный столбик соцсетей.
     #[serde(default)]
     pub collapsed: Collapsed,
+    /// Тема интерфейса и свои цвета.
+    #[serde(default)]
+    pub theme: Theme,
     #[serde(default)]
     pub games: Vec<Game>,
 }
@@ -285,6 +342,7 @@ impl Default for AppConfig {
             language: Language::En,
             video_language: VideoLanguage::En,
             collapsed: Collapsed::default(),
+            theme: Theme::default(),
             games: Vec::new(),
         }
     }
@@ -372,6 +430,7 @@ pub fn migrate_v1(raw: &serde_json::Value) -> Option<AppConfig> {
         language: Language::En,
         video_language: VideoLanguage::En,
         collapsed: Collapsed::default(),
+        theme: Theme::default(),
         games,
     })
 }
@@ -422,6 +481,7 @@ pub fn migrate_v2(raw: &serde_json::Value) -> Option<AppConfig> {
         language: Language::En,
         video_language: VideoLanguage::En,
         collapsed: Collapsed::default(),
+        theme: Theme::default(),
         games,
     })
 }
@@ -578,6 +638,12 @@ fn assemble_current(raw: &serde_json::Value, version: u32, games: Vec<Game>) -> 
         collapsed: raw
             .get("collapsed")
             .and_then(|v| serde_json::from_value(v.clone()).ok())
+            .unwrap_or_default(),
+        // Тема чужого вида — тёмная без своих цветов; код не цвета — цвет темы.
+        theme: raw
+            .get("theme")
+            .and_then(|v| serde_json::from_value::<Theme>(v.clone()).ok())
+            .map(Theme::cleaned)
             .unwrap_or_default(),
         // Блок `look` от прежней настройки цвета намеренно не читается. У тех,
         // кто успел его сохранить, он просто исчезнет при следующей записи
@@ -840,6 +906,7 @@ mod tests {
             language: Language::En,
             video_language: VideoLanguage::En,
             collapsed: Collapsed::default(),
+            theme: Theme::default(),
             games: vec![
                 Game::manual("b".into(), "Второй".into()),
                 Game::manual("a".into(), "Первый".into()),
@@ -979,6 +1046,7 @@ mod tests {
             language: Language::En,
             video_language: VideoLanguage::En,
             collapsed: Collapsed::default(),
+            theme: Theme::default(),
             games: vec![],
         };
         let text = serde_json::to_string(&cfg).unwrap();
@@ -1183,6 +1251,37 @@ mod tests {
         assert_eq!((absent.language, absent.video_language), (Language::En, VideoLanguage::En));
         let odd = assemble_current(&serde_json::json!({ "version": 3, "games": [], "language": "fr", "videoLanguage": 7 }), 3, Vec::new());
         assert_eq!((odd.language, odd.video_language), (Language::En, VideoLanguage::En));
+    }
+
+    #[test]
+    fn assemble_current_keeps_a_saved_theme_and_drops_bad_colours() {
+        let raw = serde_json::json!({
+            "version": 3,
+            "games": [],
+            "theme": { "mode": "light", "colors": { "accent": "#6AA8FF", "bg": "red", "text": "#12345" } }
+        });
+        let theme = assemble_current(&raw, 3, Vec::new()).theme;
+        assert_eq!(theme.mode, ThemeMode::Light);
+        assert_eq!(theme.colors.accent.as_deref(), Some("#6aa8ff"));
+        assert_eq!((theme.colors.bg, theme.colors.text), (None, None));
+    }
+
+    #[test]
+    fn assemble_current_uses_the_dark_theme_when_it_is_absent_or_odd() {
+        for raw in [
+            serde_json::json!({ "version": 3, "games": [] }),
+            serde_json::json!({ "version": 3, "games": [], "theme": { "mode": "neon" } }),
+            serde_json::json!({ "version": 3, "games": [], "theme": 7 }),
+        ] {
+            assert_eq!(assemble_current(&raw, 3, Vec::new()).theme, Theme::default());
+        }
+    }
+
+    #[test]
+    fn a_theme_without_own_colours_saves_only_its_mode() {
+        let cfg = AppConfig { theme: Theme { mode: ThemeMode::System, ..Theme::default() }, ..AppConfig::default() };
+        let json = serde_json::to_value(&cfg).unwrap();
+        assert_eq!(json["theme"], serde_json::json!({ "mode": "system", "colors": {} }));
     }
 
     #[test]

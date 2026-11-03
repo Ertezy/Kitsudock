@@ -49,6 +49,15 @@
   --content-soft: #c8a3b7;
   --label: #ffd2eb;
 
+  /* Значки интерфейса: шестерёнка, соцсети, копирование кода. */
+  --icon: var(--ink);
+
+  /* Выбор цвета: белый и чёрный поверх оттенка дают квадрат насыщенности и
+     яркости; полоса — круг оттенков. Это сами цвета выбора, не палитра. */
+  --picker-white: #ffffff;
+  --picker-black: #000000;
+  --picker-hues: linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000);
+
   /* Опасное сдвинуто к розово-красному, чтобы не спорить с оранжевым. */
   --danger: #f56b76;
   /* Метка премьеры на превью видео — красная, как принято у видеосервисов. */
@@ -1384,6 +1393,7 @@ body::after {
 }
 
 .social svg {
+  color: var(--icon);
   width: 16px;
   height: 16px;
 }
@@ -2069,6 +2079,7 @@ body::after {
 }
 .code-copy-icon {
   grid-area: 1 / 1;
+  color: var(--icon);
   transition:
     transform var(--move) var(--ease-spring),
     opacity var(--move-fast) var(--ease-out);
@@ -2320,6 +2331,7 @@ body::after {
 }
 
 .panel-gear svg {
+  color: var(--icon);
   width: 26px;
   height: 26px;
   transition: transform var(--move-scene) var(--ease-out);
@@ -3441,6 +3453,325 @@ select.input {
 
 .lang-panel.is-open .ways-item:nth-child(5) > * {
   transition-delay: calc(var(--move) * 0.6);
+}
+
+/* Тема: три карточки с маленьким окном внутри — фон, панель и кнопка PLAY
+   этой темы. «Как в Windows» — пополам тёмное и светлое. */
+.theme-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 18px;
+}
+
+.theme-card {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--move-fast) var(--ease-spring);
+}
+
+.theme-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-lg);
+  background: var(--hover);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.theme-card::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border: 2px solid var(--accent);
+  border-radius: var(--r-lg);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+  pointer-events: none;
+}
+
+.theme-card:hover::before {
+  opacity: 1;
+}
+
+.theme-card.is-current::after {
+  opacity: 1;
+}
+
+.theme-card:active {
+  transform: scale(0.97);
+}
+
+.theme-mini {
+  display: flex;
+  height: 56px;
+  overflow: hidden;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+}
+
+.theme-mini-half {
+  position: relative;
+  flex: 1;
+}
+
+.theme-mini-panel {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 8px;
+  width: 34%;
+  border-radius: var(--r-sm);
+  opacity: 0.85;
+}
+
+.theme-mini-play {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  width: 30%;
+  height: 10px;
+  border-radius: var(--r-pill);
+}
+
+.theme-mini.is-system .theme-mini-panel {
+  width: 50%;
+}
+
+.theme-card-name {
+  padding: 0 4px;
+  font-size: var(--text-sm);
+}
+
+/* Заголовок «Цвета» и сброс справа на одной строке. */
+.theme-colors-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.theme-reset {
+  position: relative;
+  isolation: isolate;
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: none;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: transform var(--move-fast) var(--ease-spring);
+}
+
+.theme-reset::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-pill);
+  background: var(--hover);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.theme-reset:hover:not(:disabled)::before {
+  opacity: 1;
+}
+
+.theme-reset:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.theme-reset:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Выбор цвета — та же раскрывающаяся панель, что у выбора языка. */
+.color-picker {
+  position: relative;
+}
+
+.color-picker.is-open,
+.settings-row:has(.color-picker.is-open) {
+  z-index: var(--z-panel);
+}
+
+.color-switch {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-pill);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: transform var(--move-fast) var(--ease-spring);
+}
+
+.color-switch::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-below);
+  border-radius: var(--r-pill);
+  background: var(--hover);
+  opacity: 0;
+  transition: opacity var(--move) var(--ease-out);
+}
+
+.color-switch:hover::before,
+.color-picker.is-open .color-switch::before {
+  opacity: 1;
+}
+
+.color-switch:active {
+  transform: scale(0.96);
+}
+
+.color-dot {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+}
+
+.color-code {
+  min-width: 62px;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+  text-transform: uppercase;
+}
+
+.color-panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 232px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  background: linear-gradient(var(--glass), var(--glass)), var(--bg);
+  box-shadow: var(--glass-edge), var(--shadow-2);
+  opacity: 0;
+  transform: translateY(-8px) scale(0.98);
+  transform-origin: top right;
+  pointer-events: none;
+  transition:
+    opacity var(--move) var(--ease-out),
+    transform var(--move) var(--ease-out);
+}
+
+.color-panel.is-open {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.color-area {
+  position: relative;
+  height: 128px;
+  border-radius: var(--r-md);
+  background-image:
+    linear-gradient(to top, var(--picker-black), transparent),
+    linear-gradient(to right, var(--picker-white), transparent);
+  cursor: crosshair;
+  touch-action: none;
+}
+
+.color-hue {
+  position: relative;
+  height: 12px;
+  border-radius: var(--r-pill);
+  background: var(--picker-hues);
+  cursor: ew-resize;
+  touch-action: none;
+}
+
+.color-area-knob,
+.color-hue-knob {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--picker-white);
+  border-radius: var(--r-pill);
+  box-shadow: var(--shadow-1);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.color-hue-knob {
+  top: 50%;
+}
+
+.color-hex {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--text-sm);
+  color: var(--ink-dim);
+}
+
+.color-hex input {
+  width: 96px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-transform: uppercase;
+}
+
+.color-swatches {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.color-swatch {
+  aspect-ratio: 1;
+  padding: 0;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  cursor: pointer;
+  transition: transform var(--move-fast) var(--ease-spring);
+}
+
+.color-swatch:hover {
+  transform: scale(1.12);
+}
+
+.color-swatch:active {
+  transform: scale(0.92);
+}
+
+.color-swatch.is-current {
+  box-shadow: 0 0 0 2px var(--ink);
 }
 
 /* Подпись над карточкой — «Language · Язык · 语言 · 言語 · 언어». */

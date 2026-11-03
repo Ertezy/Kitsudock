@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import rawCss from "./styles.css?raw";
+import { PRESETS, tokensFor } from "./lib/theme";
 
 // Контраст проверяется по значениям настоящей палитры, с учётом прозрачности
 // стекла и текста. Наличие токенов само по себе не гарантирует читаемость.
@@ -373,9 +374,17 @@ describe("чтение стилей", () => {
   });
 });
 
-describe("читаемость палитры", () => {
+// Тёмная тема — палитра из стилей как есть. Светлая — те же токены, поверх
+// которых приложение кладёт выведенные из её крупных цветов (`lib/theme.ts`).
+const THEMES: [string, Record<string, string>][] = [
+  ["тёмная", {}],
+  ["светлая", tokensFor(PRESETS.light)],
+];
+
+for (const [themeName, overrides] of THEMES) describe(`читаемость палитры: ${themeName} тема`, () => {
   const palette = () => {
     const tokens = rootTokens(rawCss);
+    for (const [name, value] of Object.entries(overrides)) tokens.set(name, value);
     const get = (name: string): Colour => {
       const value = tokens.get(name);
       if (value === undefined) throw new Error(`в :root нет токена ${name}`);

@@ -12,6 +12,7 @@ import { LANGUAGE_BLOCK_TITLE, VIDEO_LANGS, VIDEO_LANG_NAMES } from "../../i18n/
 import Switch from "./Switch";
 import LanguagePicker from "./LanguagePicker";
 import Segmented from "./Segmented";
+import ThemeSection from "./ThemeSection";
 import EmptyState from "../../components/EmptyState";
 import type { GameView } from "../../types";
 
@@ -167,6 +168,8 @@ export default function LookSection() {
           </div>
         </div>
       </div>
+
+      <ThemeSection />
 
       <div className="settings-card">
         <div className="settings-row">
