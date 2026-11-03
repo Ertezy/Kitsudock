@@ -3,8 +3,8 @@ import { api } from "../../lib/api";
 import { addChecked, defaultChecked } from "../../lib/scanAdd";
 import { currentLang, currentT, dictionary, setLanguage, useLang, useT, type Lang } from "../../i18n";
 import { errorText } from "../../i18n/errors";
-import { LANGS, LANG_SHORT, LANGUAGE_BLOCK_TITLE } from "../../i18n/native";
-import Segmented from "./Segmented";
+import { LANGUAGE_BLOCK_TITLE } from "../../i18n/native";
+import LanguagePicker from "./LanguagePicker";
 import EmptyState from "../../components/EmptyState";
 import type { FoundGame } from "../../types";
 
@@ -120,8 +120,7 @@ export default function FirstRunView({ onDone }: Props) {
     <div>
       <div className="first-run-head">
         <h2 className="settings-section-title">{t.settings.firstRun.title}</h2>
-        <Segmented
-          options={LANGS.map((l) => ({ value: l, label: LANG_SHORT[l] }))}
+        <LanguagePicker
           value={lang}
           label={LANGUAGE_BLOCK_TITLE}
           disabled={busy}

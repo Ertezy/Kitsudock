@@ -3,17 +3,15 @@
 // Кроме ru.ts, это единственное место, где сторож кириллицы разрешает русские
 // буквы.
 
-export type Lang = "en" | "ru";
+export type Lang = "en" | "ru" | "zh" | "ja" | "ko";
 export type VideoLang = "en" | "ja";
 
-export const LANGS: readonly Lang[] = ["en", "ru"];
+export const LANGS: readonly Lang[] = ["en", "ru", "zh", "ja", "ko"];
 export const VIDEO_LANGS: readonly VideoLang[] = ["en", "ja"];
 
-/** Заголовок блока выбора языка — одинаковый на обоих языках. */
-export const LANGUAGE_BLOCK_TITLE = "Language · Язык";
+/** Заголовок блока выбора языка — одинаковый на всех языках. */
+export const LANGUAGE_BLOCK_TITLE = "Language · Язык · 语言 · 言語 · 언어";
 
-export const LANG_NAMES: Record<Lang, string> = { en: "English", ru: "Русский" };
+export const LANG_NAMES: Record<Lang, string> = { en: "English", ru: "Русский", zh: "简体中文", ja: "日本語", ko: "한국어" };
 export const VIDEO_LANG_NAMES: Record<VideoLang, string> = { en: "English", ja: "日本語" };
 
-/** Короткие подписи для переключателя на экране первого запуска. */
-export const LANG_SHORT: Record<Lang, string> = { en: "EN", ru: "RU" };

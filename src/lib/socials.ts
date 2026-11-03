@@ -29,9 +29,11 @@ const known = (list: Social[] | undefined) => (list ?? []).filter((s) => SOCIAL_
 
 /**
  * Соцсети игры на языке интерфейса; нет списка для этого языка — на другом.
- * Пустой ответ — столбика нет совсем.
+ * Списков в файле хаба два, русский и английский: остальным языкам достаётся
+ * английский. Пустой ответ — столбика нет совсем.
  */
 export function socialsFor(socials: HubGame["socials"], lang: Lang): Social[] {
-  const own = known(socials?.[lang]);
-  return own.length > 0 ? own : known(socials?.[lang === "ru" ? "en" : "ru"]);
+  const first = lang === "ru" ? "ru" : "en";
+  const own = known(socials?.[first]);
+  return own.length > 0 ? own : known(socials?.[first === "ru" ? "en" : "ru"]);
 }

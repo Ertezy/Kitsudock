@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { errorText } from "./errors";
 import { en } from "./en";
 import { ru } from "./ru";
+import { dictionary } from "./index";
+import { LANGS } from "./native";
 
 describe("текст ошибки", () => {
   it("код с подробностью — фраза выбранного языка", () => {
@@ -24,7 +26,7 @@ describe("текст ошибки", () => {
     expect(errorText(en, "plain")).toBe("plain");
   });
 
-  it("у каждого кода Rust есть фраза на обоих языках", () => {
+  it("у каждого кода Rust есть фраза на каждом языке", () => {
     // Список повторяет src-tauri/src/error.rs, модуль code.
     const codes = [
       "gameNotFound", "fileMissing", "exePathMissing", "argsUnclosedQuote", "exeStartFailed",
@@ -40,6 +42,10 @@ describe("текст ошибки", () => {
       const russian = errorText(ru, { code, detail: "d" });
       if (code === "internal") expect(russian).toBe("Внутренняя ошибка: d");
       expect(russian).not.toBe("Неизвестная ошибка: d");
+      for (const lang of LANGS) {
+        const t = dictionary(lang);
+        expect(errorText(t, { code, detail: "d" }), `${lang} ${code}`).not.toBe(`${t.errors.unknown}: d`);
+      }
     }
   });
 

@@ -3,6 +3,7 @@ import { activeCodes, bannerHasClock, bannerKeys, codeHasClock, codesFor, dataSt
 import { burnsToday } from "./time";
 import { en } from "../i18n/en";
 import { ru } from "../i18n/ru";
+import { dictionary } from "../i18n";
 import type { Banner, Code, HubData, Video } from "../types";
 
 const NOW = 1788091200;
@@ -298,9 +299,12 @@ describe("баннеры в карусели", () => {
     expect(panelIsEmpty([], [b("next", 2000, 3000)], [], 1000)).toBe(false);
   });
 
-  it("метка будущего баннера на обоих языках", () => {
+  it("метка будущего баннера на каждом языке", () => {
     expect(en.panel.soonIn("3 days")).toBe("Soon · in 3 days");
     expect(ru.panel.soonIn("3 дня")).toBe("Скоро · через 3 дня");
+    expect(dictionary("zh").panel.soonIn("3 天")).toBe("即将开启 · 3 天后");
+    expect(dictionary("ja").panel.soonIn("3日")).toBe("まもなく開始 · あと3日");
+    expect(dictionary("ko").panel.soonIn("3일")).toBe("곧 시작 · 3일 후");
   });
 });
 

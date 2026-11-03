@@ -1,8 +1,14 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { dayMonth, plural, relativeDays } from "./format";
 import { en } from "./en";
+import { ja } from "./ja";
+import { ko } from "./ko";
 import { ru } from "./ru";
-import { asLang, currentLang, currentT, dictionary, setLanguage, subscribeLanguage } from "./index";
+import { zh } from "./zh";
+import { asLang, currentLang, currentT, dictionary, setLanguage, subscribeLanguage, systemLang } from "./index";
+import { LANGS } from "./native";
+
+const ALL = { en, ru, zh, ja, ko };
 
 /** Форма словаря: те же поля, функции на тех же местах. */
 function shape(value: unknown): unknown {
@@ -21,8 +27,12 @@ function shape(value: unknown): unknown {
 afterEach(() => setLanguage("en"));
 
 describe("словари", () => {
-  it("русский повторяет форму английского", () => {
-    expect(shape(ru)).toEqual(shape(en));
+  it("каждый словарь повторяет форму английского", () => {
+    for (const dict of [ru, zh, ja, ko]) expect(shape(dict)).toEqual(shape(en));
+  });
+
+  it("словарь есть у каждого языка из списка", () => {
+    for (const lang of LANGS) expect(dictionary(lang)).toBe(ALL[lang]);
   });
 
   it("тексты прямые: без «Упс», восклицаний и «что-то пошло не так»", () => {
@@ -32,10 +42,10 @@ describe("словари", () => {
       if (value !== null && typeof value === "object") return Object.values(value).flatMap(texts);
       return [];
     };
-    for (const dict of [en, ru]) {
+    for (const dict of Object.values(ALL)) {
       const all = texts(dict);
       expect(all.length).toBeGreaterThan(100);
-      for (const text of all) expect(text, text).not.toMatch(/!|Упс|Oops|Что-то пошло не так|Something went wrong/i);
+      for (const text of all) expect(text, text).not.toMatch(/!|！|Упс|Oops|Что-то пошло не так|Something went wrong/i);
     }
   });
 
@@ -98,11 +108,20 @@ describe("относительные дни и даты", () => {
     ]);
   });
 
+  it("китайский, японский, корейский: сегодня, вчера, завтра", () => {
+    expect([0, -1, 1, 3].map((d) => relativeDays("zh", d))).toEqual(["今天", "昨天", "明天", "3天后"]);
+    expect([0, -1, 1].map((d) => relativeDays("ja", d))).toEqual(["今日", "昨日", "明日"]);
+    expect([0, -1, 1].map((d) => relativeDays("ko", d))).toEqual(["오늘", "어제", "내일"]);
+  });
+
   it("день и месяц", () => {
     // Полдень по местному времени: в любом поясе это тот же календарный день.
     const noon = new Date(2026, 7, 28, 12).getTime() / 1000;
     expect(dayMonth("en", noon)).toBe("Aug 28");
     expect(dayMonth("ru", noon)).toBe("28 августа");
+    expect(dayMonth("zh", noon)).toBe("8月28日");
+    expect(dayMonth("ja", noon)).toBe("8月28日");
+    expect(dayMonth("ko", noon)).toBe("8월 28일");
   });
 
   it("время вне календаря JS — прочерк, а не ошибка (иначе окно остаётся пустым)", () => {
@@ -124,8 +143,19 @@ describe("текущий язык", () => {
   it("по умолчанию английский, незнакомое значение — английский", () => {
     expect(currentLang()).toBe("en");
     expect(asLang("ru")).toBe("ru");
+    expect(asLang("ko")).toBe("ko");
     expect(asLang("fr")).toBe("en");
     expect(asLang(undefined)).toBe("en");
+  });
+
+  it("язык системы: свой, если он у нас есть, иначе английский", () => {
+    expect(systemLang("ru-RU")).toBe("ru");
+    expect(systemLang("zh-CN")).toBe("zh");
+    expect(systemLang("zh-TW")).toBe("zh");
+    expect(systemLang("ja")).toBe("ja");
+    expect(systemLang("ko-KR")).toBe("ko");
+    expect(systemLang("de-DE")).toBe("en");
+    expect(systemLang(undefined)).toBe("en");
   });
 
   it("смена оповещает подписчиков, отписка работает", () => {

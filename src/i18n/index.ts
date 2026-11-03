@@ -5,13 +5,16 @@
 
 import { useEffect, useState } from "react";
 import { en, type Dictionary } from "./en";
+import { ja } from "./ja";
+import { ko } from "./ko";
 import { ru } from "./ru";
-import type { Lang } from "./native";
+import { zh } from "./zh";
+import { LANGS, type Lang } from "./native";
 
 export type { Dictionary } from "./en";
 export type { Lang, VideoLang } from "./native";
 
-const DICTIONARIES: Record<Lang, Dictionary> = { en, ru };
+const DICTIONARIES: Record<Lang, Dictionary> = { en, ru, zh, ja, ko };
 
 let current: Lang = "en";
 const listeners = new Set<(lang: Lang) => void>();
@@ -31,7 +34,13 @@ export function currentT(): Dictionary {
 
 /** Незнакомое значение (старый или испорченный конфиг) — английский. */
 export function asLang(value: unknown): Lang {
-  return value === "ru" ? "ru" : "en";
+  return LANGS.find((l) => l === value) ?? "en";
+}
+
+/** Язык системы (`navigator.language`, например «ja-JP» или «zh-TW»), если он
+ *  есть среди наших; иначе английский. Китайский у нас один — упрощённый. */
+export function systemLang(tag: string | undefined): Lang {
+  return asLang(tag?.toLowerCase().split("-")[0]);
 }
 
 /** Запоминает язык, ставит его в `<html lang>` и сообщает подписчикам.
