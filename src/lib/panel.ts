@@ -47,13 +47,15 @@ export const MAX_SHOWN_BANNERS = 12;
 
 /**
  * Баннеры для карусели: сначала идущие — ближайшие к окончанию первыми, затем
- * будущие — ближайшие к началу первыми. Кончившиеся не показываются. Больше
- * `MAX_SHOWN_BANNERS` не бывает: лишние — те, что стоят в этом порядке
- * последними.
+ * будущие — ближайшие к началу первыми. Внутри каждой группы баннеры с
+ * персонажами раньше оружейных: у оружейного список персонажей пуст.
+ * Кончившиеся не показываются. Больше `MAX_SHOWN_BANNERS` не бывает: лишние —
+ * те, что стоят в этом порядке последними.
  */
 export function shownBanners(banners: Banner[], nowSec: number): Banner[] {
-  const running = runningBanners(banners, nowSec).sort((a, b) => a.endsAt - b.endsAt);
-  const upcoming = banners.filter((b) => b.startsAt > nowSec).sort((a, b) => a.startsAt - b.startsAt);
+  const weapon = (b: Banner) => (b.featured.length === 0 ? 1 : 0);
+  const running = runningBanners(banners, nowSec).sort((a, b) => weapon(a) - weapon(b) || a.endsAt - b.endsAt);
+  const upcoming = banners.filter((b) => b.startsAt > nowSec).sort((a, b) => weapon(a) - weapon(b) || a.startsAt - b.startsAt);
   return [...running, ...upcoming].slice(0, MAX_SHOWN_BANNERS);
 }
 

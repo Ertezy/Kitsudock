@@ -268,6 +268,13 @@ describe("баннеры в карусели", () => {
     expect(shownBanners(list, now).map((x) => x.title)).toEqual(["soon-end", "late-end", "near", "far"]);
   });
 
+  it("баннеры с персонажами раньше оружейных — и среди идущих, и среди будущих", () => {
+    const now = 1000;
+    const hero = (title: string, startsAt: number, endsAt: number) => ({ ...b(title, startsAt, endsAt), featured: ["Skirk"] });
+    const list = [b("weapon", 0, 2000), hero("hero", 0, 2000), hero("hero-later", 0, 3000), b("weapon-next", 1500, 9000), hero("hero-next", 1500, 9000)];
+    expect(shownBanners(list, now).map((x) => x.title)).toEqual(["hero", "hero-later", "weapon", "hero-next", "weapon-next"]);
+  });
+
   it("в карусель попадает не больше двенадцати баннеров игры", () => {
     expect(MAX_SHOWN_BANNERS).toBe(12);
     const now = 1000;
