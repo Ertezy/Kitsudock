@@ -8,7 +8,7 @@ body:
         Issues and attachments are public. Do not include personal data, passwords or access tokens.
         Журналы и вложения здесь публичны. Не прикладывайте личные данные, пароли или токены доступа.
         For a security vulnerability, use [private reporting](https://github.com/Ertezy/Kitsudock/security/advisories/new)
-        and follow [SECURITY.md](https://github.com/Ertezy/Kitsudock/blob/main/SECURITY.md).
+        and follow [SECURITY.md](https://github.com/Ertezy/Kitsudock/blob/main/.github/SECURITY.md).
         Об уязвимости сообщите приватно по ссылке выше; порядок описан в SECURITY.md.
   - type: input
     id: version

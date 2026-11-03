@@ -1,6 +1,6 @@
 # Kitsudock
 
-[English](README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · **한국어**
+[English](../README.md) · [Русский](README.ru.md) · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · **한국어**
 
 <img width="800" alt="Kitsudock demo" src="https://github.com/user-attachments/assets/a4309a5a-8c96-40aa-a709-6fa5117bfcb4" />
 
@@ -61,12 +61,12 @@ Steam, Epic 서버에서 가져오며, 스토어 아트워크는 로컬 캐시�
 - **네트워크:** 다운로드와 외부 링크는 [개인정보](#개인정보)를 참고하세요. 로그는 자동으로 전송되지 않습니다.
 - **업데이트:** **업데이트**를 누를 때만 진행됩니다. 서명이 앱에 내장된 키와 일치할 때만 설치되며,
   일치하지 않으면 아무것도 설치되지 않습니다.
-- **소스와 빌드:** 소스 코드는 [MIT 라이선스](LICENSE)로 공개되어 있습니다. 설치 프로그램은 이 저장소의
-  [릴리스 워크플로](.github/workflows/release.yml)로 GitHub Actions에서 빌드됩니다.
+- **소스와 빌드:** 소스 코드는 [MIT 라이선스](../LICENSE)로 공개되어 있습니다. 설치 프로그램은 이 저장소의
+  [릴리스 워크플로](../.github/workflows/release.yml)로 GitHub Actions에서 빌드됩니다.
 - **Windows 경고와 다운로드:** 현재 설치 프로그램에 서명이 없어서 SmartScreen이 "인식할 수 없는 앱"이라고
   경고할 수 있습니다. 이 저장소의 [Releases 페이지](https://github.com/Ertezy/Kitsudock/releases)에서만
   내려받고, 주소가 `github.com/Ertezy/Kitsudock`인지 확인하세요. 경고 자체가 안전성에 대한 판정은
-  아닙니다. 자세한 내용은 [Code signing policy](README.md#code-signing-policy)를 참고하세요.
+  아닙니다. 자세한 내용은 [Code signing policy](../README.md#code-signing-policy)를 참고하세요.
 
 ## 기능
 
@@ -101,9 +101,9 @@ Steam, Epic 서버에서 가져오며, 스토어 아트워크는 로컬 캐시�
 
 ## 개발자용
 
-구조 설명, 소스에서 빌드하기, 테스트는 [영어 README](README.md#how-it-works)를 참고하세요.
+구조 설명, 소스에서 빌드하기, 테스트는 [영어 README](../README.md#how-it-works)를 참고하세요.
 
 ## 라이선스
 
-MIT — [LICENSE](LICENSE)를 참고하세요. 게임 이름, 아트워크, 상표의 권리는 각 권리자에게 있습니다.
+MIT — [LICENSE](../LICENSE)를 참고하세요. 게임 이름, 아트워크, 상표의 권리는 각 권리자에게 있습니다.
 Genshin Impact, Honkai: Star Rail and Zenless Zone Zero: © All rights reserved by HoYoverse.

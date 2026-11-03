@@ -1,6 +1,6 @@
 # Kitsudock
 
-[English](README.md) · **Русский** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
+[English](../README.md) · **Русский** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 <img width="800" alt="Kitsudock demo" src="https://github.com/user-attachments/assets/a4309a5a-8c96-40aa-a709-6fa5117bfcb4" />
 
@@ -75,9 +75,9 @@ Kitsudock галочку «Удалить данные приложения» м
   [Приватность](#приватность); журналы автоматически не отправляются.
 - **Обновления:** только по нажатию **Обновить**. Обновление ставится, только если его
   подпись сходится с ключом, вшитым в приложение; иначе ничего не ставится.
-- **Исходники и сборка:** исходный код доступен по [лицензии MIT](LICENSE).
+- **Исходники и сборка:** исходный код доступен по [лицензии MIT](../LICENSE).
   Установщики собираются GitHub Actions из этого репозитория через
-  [workflow выпуска](.github/workflows/release.yml).
+  [workflow выпуска](../.github/workflows/release.yml).
 - **Предупреждения Windows и скачивание:** установщики пока не подписаны, поэтому
   SmartScreen может предупредить о неизвестном приложении. Скачивайте только со
   [страницы Releases этого репозитория](https://github.com/Ertezy/Kitsudock/releases)
@@ -137,9 +137,9 @@ HoYoPlay, затем публикует результат файлом `hub.jso
   картинки и видео по адресам из него.
 - Один переключатель Настройки → Вид → Анимация выключает движение интерфейса,
   видео фона и автоматическое листание баннеров.
-- У каждого языка интерфейса свой словарь: [src/i18n/en.ts](src/i18n/en.ts),
-  [ru.ts](src/i18n/ru.ts), [zh.ts](src/i18n/zh.ts), [ja.ts](src/i18n/ja.ts) и
-  [ko.ts](src/i18n/ko.ts).
+- У каждого языка интерфейса свой словарь: [src/i18n/en.ts](../src/i18n/en.ts),
+  [ru.ts](../src/i18n/ru.ts), [zh.ts](../src/i18n/zh.ts), [ja.ts](../src/i18n/ja.ts) и
+  [ko.ts](../src/i18n/ko.ts).
 
 ## Откуда данные
 
@@ -160,14 +160,14 @@ Wuthering Waves (только факты: название, персонаж, с
 Бесплатная подпись кода — [SignPath.io](https://about.signpath.io), сертификат —
 [SignPath Foundation](https://signpath.org). *Пока не подключена — до этого установщики
 не подписаны (см. [Установка](#установка)).* Подробности — в разделе
-[Code signing policy](README.md#code-signing-policy).
+[Code signing policy](../README.md#code-signing-policy).
 
 ## Сборка из исходников
 
-См. [README на английском](README.md#building-from-source).
+См. [README на английском](../README.md#building-from-source).
 
 ## Лицензия
 
-MIT — см. [LICENSE](LICENSE). Названия игр, арт и товарные знаки принадлежат
+MIT — см. [LICENSE](../LICENSE). Названия игр, арт и товарные знаки принадлежат
 правообладателям;
 Genshin Impact, Honkai: Star Rail и Zenless Zone Zero: © All rights reserved by HoYoverse.

@@ -10,7 +10,7 @@ vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 To suggest an idea, [open an issue](https://github.com/Ertezy/Kitsudock/issues/new)
 and describe what you would like to do in the app and why it would help.
 
-For setup and build instructions, see [Building from source](README.md#building-from-source).
+For setup and build instructions, see [Building from source](../README.md#building-from-source).
 Run these checks from the project root:
 
 ```sh
@@ -35,7 +35,7 @@ while. Game artwork is not accepted in this repository.
 Чтобы предложить идею, [откройте issue](https://github.com/Ertezy/Kitsudock/issues/new)
 и опишите, что вы хотите делать в приложении и чем это поможет.
 
-Подготовка окружения и сборка описаны в [README](README.md#building-from-source).
+Подготовка окружения и сборка описаны в [README](../README.md#building-from-source).
 Запустите проверки из корня проекта:
 
 ```sh

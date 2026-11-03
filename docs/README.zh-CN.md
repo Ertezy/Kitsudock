@@ -1,6 +1,6 @@
 # Kitsudock
 
-[English](README.md) · [Русский](README.ru.md) · **简体中文** · [日本語](README.ja.md) · [한국어](README.ko.md)
+[English](../README.md) · [Русский](README.ru.md) · **简体中文** · [日本語](README.ja.md) · [한국어](README.ko.md)
 
 <img width="800" alt="Kitsudock demo" src="https://github.com/user-attachments/assets/a4309a5a-8c96-40aa-a709-6fa5117bfcb4" />
 
@@ -60,12 +60,12 @@ Steam 和 Epic 的服务器；商店宣传图也可能来自本地缓存。视�
 - **网络访问：** 所有下载和外部链接见 [隐私](#隐私)；日志不会被自动发送。
 - **更新：** 只在你点击 **更新** 时进行。只有签名与应用内置的密钥一致时才会安装，否则什么都
   不会安装。
-- **源代码和构建：** 源代码以 [MIT 许可证](LICENSE) 公开。安装程序由本仓库的
-  [发布工作流](.github/workflows/release.yml) 在 GitHub Actions 中构建。
+- **源代码和构建：** 源代码以 [MIT 许可证](../LICENSE) 公开。安装程序由本仓库的
+  [发布工作流](../.github/workflows/release.yml) 在 GitHub Actions 中构建。
 - **Windows 警告与下载：** 安装程序目前没有签名，SmartScreen 可能会提示这是无法识别的应用。
   请只从本仓库的 [Releases 页面](https://github.com/Ertezy/Kitsudock/releases) 下载，并在
   下载前确认地址属于 `github.com/Ertezy/Kitsudock`。这个警告本身并不代表软件不安全。
-  详见 [Code signing policy](README.md#code-signing-policy)。
+  详见 [Code signing policy](../README.md#code-signing-policy)。
 
 ## 功能
 
@@ -100,9 +100,9 @@ API 镜像，以及各游戏的官方 YouTube 频道。每个兑换码和卡池�
 
 ## 开发者
 
-架构说明、从源代码构建和测试，请参阅 [英文 README](README.md#how-it-works)。
+架构说明、从源代码构建和测试，请参阅 [英文 README](../README.md#how-it-works)。
 
 ## 许可证
 
-MIT——见 [LICENSE](LICENSE)。游戏名称、美术素材和商标归其权利人所有；
+MIT——见 [LICENSE](../LICENSE)。游戏名称、美术素材和商标归其权利人所有；
 Genshin Impact, Honkai: Star Rail and Zenless Zone Zero: © All rights reserved by HoYoverse.
