@@ -113,6 +113,9 @@ unsigned (see [Install](#install)).*
 - **Languages:** interface in English, Russian, Simplified Chinese, Japanese or Korean —
   on first start it follows the Windows language; videos in English or Japanese. Data
   such as code rewards and banner names comes from English wikis and stays in English.
+- **Themes and colours:** dark, light or following Windows. Seven main colours — background,
+  panels, text, the Play button, captions, icons and borders — can be changed in
+  Settings → Appearance, and one button puts the theme's own colours back.
 - **Backgrounds:** the official HoYoPlay background for Genshin Impact, Honkai: Star
   Rail and Zenless Zone Zero (a video when animation is on), store artwork, your own
   image or your own video.

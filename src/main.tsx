@@ -10,17 +10,22 @@ import { api } from "./lib/api";
 import { asLang, setLanguage } from "./i18n";
 import { asVideoLang, setVideoLanguage } from "./lib/videoLanguage";
 import { NOTHING_COLLAPSED, asCollapsed, setCollapsedAll } from "./lib/collapse";
+import { DEFAULT_THEME, asTheme, setThemeAll, startTheme } from "./lib/theme";
 import "./styles.css";
 
 // Язык читается до первой отрисовки: иначе при запуске на миг мелькнул бы
 // английский у того, кто выбрал русский. Свёрнутые разделы — тоже: свёрнутое
-// должно сразу встать свёрнутым, а не сворачиваться на глазах. Отказ моста —
+// должно сразу встать свёрнутым, а не сворачиваться на глазах. И тема: светлая
+// не загорается поверх тёмной. Отказ моста —
 // значения по умолчанию, приложение всё равно открывается.
 void Promise.all([
   api.getLanguage().then(asLang, () => "en" as const),
   api.getVideoLanguage().then(asVideoLang, () => "en" as const),
   api.getCollapsed().then(asCollapsed, () => NOTHING_COLLAPSED),
-]).then(([lang, videoLang, collapsed]) => {
+  api.getTheme().then(asTheme, () => DEFAULT_THEME),
+]).then(([lang, videoLang, collapsed, theme]) => {
+  setThemeAll(theme);
+  startTheme();
   setLanguage(lang);
   setVideoLanguage(videoLang);
   setCollapsedAll(collapsed);

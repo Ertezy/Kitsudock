@@ -135,6 +135,8 @@ const APP_COMMANDS = [
   "set_language",
   "get_video_language",
   "set_video_language",
+  "get_theme",
+  "set_theme",
   "get_collapsed",
   "set_collapsed",
   "get_autostart",
@@ -230,6 +232,7 @@ export function createHandlers(scenario: Scenario, settings: StandSettings = {})
     lastPlayed: (firstRun ? null : "genshin") as string | null,
     language: settings.lang ?? DEFAULT_PARAMS.lang,
     videoLanguage: "en" as VideoLang,
+    theme: { mode: "dark", colors: {} } as unknown,
     collapsed: Object.fromEntries(COLLAPSE_PARTS.map((part) => [part, settings.collapsed?.includes(part) ?? false])) as Collapsed,
     animation: settings.motion ?? DEFAULT_PARAMS.motion,
     storeArt: true,
@@ -390,6 +393,11 @@ export function createHandlers(scenario: Scenario, settings: StandSettings = {})
     get_video_language: () => state.videoLanguage,
     set_video_language: ({ language }) => {
       state.videoLanguage = language as VideoLang;
+      return null;
+    },
+    get_theme: () => clone(state.theme),
+    set_theme: ({ theme }) => {
+      state.theme = clone(theme);
       return null;
     },
     get_collapsed: () => clone(state.collapsed),
