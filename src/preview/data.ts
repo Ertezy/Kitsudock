@@ -30,10 +30,10 @@ interface Preset {
 }
 
 const PRESETS: Preset[] = [
-  { id: "genshin", title: "Genshin Impact", contentId: "genshin", sourceKind: "epic", artSource: "hoyoplay", hues: [38, 205], ways: ["direct", "launcher", "store"], launcher: "hoyoplay" },
+  { id: "genshin", title: "Genshin Impact", contentId: "genshin", sourceKind: "epic", artSource: "hoyoplay", hues: [38, 205], ways: ["launcher", "store"], launcher: "hoyoplay" },
   { id: "hsr", title: "Honkai: Star Rail", contentId: "hsr", sourceKind: "exe", artSource: "hoyoplay", hues: [268, 218], ways: ["direct", "launcher"], way: "launcher", launcher: "hoyoplay" },
   { id: "zzz", title: "Zenless Zone Zero", contentId: "zzz", sourceKind: "exe", artSource: "hoyoplay", ownPicture: true, hues: [338, 28] },
-  { id: "wuthering", title: "Wuthering Waves", contentId: "wuthering", sourceKind: "steam", artSource: "steam", hues: [188, 140], ways: ["direct", "store"] },
+  { id: "wuthering", title: "Wuthering Waves", contentId: "wuthering", sourceKind: "steam", artSource: "steam", hues: [188, 140], ways: ["direct", "launcher", "store"], launcher: "kuro" },
   // Игра без данных хаба и без картинок: на ней видны запасные фон и иконка-буква.
   { id: "endfield", title: "Arknights: Endfield", contentId: null, sourceKind: "exe", artSource: "fill", hues: null },
 ];
