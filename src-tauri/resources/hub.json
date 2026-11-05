@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": 1793728132,
+  "updatedAt": 1793904136,
   "games": [
     {
       "id": "genshin",
@@ -14,7 +14,8 @@
         ]
       },
       "background": {
-        "image": "https://launcher-webstatic.hoyoverse.com/launcher-public/2026/10/13/bc7e25f8cfa2b38b7074d2bf96adfe48_172249607608782874.webp"
+        "image": "https://launcher-webstatic.hoyoverse.com/launcher-public/2026/10/30/f4188a48e3a68a52d00a3b28bb042e58_5159184125052880341.webp",
+        "video": "https://launcher-webstatic.hoyoverse.com/launcher-public/2026/10/30/23bb82e77d271193e9e9da25aa9e026f_7756217358019526142.webm"
       },
       "socials": {
         "ru": [
@@ -367,6 +368,30 @@
     }
   ],
   "codes": [
+    {
+      "gameId": "genshin",
+      "code": "KeepUpWithMitya",
+      "rewards": "Guide to Charity ×3, \"Energy-Replenishing Meal\" ×3, Kristallfold ×3",
+      "expiresAt": null,
+      "region": "all",
+      "source": "https://genshin-impact.fandom.com/wiki/Promotional_Code"
+    },
+    {
+      "gameId": "genshin",
+      "code": "MIJIQ23V2437",
+      "rewards": "Mora ×10000, Adventurer's Experience ×10, Fine Enhancement Ore ×5, Stir-Fried Fish Noodles ×5, Jueyun Chili Chicken ×5",
+      "expiresAt": null,
+      "region": "all",
+      "source": "https://genshin-impact.fandom.com/wiki/Promotional_Code"
+    },
+    {
+      "gameId": "genshin",
+      "code": "CDOF4X83H7X2",
+      "rewards": "Mora ×10000, Adventurer's Experience ×10, Fine Enhancement Ore ×5, Stir-Fried Fish Noodles ×5, Jueyun Chili Chicken ×5",
+      "expiresAt": null,
+      "region": "all",
+      "source": "https://genshin-impact.fandom.com/wiki/Promotional_Code"
+    },
     {
       "gameId": "genshin",
       "code": "PJ2KEBRAYSRM",
@@ -775,18 +800,6 @@
     },
     {
       "gameId": "endfield",
-      "title": "Rejuvenation",
-      "featured": [
-        "Si"
-      ],
-      "rarity": 6,
-      "image": "https://endfield.wiki.gg/images/thumb/Rejuvenation_banner.png/400px-Rejuvenation_banner.png?dd8af7",
-      "startsAt": 1792036800,
-      "endsAt": 1793897940,
-      "url": "https://endfield.wiki.gg/wiki/Headhunting/Banners"
-    },
-    {
-      "gameId": "endfield",
       "title": "Ancestral Spring Flows Anew",
       "featured": [
         "Tangtang"
@@ -804,13 +817,43 @@
         "Argent Flow"
       ],
       "rarity": 6,
-      "image": null,
-      "startsAt": 1793851200,
-      "endsAt": 1795712340,
+      "image": "https://endfield.wiki.gg/images/thumb/The_Hearth_Fire_Beckons_the_Starry_Flow_banner.png/400px-The_Hearth_Fire_Beckons_the_Starry_Flow_banner.png?e66d09",
+      "startsAt": 1793898000,
+      "endsAt": 1795665540,
       "url": "https://endfield.wiki.gg/wiki/Headhunting/Banners"
     }
   ],
   "videos": [
+    {
+      "gameId": "genshin",
+      "lang": "en",
+      "title": "Do me a favor. Keep Mr. Valeriy busy for me. #GenshinImpact #Mitya #Valeriy",
+      "url": "https://www.youtube.com/shorts/rHF-lm4qkFw",
+      "thumb": "https://i3.ytimg.com/vi/rHF-lm4qkFw/hqdefault.jpg",
+      "publishedAt": 1793786409,
+      "duration": null,
+      "premiere": false
+    },
+    {
+      "gameId": "genshin",
+      "lang": "en",
+      "title": "New Archon Quests Act V and Act VI Now Available #GenshinImpact #HourOfRuin",
+      "url": "https://www.youtube.com/shorts/aaZxyTfgGpM",
+      "thumb": "https://i2.ytimg.com/vi/aaZxyTfgGpM/hqdefault.jpg",
+      "publishedAt": 1793763039,
+      "duration": null,
+      "premiere": false
+    },
+    {
+      "gameId": "genshin",
+      "lang": "en",
+      "title": "Version 7.2 Now Available | Genshin Impact #GenshinImpact #HourOfRuin",
+      "url": "https://www.youtube.com/shorts/aUv_MxpacXw",
+      "thumb": "https://i2.ytimg.com/vi/aUv_MxpacXw/hqdefault.jpg",
+      "publishedAt": 1793763015,
+      "duration": null,
+      "premiere": false
+    },
     {
       "gameId": "genshin",
       "lang": "en",
@@ -843,31 +886,41 @@
     },
     {
       "gameId": "genshin",
-      "lang": "en",
-      "title": "Mitya's Character Trailer (Extract 2) | Genshin Impact #GenshinImpact #Mitya",
-      "url": "https://www.youtube.com/shorts/xbVR53mPLI0",
-      "thumb": "https://i1.ytimg.com/vi/xbVR53mPLI0/hqdefault.jpg",
-      "publishedAt": 1793678558,
+      "lang": "ja",
+      "title": "【原神】キャストインタビュー　小林裕介（ミティヤ 役）",
+      "url": "https://www.youtube.com/watch?v=nR646iSGO2A",
+      "thumb": "https://i3.ytimg.com/vi/nR646iSGO2A/hqdefault.jpg",
+      "publishedAt": 1793872806,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "genshin",
-      "lang": "en",
-      "title": "Mitya's Character Trailer (Extract 1) | Genshin Impact #GenshinImpact #Mitya",
-      "url": "https://www.youtube.com/shorts/OOd6_6nSM48",
-      "thumb": "https://i4.ytimg.com/vi/OOd6_6nSM48/hqdefault.jpg",
-      "publishedAt": 1793678465,
+      "lang": "ja",
+      "title": "【原神】頼みがある。バレリーを半日だけ足止めしてくれないか。 #原神 #原神スネージナヤ",
+      "url": "https://www.youtube.com/shorts/zCIeGzBJ7Rs",
+      "thumb": "https://i3.ytimg.com/vi/zCIeGzBJ7Rs/hqdefault.jpg",
+      "publishedAt": 1793786408,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "genshin",
-      "lang": "en",
-      "title": "Character Trailer - \"Mitya: Everything's in Order\" | Genshin Impact #Mitya #GenshinSnezhnaya",
-      "url": "https://www.youtube.com/watch?v=9OHKzmmq2e8",
-      "thumb": "https://i2.ytimg.com/vi/9OHKzmmq2e8/hqdefault.jpg",
-      "publishedAt": 1793678424,
+      "lang": "ja",
+      "title": "【原神】Ver.7.2正式リリース #終焉へ墜ちる時 #原神スネージナヤ #原神",
+      "url": "https://www.youtube.com/shorts/bfbxoTprN_k",
+      "thumb": "https://i3.ytimg.com/vi/bfbxoTprN_k/hqdefault.jpg",
+      "publishedAt": 1793763011,
+      "duration": null,
+      "premiere": false
+    },
+    {
+      "gameId": "genshin",
+      "lang": "ja",
+      "title": "【原神】魔神任務 第五幕、第六幕開放 #終焉へ墜ちる時 #原神スネージナヤ #原神",
+      "url": "https://www.youtube.com/shorts/k6RtS9Hw8KI",
+      "thumb": "https://i4.ytimg.com/vi/k6RtS9Hw8KI/hqdefault.jpg",
+      "publishedAt": 1793763011,
       "duration": null,
       "premiere": false
     },
@@ -892,42 +945,42 @@
       "premiere": false
     },
     {
-      "gameId": "genshin",
-      "lang": "ja",
-      "title": "【原神】キャラクタートレーラー ミティヤ（ショートVer.3） #原神 #ミティヤ #原神スネージナヤ",
-      "url": "https://www.youtube.com/shorts/hKI74FGEeJ0",
-      "thumb": "https://i1.ytimg.com/vi/hKI74FGEeJ0/hqdefault.jpg",
-      "publishedAt": 1793678592,
+      "gameId": "hsr",
+      "lang": "en",
+      "title": "Aha's Coltastic Melody | Honkai: Star Rail",
+      "url": "https://www.youtube.com/watch?v=eXaeZnq8Ca8",
+      "thumb": "https://i2.ytimg.com/vi/eXaeZnq8Ca8/hqdefault.jpg",
+      "publishedAt": 1793851234,
       "duration": null,
       "premiere": false
     },
     {
-      "gameId": "genshin",
-      "lang": "ja",
-      "title": "【原神】キャラクタートレーラー ミティヤ（ショートVer.2） #原神 #ミティヤ #原神スネージナヤ",
-      "url": "https://www.youtube.com/shorts/3kgAaBko-RI",
-      "thumb": "https://i4.ytimg.com/vi/3kgAaBko-RI/hqdefault.jpg",
-      "publishedAt": 1793678527,
+      "gameId": "hsr",
+      "lang": "en",
+      "title": "Improv Tour Trailer: \"When Aha Comes Knocking\" (Excerpt 1) | Honkai: Star Rail",
+      "url": "https://www.youtube.com/shorts/npsD7oBdw9s",
+      "thumb": "https://i3.ytimg.com/vi/npsD7oBdw9s/hqdefault.jpg",
+      "publishedAt": 1793765713,
       "duration": null,
       "premiere": false
     },
     {
-      "gameId": "genshin",
-      "lang": "ja",
-      "title": "【原神】キャラクタートレーラー ミティヤ（ショートVer.1） #原神 #ミティヤ #原神スネージナヤ",
-      "url": "https://www.youtube.com/shorts/MAwsilUzLTw",
-      "thumb": "https://i2.ytimg.com/vi/MAwsilUzLTw/hqdefault.jpg",
-      "publishedAt": 1793678497,
+      "gameId": "hsr",
+      "lang": "en",
+      "title": "Improv Tour Trailer: \"When Aha Comes Knocking\" | Honkai: Star Rail",
+      "url": "https://www.youtube.com/watch?v=Asggb78zcYA",
+      "thumb": "https://i2.ytimg.com/vi/Asggb78zcYA/hqdefault.jpg",
+      "publishedAt": 1793764805,
       "duration": null,
       "premiere": false
     },
     {
-      "gameId": "genshin",
-      "lang": "ja",
-      "title": "【原神】キャラクタートレーラー ミティヤ（CV：小林裕介）「理路整然」",
-      "url": "https://www.youtube.com/watch?v=1Zff-uJ1sz4",
-      "thumb": "https://i2.ytimg.com/vi/1Zff-uJ1sz4/hqdefault.jpg",
-      "publishedAt": 1793678412,
+      "gameId": "hsr",
+      "lang": "en",
+      "title": "Character Preview | Aeon ★ Aha",
+      "url": "https://www.youtube.com/shorts/LxsRESfLAZ0",
+      "thumb": "https://i1.ytimg.com/vi/LxsRESfLAZ0/hqdefault.jpg",
+      "publishedAt": 1793761231,
       "duration": null,
       "premiere": false
     },
@@ -953,41 +1006,41 @@
     },
     {
       "gameId": "hsr",
-      "lang": "en",
-      "title": "Version 4.7 \"Now, Lay Laughter to All Stars\" Preview",
-      "url": "https://www.youtube.com/shorts/e91J24Xu4Z0",
-      "thumb": "https://i2.ytimg.com/vi/e91J24Xu4Z0/hqdefault.jpg",
-      "publishedAt": 1793368503,
+      "lang": "ja",
+      "title": "『崩壊：スターレイル』アッハのはちゃめちゃソング",
+      "url": "https://www.youtube.com/watch?v=rmJ_jRdzf5I",
+      "thumb": "https://i3.ytimg.com/vi/rmJ_jRdzf5I/hqdefault.jpg",
+      "publishedAt": 1793851212,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "hsr",
-      "lang": "en",
-      "title": "Fun with Aha: Ways to Defeat the Voracity",
-      "url": "https://www.youtube.com/watch?v=3Id6j-gmaww",
-      "thumb": "https://i4.ytimg.com/vi/3Id6j-gmaww/hqdefault.jpg",
-      "publishedAt": 1793365233,
+      "lang": "ja",
+      "title": "【崩壊：スターレイル】 即興芝居PV 「アッハが訪れた時」（抜粋 1）",
+      "url": "https://www.youtube.com/shorts/JUUns3hT8O8",
+      "thumb": "https://i3.ytimg.com/vi/JUUns3hT8O8/hqdefault.jpg",
+      "publishedAt": 1793765735,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "hsr",
-      "lang": "en",
-      "title": "Honkai: Star Rail Version 4.7 \"Now, Lay Laughter to All Stars\" Special Program",
-      "url": "https://www.youtube.com/watch?v=psifFhA2QAA",
-      "thumb": "https://i1.ytimg.com/vi/psifFhA2QAA/hqdefault.jpg",
-      "publishedAt": 1793363299,
+      "lang": "ja",
+      "title": "【崩壊：スターレイル】 即興芝居PV 「アッハが訪れた時」",
+      "url": "https://www.youtube.com/watch?v=lSfsFcXLCm8",
+      "thumb": "https://i1.ytimg.com/vi/lSfsFcXLCm8/hqdefault.jpg",
+      "publishedAt": 1793764808,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "hsr",
-      "lang": "en",
-      "title": "Version 4.7 Trailer: \"Now, Lay Laughter to All Stars\" | Honkai: Star Rail",
-      "url": "https://www.youtube.com/watch?v=Q7JuwvcqoMI",
-      "thumb": "https://i2.ytimg.com/vi/Q7JuwvcqoMI/hqdefault.jpg",
-      "publishedAt": 1793362504,
+      "lang": "ja",
+      "title": "キャラクタープレビュー | 星神★アッハ",
+      "url": "https://www.youtube.com/shorts/dLfNf96Ptzk",
+      "thumb": "https://i1.ytimg.com/vi/dLfNf96Ptzk/hqdefault.jpg",
+      "publishedAt": 1793761231,
       "duration": null,
       "premiere": false
     },
@@ -1012,42 +1065,12 @@
       "premiere": false
     },
     {
-      "gameId": "hsr",
-      "lang": "ja",
-      "title": "Ver.4.7「いま、群星は笑いに包まれる」予告番組速報",
-      "url": "https://www.youtube.com/shorts/bXbXkK3yfkQ",
-      "thumb": "https://i3.ytimg.com/vi/bXbXkK3yfkQ/hqdefault.jpg",
-      "publishedAt": 1793368511,
-      "duration": null,
-      "premiere": false
-    },
-    {
-      "gameId": "hsr",
-      "lang": "ja",
-      "title": "アッハのミニ講座——貪慾を倒すＮ個の方法",
-      "url": "https://www.youtube.com/watch?v=dlXsSE-kBno",
-      "thumb": "https://i1.ytimg.com/vi/dlXsSE-kBno/hqdefault.jpg",
-      "publishedAt": 1793365201,
-      "duration": null,
-      "premiere": false
-    },
-    {
-      "gameId": "hsr",
-      "lang": "ja",
-      "title": "『崩壊：スターレイル』Ver.4.7「いま、群星は笑いに包まれる」予告番組",
-      "url": "https://www.youtube.com/watch?v=lY2lnWCoWoU",
-      "thumb": "https://i1.ytimg.com/vi/lY2lnWCoWoU/hqdefault.jpg",
-      "publishedAt": 1793364983,
-      "duration": null,
-      "premiere": false
-    },
-    {
-      "gameId": "hsr",
-      "lang": "ja",
-      "title": "【崩壊：スターレイル】 Ver.4.7PV 「いま、群星は笑いに包まれる」",
-      "url": "https://www.youtube.com/watch?v=4DA0674x1NI",
-      "thumb": "https://i1.ytimg.com/vi/4DA0674x1NI/hqdefault.jpg",
-      "publishedAt": 1793362528,
+      "gameId": "zzz",
+      "lang": "en",
+      "title": "Random Play | Holographic Trial - Severian",
+      "url": "https://www.youtube.com/shorts/gjld2fplkCI",
+      "thumb": "https://i4.ytimg.com/vi/gjld2fplkCI/hqdefault.jpg",
+      "publishedAt": 1793764805,
       "duration": null,
       "premiere": false
     },
@@ -1103,11 +1126,11 @@
     },
     {
       "gameId": "zzz",
-      "lang": "en",
-      "title": "Dracaene Sunbringer",
-      "url": "https://www.youtube.com/shorts/uXFeQ23-2Xw",
-      "thumb": "https://i2.ytimg.com/vi/uXFeQ23-2Xw/hqdefault.jpg",
-      "publishedAt": 1792725331,
+      "lang": "ja",
+      "title": "「Random Play」｜バトルシミュレーション - セヴェリアン",
+      "url": "https://www.youtube.com/shorts/hDq404zvrmM",
+      "thumb": "https://i1.ytimg.com/vi/hDq404zvrmM/hqdefault.jpg",
+      "publishedAt": 1793764813,
       "duration": null,
       "premiere": false
     },
@@ -1158,16 +1181,6 @@
       "url": "https://www.youtube.com/shorts/gUjPw5-0LdQ",
       "thumb": "https://i4.ytimg.com/vi/gUjPw5-0LdQ/hqdefault.jpg",
       "publishedAt": 1792727112,
-      "duration": null,
-      "premiere": false
-    },
-    {
-      "gameId": "zzz",
-      "lang": "ja",
-      "title": "ドラキナ・サンブリンガー",
-      "url": "https://www.youtube.com/shorts/I1GYMIdcVoI",
-      "thumb": "https://i2.ytimg.com/vi/I1GYMIdcVoI/hqdefault.jpg",
-      "publishedAt": 1792725325,
       "duration": null,
       "premiere": false
     },
@@ -1234,6 +1247,16 @@
     {
       "gameId": "wuthering",
       "lang": "ja",
+      "title": "共鳴ハロウィン in 池ハロ2026 イベント振り返り",
+      "url": "https://www.youtube.com/watch?v=ogmL-k9b-jE",
+      "thumb": "https://i4.ytimg.com/vi/ogmL-k9b-jE/hqdefault.jpg",
+      "publishedAt": 1793872802,
+      "duration": null,
+      "premiere": false
+    },
+    {
+      "gameId": "wuthering",
+      "lang": "ja",
       "title": "「心狐の召喚方法」 #鳴潮 #心 #シン",
       "url": "https://www.youtube.com/shorts/5xsiyiGhZek",
       "thumb": "https://i2.ytimg.com/vi/5xsiyiGhZek/hqdefault.jpg",
@@ -1282,138 +1305,128 @@
       "premiere": false
     },
     {
-      "gameId": "wuthering",
-      "lang": "ja",
-      "title": "『鳴潮』テーマ デスクトップマスコット Wuwa Tappo が正式リリース！  #鳴潮#WuwaTappo",
-      "url": "https://www.youtube.com/shorts/UJ39iOxnZr0",
-      "thumb": "https://i2.ytimg.com/vi/UJ39iOxnZr0/hqdefault.jpg",
-      "publishedAt": 1792987224,
+      "gameId": "endfield",
+      "lang": "en",
+      "title": "Help Me Out Argent Flow! Ranching 101!",
+      "url": "https://www.youtube.com/shorts/Lp-yRQLB0Po",
+      "thumb": "https://i1.ytimg.com/vi/Lp-yRQLB0Po/hqdefault.jpg",
+      "publishedAt": 1793872831,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "en",
-      "title": "Arknights: Endfield Operator Artwork - Argent Flow",
-      "url": "https://www.youtube.com/shorts/h5aA0bhIAEs",
-      "thumb": "https://i1.ytimg.com/vi/h5aA0bhIAEs/hqdefault.jpg",
-      "publishedAt": 1793700020,
+      "title": "Through the trials of tempering, a blade knows the way of the lands.",
+      "url": "https://www.youtube.com/shorts/HipJmgwPXTI",
+      "thumb": "https://i1.ytimg.com/vi/HipJmgwPXTI/hqdefault.jpg",
+      "publishedAt": 1793851237,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "en",
-      "title": "Arknights: Endfield Operator Combat Demo - Argent Flow",
-      "url": "https://www.youtube.com/watch?v=XLmR0fjlER8",
-      "thumb": "https://i1.ytimg.com/vi/XLmR0fjlER8/hqdefault.jpg",
-      "publishedAt": 1793674802,
+      "title": "The night is long, the stars shine bright. True to its course, the starry flow winds on.",
+      "url": "https://www.youtube.com/shorts/NP5QKWl6nzI",
+      "thumb": "https://i3.ytimg.com/vi/NP5QKWl6nzI/hqdefault.jpg",
+      "publishedAt": 1793847625,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "en",
-      "title": "// Argent Flow - Operator Showcase",
-      "url": "https://www.youtube.com/shorts/8KYXFyru3ic",
-      "thumb": "https://i1.ytimg.com/vi/8KYXFyru3ic/hqdefault.jpg",
-      "publishedAt": 1793588429,
+      "title": "Arknights: Endfield EP - Argent Flow [The Starry Flow Winds On]",
+      "url": "https://www.youtube.com/watch?v=CXHb9bupPaQ",
+      "thumb": "https://i4.ytimg.com/vi/CXHb9bupPaQ/hqdefault.jpg",
+      "publishedAt": 1793847611,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "en",
-      "title": "TIDE ON THE BRINK",
-      "url": "https://www.youtube.com/shorts/suyo599iKD4",
-      "thumb": "https://i4.ytimg.com/vi/suyo599iKD4/hqdefault.jpg",
-      "publishedAt": 1793527210,
+      "title": "The sword is forged. The time has come to repay my debt of gratitude. Come, old girl.",
+      "url": "https://www.youtube.com/shorts/3QqMjPCKfLs",
+      "thumb": "https://i4.ytimg.com/vi/3QqMjPCKfLs/hqdefault.jpg",
+      "publishedAt": 1793763072,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "en",
-      "title": "Clash of Candies! The long-awaited results will soon be revealed —",
-      "url": "https://www.youtube.com/shorts/NGcQIL3AAqM",
-      "thumb": "https://i3.ytimg.com/vi/NGcQIL3AAqM/hqdefault.jpg",
-      "publishedAt": 1793426416,
-      "duration": null,
-      "premiere": false
-    },
-    {
-      "gameId": "endfield",
-      "lang": "en",
-      "title": "Keep the Stockade safe, and keep yourself safe, Chief.",
-      "url": "https://www.youtube.com/shorts/G-mVn0TDzN0",
-      "thumb": "https://i4.ytimg.com/vi/G-mVn0TDzN0/hqdefault.jpg",
-      "publishedAt": 1793354408,
+      "title": "Arknights: Endfield Operator Story [Argent Flow: The Returning Traveler]",
+      "url": "https://www.youtube.com/watch?v=8s5c9erUtFc",
+      "thumb": "https://i1.ytimg.com/vi/8s5c9erUtFc/hqdefault.jpg",
+      "publishedAt": 1793763027,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "ja",
-      "title": "「武具を纏えば、手心など加えるはずもない。」",
-      "url": "https://www.youtube.com/shorts/8P_K5MUWbP4",
-      "thumb": "https://i1.ytimg.com/vi/8P_K5MUWbP4/hqdefault.jpg",
-      "publishedAt": 1793700027,
+      "title": "ミンホがお助け！ゼロから始める牧場生活講座！",
+      "url": "https://www.youtube.com/shorts/R5A5UnvVX8g",
+      "thumb": "https://i3.ytimg.com/vi/R5A5UnvVX8g/hqdefault.jpg",
+      "publishedAt": 1793872831,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "ja",
-      "title": "『アークナイツ：エンドフィールド』オペレーター戦闘紹介 - ミンホ",
-      "url": "https://www.youtube.com/watch?v=Ih7rH39mXs0",
-      "thumb": "https://i2.ytimg.com/vi/Ih7rH39mXs0/hqdefault.jpg",
-      "publishedAt": 1793674839,
+      "title": "刃は磨かれてこそ、山河を知る。",
+      "url": "https://www.youtube.com/shorts/zTEtvMJl6jg",
+      "thumb": "https://i3.ytimg.com/vi/zTEtvMJl6jg/hqdefault.jpg",
+      "publishedAt": 1793851212,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "ja",
-      "title": "//ミンホ - オペレーター実演",
-      "url": "https://www.youtube.com/shorts/VaNMejGWKY8",
-      "thumb": "https://i3.ytimg.com/vi/VaNMejGWKY8/hqdefault.jpg",
-      "publishedAt": 1793588438,
+      "title": "『アークナイツ：エンドフィールド』ミンホEP - 『The Starry Flow Winds On』",
+      "url": "https://www.youtube.com/watch?v=F4kJxFe2k_I",
+      "thumb": "https://i3.ytimg.com/vi/F4kJxFe2k_I/hqdefault.jpg",
+      "publishedAt": 1793847624,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "ja",
-      "title": "潮騒高まり、雲湧く",
-      "url": "https://www.youtube.com/shorts/_Z_shbL_bmk",
-      "thumb": "https://i4.ytimg.com/vi/_Z_shbL_bmk/hqdefault.jpg",
-      "publishedAt": 1793527209,
+      "title": "ミンホEP - 『The Starry Flow Winds On』Short Ver.",
+      "url": "https://www.youtube.com/shorts/kgkAAW2Fjys",
+      "thumb": "https://i4.ytimg.com/vi/kgkAAW2Fjys/hqdefault.jpg",
+      "publishedAt": 1793847615,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "ja",
-      "title": "お菓子バトル勃発！注目の勝負、ついに決着――とびきり☆輝いて、勝利をつかもう！てへっ～",
-      "url": "https://www.youtube.com/shorts/Ia_z5e6xkfI",
-      "thumb": "https://i2.ytimg.com/vi/Ia_z5e6xkfI/hqdefault.jpg",
-      "publishedAt": 1793426400,
+      "title": "『アークナイツ：エンドフィールド』オペレーターファイル [ミンホ：帰客]",
+      "url": "https://www.youtube.com/watch?v=ZCelTNmcjwI",
+      "thumb": "https://i3.ytimg.com/vi/ZCelTNmcjwI/hqdefault.jpg",
+      "publishedAt": 1793763038,
       "duration": null,
       "premiere": false
     },
     {
       "gameId": "endfield",
       "lang": "ja",
-      "title": "砦と、自分自身を守れ……お頭。",
-      "url": "https://www.youtube.com/shorts/Jn8wY0Jd8Ak",
-      "thumb": "https://i3.ytimg.com/vi/Jn8wY0Jd8Ak/hqdefault.jpg",
-      "publishedAt": 1793354420,
+      "title": "オペレーターファイル [ミンホ：帰客]Short Ver.",
+      "url": "https://www.youtube.com/shorts/A6kZyRdDbD0",
+      "thumb": "https://i2.ytimg.com/vi/A6kZyRdDbD0/hqdefault.jpg",
+      "publishedAt": 1793763005,
       "duration": null,
       "premiere": false
     }
   ],
   "app": {
-    "version": "0.1.5",
-    "url": "https://github.com/Ertezy/Kitsudock/releases/tag/v0.1.5"
+    "version": "0.1.7",
+    "url": "https://github.com/Ertezy/Kitsudock/releases/tag/v0.1.7"
   }
 }
