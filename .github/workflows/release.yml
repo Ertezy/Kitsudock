@@ -69,6 +69,19 @@ jobs:
         working-directory: src-tauri
         run: cargo test --locked the_bundled_snapshot
 
+      # «Что нового» лежит в репозитории рядом с кодом выпуска и встаёт в начало
+      # описания релиза. Текст — из файла, а не подстановкой в скрипт: в
+      # описание он попадает как данные. Нет файла — описание без этого блока.
+      - name: Release notes
+        id: notes
+        shell: bash
+        run: |
+          {
+            echo 'body<<KITSUDOCK_NOTES_END'
+            if [ -f .github/release-notes.md ]; then cat .github/release-notes.md; echo; fi
+            echo 'KITSUDOCK_NOTES_END'
+          } >> "$GITHUB_OUTPUT"
+
       # Кнопка «Обновить» в приложении берёт latest.json последнего
       # опубликованного релиза и ставит установщик, только если его подпись
       # сходится с открытым ключом, вшитым в приложение. Поэтому установщик
@@ -97,6 +110,8 @@ jobs:
           releaseAssetNamePattern: Kitsudock-setup[ext]
           releaseBody: |
             Free Windows launcher for Genshin Impact, Honkai: Star Rail, Zenless Zone Zero, Wuthering Waves and Arknights: Endfield.
+
+            ${{ steps.notes.outputs.body }}
 
             **Install:** download [Kitsudock-setup.exe](https://github.com/Ertezy/Kitsudock/releases/download/${{ github.ref_name }}/Kitsudock-setup.exe) and run it. Windows 10 or 11, 64-bit; no administrator rights needed. The installer isn't code-signed yet, so Windows SmartScreen may say "Windows protected your PC" — click **More info → Run anyway**. To update, click **Update** at the bottom of the side panel, or run the new installer over the old version. More in the [README](https://github.com/Ertezy/Kitsudock#readme).
 
