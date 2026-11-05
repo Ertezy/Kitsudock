@@ -351,13 +351,19 @@ fn game_exe(game: &Game) -> Option<&Path> {
 }
 
 /// Способы, которыми эту игру можно запустить сейчас, в порядке показа:
-/// напрямую — если известен её файл; лаунчером — если он найден и это не сам
-/// файл игры (GRYPHLINK находится как игра, и его файл — лаунчер); магазином —
-/// если игра оттуда.
+/// напрямую — если известен её файл и игра не из Epic; лаунчером — если он
+/// найден и это не сам файл игры (GRYPHLINK находится как игра, и его файл —
+/// лаунчер); магазином — если игра оттуда.
+///
+/// Игру из Epic напрямую не запустить: её файл в манифесте — прослойка Epic,
+/// которая без входа через Epic висит, а Epic тем временем считает игру
+/// запущенной и второй раз её не открывает. Сам файл игры глубже в папке
+/// закрывается, не дойдя до входа в аккаунт. Файл по-прежнему нужен для
+/// значка.
 pub fn available_ways(game: &Game, launcher: Option<&Path>) -> Vec<LaunchWay> {
     let exe = game_exe(game);
     let mut ways = Vec::new();
-    if exe.is_some() {
+    if exe.is_some() && !matches!(game.launch, Launch::Epic { .. }) {
         ways.push(LaunchWay::Direct);
     }
     if let Some(launcher) = launcher {
@@ -563,8 +569,8 @@ mod launch_tests {
     #[test]
     fn only_the_ways_this_game_really_has_are_offered_in_a_fixed_order() {
         use LaunchWay::*;
-        assert_eq!(available_ways(&epic_game(), Some(Path::new(HYP))), [Direct, Launcher, Store]);
-        assert_eq!(available_ways(&epic_game(), None), [Direct, Store]);
+        assert_eq!(available_ways(&epic_game(), Some(Path::new(HYP))), [Launcher, Store]);
+        assert_eq!(available_ways(&epic_game(), None), [Store]);
         // Файл игры из Steam неизвестен — напрямую её не запустить.
         assert_eq!(available_ways(&steam_game(), None), [Store]);
         assert_eq!(available_ways(&exe_game(), Some(Path::new(HYP))), [Direct, Launcher]);
@@ -572,6 +578,16 @@ mod launch_tests {
         let mut no_file = exe_game();
         no_file.exe_path = Some(PathBuf::new());
         assert_eq!(available_ways(&no_file, None), Vec::<LaunchWay>::new());
+    }
+
+    #[test]
+    fn a_game_from_epic_is_never_started_directly_even_if_it_was_chosen_before() {
+        // Файл в папке игры из Epic — прослойка Epic: без входа через Epic она
+        // висит, а Epic считает игру запущенной и второй раз её не открывает.
+        let mut g = epic_game();
+        g.launch_way = Some(LaunchWay::Direct);
+        assert!(!available_ways(&g, None).contains(&LaunchWay::Direct));
+        assert_eq!(plan(&g, None), Ok(Plan::Epic(epic_uri("879b0d87", "7d690c12", "41869934"))));
     }
 
     #[test]
@@ -619,12 +635,14 @@ mod launch_tests {
 
     #[test]
     fn the_direct_way_starts_the_game_file_with_its_arguments() {
-        let mut g = epic_game();
+        let mut g = steam_game();
+        g.exe_path = Some(PathBuf::from(r"D:\Games\WutheringWaves\Wuthering Waves.exe"));
+        g.args = "-dx12".into();
         g.launch_way = Some(LaunchWay::Direct);
         assert_eq!(
             plan(&g, Some(Path::new(HYP))),
             Ok(Plan::Exe {
-                exe: PathBuf::from(r"D:\Games\GenshinImpact\launcher_epic.exe"),
+                exe: PathBuf::from(r"D:\Games\WutheringWaves\Wuthering Waves.exe"),
                 args: "-dx12".into(),
             })
         );
